@@ -35,3 +35,7 @@ Tag `vX.Y.Z` → `release.yml` publishes `ghcr.io/<repo>/web` and `/gateway` wit
 - Pages: promote the previous deployment in the Cloudflare dashboard.
 - D1 migrations are forward-only; write additive migrations and keep old columns until the next release.
 - Containers: redeploy the previous image digest.
+
+## Repository security features
+
+The repository is private. CodeQL always runs and its SARIF is kept as the `codeql-sarif` workflow artifact. Uploading results to GitHub code scanning and running dependency review both require GitHub Advanced Security on private repositories; once it is enabled, set the repository variable `GHAS_ENABLED=true` to turn both on. Dependabot alerts and security updates work without it — enable them under Settings → Code security.
