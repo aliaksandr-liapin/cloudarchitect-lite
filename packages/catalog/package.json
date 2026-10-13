@@ -1,0 +1,23 @@
+{
+  "name": "@cloudarchitect/catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned provider catalog: services, features, containers, validation rule metadata, icon pack records.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudarchitect/domain": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

@@ -1,0 +1,75 @@
+# CloudArchitect Lite — Product Overview
+
+> Free, local-first AI Cloud Architecture Designer — AWS first, Azure/GCP ready.
+
+**Version:** 0.2 · **Status:** product baseline + gap review incorporated · **Baseline date:** 2026-10-13  
+**Language:** English (interface and documentation)
+
+## 1. Vision
+
+CloudArchitect Lite turns a text description of an application into an **editable** cloud architecture with official icons, containers (Region / VPC / subnet), meaningful connections and explanations. It is not a raster image generator: the primary output is a typed graph model rendered in an editor.
+
+**Value proposition:** *Describe your application. Get an editable, explainable, validated AWS architecture. Free to start.*
+
+## 2. Agreed product decisions
+
+- **AWS first** for MVP AI generation; the project format, catalog and editor are ready for Azure and GCP.
+- **Local-first:** manual editing, local projects, validation and export work without an account or a paid backend.
+- **Hybrid AI (option C):** starting limit of **3 free AI operations** (1 credit = 1 user operation), then BYOK or manual mode. The budget is protected by a global budget cap and kill switch; the limit is tuned after cost measurement.
+- **BYOK:** the browser calls the AI provider directly; the key stays in tab memory only and never passes through our servers. A proxy is the fallback.
+- **Official icons** only from the three sources in §8, within their published terms, never redrawn or distorted.
+- **Current knowledge:** a curated catalog of ~40 AWS services cross-checked against the CloudFormation resource specification, with sources, check dates, lifecycle and snapshots. Services outside the catalog are shown as *unresolved*, never as verified.
+- **Verifiable architecture:** explainable components and connections, traceability to requirements, 15 deterministic validation rules and a separate AI **Review** (advisory).
+- **Independent expert review:** Claude acts as the independent cloud architect in an isolated, blind session using the rubric in PRD §14.
+
+## 3. MVP scope
+
+1. Text-to-AWS-Architecture (structured AI output) with one round of clarifying questions.
+2. Interactive canvas: nodes, edges, **nested containers**, labels, drag and drop, auto layout, undo/redo.
+3. Verified catalog of AWS services, features (e.g. CloudFront OAC) and official icons.
+4. Component and connection details with documentation links.
+5. Validation (structure, catalog, VR-001…015, requirement coverage) and AI Review.
+6. Local save/open, PNG/SVG/JSON export; Mermaid and draw.io are P1.
+7. 3 free AI operations through a protected gateway with a budget cap; BYOK after the limit.
+8. AI Edit and Ask are P1.
+
+**Out of scope for MVP:** Azure/GCP AI generation; Terraform/CDK; deployment; live cloud scanning; full cost estimates; architecture alternatives; teams, SSO, collaboration, cloud storage; automatic remediation of security findings.
+
+## 4. Target audience
+
+- Solution Architects / Cloud Engineers — speed up initial design.
+- IT Consultants / Presales — prepare and explain a technical proposal.
+- Business Analysts / Technical Product Managers — connect requirements to architecture.
+- AWS students — learn how services are used and integrated.
+
+## 5. Competitive position
+
+Text-to-diagram is already offered by Eraser, Cloudairy, Lucid, Brainboard, Cloudcraft, LLM chats (draw.io/Mermaid) and AWS's own tools. Diagram generation alone does not differentiate. Hypothesis: **verified catalog + explainable connections + requirements traceability + rule-based validation**; free/local-first is an acquisition channel. Willingness to pay is unconfirmed (Gate C).
+
+## 6. Documents
+
+- [PRD.md](PRD.md) — scenarios, requirements, credit semantics, cost model, validation rules, rubric, expert review.
+- [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) — components, API, graph model, BYOK, security, eval harness, ADRs.
+- [CLOUD_PROVIDER_CATALOG.md](CLOUD_PROVIDER_CATALOG.md) — catalog, features, containers, icon sources and terms, update process.
+- [ROADMAP.md](ROADMAP.md) — phases, epics, gates, metrics, risks.
+
+## 7. Open decisions
+
+- Branding and trademark for **CloudArchitect Lite** (working name).
+- Monthly free-AI budget cap and final quota — after measurement in Phase 0.
+- Models for the free tier and the BYOK default — based on benchmark results.
+- Accountless anti-abuse UX; optional email magic link for extra credits.
+- Product license (not chosen yet: all rights reserved).
+- Availability of a human expert for spot checks before public beta.
+- Pricing of an eventual Pro plan.
+
+**Closed in v0.2:** icon sources (only the official AWS/Azure/GCP pages; terms recorded in PRD §12); BYOK direction; independent reviewer role; container model; catalog scope.
+
+## 8. Sources
+
+- AWS Icons: https://aws.amazon.com/architecture/icons/
+- Azure Icons: https://learn.microsoft.com/en-us/azure/architecture/icons/
+- Google Cloud Icons: https://cloud.google.com/icons
+- AWS Well-Architected: https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html
+
+> The status and current versions of specific services cannot be considered verified on the basis of this document alone. Before release, every catalog entry must have its own verification evidence.

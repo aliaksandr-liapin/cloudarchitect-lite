@@ -1,0 +1,804 @@
+[
+  {
+    "id": "aws.cloudfront",
+    "provider": "aws",
+    "displayName": "Amazon CloudFront",
+    "category": "networking",
+    "scope": "global",
+    "capabilities": ["cdn", "edge-cache", "tls-termination"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::CloudFront::Distribution"],
+    "documentationUrl": "https://docs.aws.amazon.com/cloudfront/",
+    "iconAssetId": "aws/cloudfront",
+    "features": ["aws.cloudfront.oac"],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/cloudfront/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.route53",
+    "provider": "aws",
+    "displayName": "Amazon Route 53",
+    "category": "networking",
+    "scope": "global",
+    "capabilities": ["dns"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Route53::HostedZone", "AWS::Route53::RecordSet"],
+    "documentationUrl": "https://docs.aws.amazon.com/route53/",
+    "iconAssetId": "aws/route53",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/route53/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.apigateway",
+    "provider": "aws",
+    "displayName": "Amazon API Gateway",
+    "category": "networking",
+    "scope": "regional",
+    "capabilities": ["rest-api", "http-api", "websocket-api"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::ApiGateway::RestApi", "AWS::ApiGatewayV2::Api"],
+    "documentationUrl": "https://docs.aws.amazon.com/apigateway/",
+    "iconAssetId": "aws/apigateway",
+    "features": ["aws.apigateway.authorizer"],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/apigateway/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.alb",
+    "provider": "aws",
+    "displayName": "Application Load Balancer",
+    "category": "networking",
+    "scope": "vpc",
+    "capabilities": ["load-balancing", "http-routing"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::ElasticLoadBalancingV2::LoadBalancer"],
+    "documentationUrl": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/",
+    "iconAssetId": "aws/alb",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.nat-gateway",
+    "provider": "aws",
+    "displayName": "NAT Gateway",
+    "category": "networking",
+    "scope": "vpc",
+    "capabilities": ["egress"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::EC2::NatGateway"],
+    "documentationUrl": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html",
+    "iconAssetId": "aws/nat-gateway",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.lambda",
+    "provider": "aws",
+    "displayName": "AWS Lambda",
+    "category": "compute",
+    "scope": "regional",
+    "capabilities": ["serverless-compute", "event-processing"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Lambda::Function"],
+    "documentationUrl": "https://docs.aws.amazon.com/lambda/",
+    "iconAssetId": "aws/lambda",
+    "features": ["aws.lambda.failure-destination"],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/lambda/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.ec2",
+    "provider": "aws",
+    "displayName": "Amazon EC2",
+    "category": "compute",
+    "scope": "vpc",
+    "capabilities": ["virtual-machines"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::EC2::Instance"],
+    "documentationUrl": "https://docs.aws.amazon.com/ec2/",
+    "iconAssetId": "aws/ec2",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/ec2/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.ecs",
+    "provider": "aws",
+    "displayName": "Amazon ECS",
+    "category": "compute",
+    "scope": "regional",
+    "capabilities": ["container-orchestration"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::ECS::Cluster", "AWS::ECS::Service"],
+    "documentationUrl": "https://docs.aws.amazon.com/ecs/",
+    "iconAssetId": "aws/ecs",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/ecs/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.fargate",
+    "provider": "aws",
+    "displayName": "AWS Fargate",
+    "category": "compute",
+    "scope": "vpc",
+    "capabilities": ["serverless-containers"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::ECS::Service"],
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html",
+    "iconAssetId": "aws/fargate",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.eks",
+    "provider": "aws",
+    "displayName": "Amazon EKS",
+    "category": "compute",
+    "scope": "regional",
+    "capabilities": ["kubernetes"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::EKS::Cluster"],
+    "documentationUrl": "https://docs.aws.amazon.com/eks/",
+    "iconAssetId": "aws/eks",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/eks/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.s3",
+    "provider": "aws",
+    "displayName": "Amazon S3",
+    "category": "storage",
+    "scope": "regional",
+    "capabilities": ["object-storage", "static-hosting", "event-source"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::S3::Bucket"],
+    "documentationUrl": "https://docs.aws.amazon.com/s3/",
+    "iconAssetId": "aws/s3",
+    "features": [
+      "aws.s3.transfer-acceleration",
+      "aws.s3.event-notifications",
+      "aws.s3.presigned-upload"
+    ],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/s3/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.efs",
+    "provider": "aws",
+    "displayName": "Amazon EFS",
+    "category": "storage",
+    "scope": "vpc",
+    "capabilities": ["file-storage"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::EFS::FileSystem"],
+    "documentationUrl": "https://docs.aws.amazon.com/efs/",
+    "iconAssetId": "aws/efs",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/efs/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.dynamodb",
+    "provider": "aws",
+    "displayName": "Amazon DynamoDB",
+    "category": "database",
+    "scope": "regional",
+    "capabilities": ["key-value", "document", "streams"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::DynamoDB::Table"],
+    "documentationUrl": "https://docs.aws.amazon.com/dynamodb/",
+    "iconAssetId": "aws/dynamodb",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/dynamodb/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.dax",
+    "provider": "aws",
+    "displayName": "DynamoDB Accelerator (DAX)",
+    "category": "database",
+    "scope": "vpc",
+    "capabilities": ["in-memory-cache"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::DAX::Cluster"],
+    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html",
+    "iconAssetId": "aws/dax",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.rds",
+    "provider": "aws",
+    "displayName": "Amazon RDS",
+    "category": "database",
+    "scope": "vpc",
+    "capabilities": ["relational"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::RDS::DBInstance"],
+    "documentationUrl": "https://docs.aws.amazon.com/rds/",
+    "iconAssetId": "aws/rds",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/rds/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.aurora",
+    "provider": "aws",
+    "displayName": "Amazon Aurora",
+    "category": "database",
+    "scope": "vpc",
+    "capabilities": ["relational", "serverless-relational"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::RDS::DBCluster"],
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/",
+    "iconAssetId": "aws/aurora",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.rds-proxy",
+    "provider": "aws",
+    "displayName": "Amazon RDS Proxy",
+    "category": "database",
+    "scope": "vpc",
+    "capabilities": ["connection-pooling"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::RDS::DBProxy"],
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html",
+    "iconAssetId": "aws/rds-proxy",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.elasticache",
+    "provider": "aws",
+    "displayName": "Amazon ElastiCache",
+    "category": "database",
+    "scope": "vpc",
+    "capabilities": ["in-memory-cache"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::ElastiCache::ReplicationGroup"],
+    "documentationUrl": "https://docs.aws.amazon.com/elasticache/",
+    "iconAssetId": "aws/elasticache",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/elasticache/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.opensearch",
+    "provider": "aws",
+    "displayName": "Amazon OpenSearch Service",
+    "category": "analytics",
+    "scope": "regional",
+    "capabilities": ["search", "log-analytics"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::OpenSearchService::Domain"],
+    "documentationUrl": "https://docs.aws.amazon.com/opensearch-service/",
+    "iconAssetId": "aws/opensearch",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/opensearch-service/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.sqs",
+    "provider": "aws",
+    "displayName": "Amazon SQS",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["queue", "event-source"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::SQS::Queue"],
+    "documentationUrl": "https://docs.aws.amazon.com/sqs/",
+    "iconAssetId": "aws/sqs",
+    "features": ["aws.sqs.dlq"],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/sqs/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.sns",
+    "provider": "aws",
+    "displayName": "Amazon SNS",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["pub-sub", "event-source"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::SNS::Topic"],
+    "documentationUrl": "https://docs.aws.amazon.com/sns/",
+    "iconAssetId": "aws/sns",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/sns/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.eventbridge",
+    "provider": "aws",
+    "displayName": "Amazon EventBridge",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["event-bus", "scheduling", "event-source"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Events::EventBus", "AWS::Events::Rule"],
+    "documentationUrl": "https://docs.aws.amazon.com/eventbridge/",
+    "iconAssetId": "aws/eventbridge",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/eventbridge/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.stepfunctions",
+    "provider": "aws",
+    "displayName": "AWS Step Functions",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["workflow"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::StepFunctions::StateMachine"],
+    "documentationUrl": "https://docs.aws.amazon.com/step-functions/",
+    "iconAssetId": "aws/stepfunctions",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/step-functions/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.kinesis",
+    "provider": "aws",
+    "displayName": "Amazon Kinesis Data Streams",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["streaming"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Kinesis::Stream"],
+    "documentationUrl": "https://docs.aws.amazon.com/kinesis/",
+    "iconAssetId": "aws/kinesis",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/kinesis/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.firehose",
+    "provider": "aws",
+    "displayName": "Amazon Data Firehose",
+    "category": "integration",
+    "scope": "regional",
+    "capabilities": ["stream-delivery"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::KinesisFirehose::DeliveryStream"],
+    "documentationUrl": "https://docs.aws.amazon.com/firehose/",
+    "iconAssetId": "aws/firehose",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/firehose/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.iam",
+    "provider": "aws",
+    "displayName": "AWS IAM",
+    "category": "security",
+    "scope": "global",
+    "capabilities": ["access-control"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::IAM::Role", "AWS::IAM::Policy"],
+    "documentationUrl": "https://docs.aws.amazon.com/iam/",
+    "iconAssetId": "aws/iam",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/iam/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.cognito",
+    "provider": "aws",
+    "displayName": "Amazon Cognito",
+    "category": "security",
+    "scope": "regional",
+    "capabilities": ["user-auth"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Cognito::UserPool"],
+    "documentationUrl": "https://docs.aws.amazon.com/cognito/",
+    "iconAssetId": "aws/cognito",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/cognito/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.waf",
+    "provider": "aws",
+    "displayName": "AWS WAF",
+    "category": "security",
+    "scope": "regional",
+    "capabilities": ["web-firewall"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::WAFv2::WebACL"],
+    "documentationUrl": "https://docs.aws.amazon.com/waf/",
+    "iconAssetId": "aws/waf",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/waf/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.shield",
+    "provider": "aws",
+    "displayName": "AWS Shield",
+    "category": "security",
+    "scope": "global",
+    "capabilities": ["ddos-protection"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Shield::Protection"],
+    "documentationUrl": "https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html",
+    "iconAssetId": "aws/shield",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.kms",
+    "provider": "aws",
+    "displayName": "AWS KMS",
+    "category": "security",
+    "scope": "regional",
+    "capabilities": ["encryption-keys"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::KMS::Key"],
+    "documentationUrl": "https://docs.aws.amazon.com/kms/",
+    "iconAssetId": "aws/kms",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/kms/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.secretsmanager",
+    "provider": "aws",
+    "displayName": "AWS Secrets Manager",
+    "category": "security",
+    "scope": "regional",
+    "capabilities": ["secrets"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::SecretsManager::Secret"],
+    "documentationUrl": "https://docs.aws.amazon.com/secretsmanager/",
+    "iconAssetId": "aws/secretsmanager",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/secretsmanager/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.acm",
+    "provider": "aws",
+    "displayName": "AWS Certificate Manager",
+    "category": "security",
+    "scope": "regional",
+    "capabilities": ["tls-certificates"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::CertificateManager::Certificate"],
+    "documentationUrl": "https://docs.aws.amazon.com/acm/",
+    "iconAssetId": "aws/acm",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/acm/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.cloudwatch",
+    "provider": "aws",
+    "displayName": "Amazon CloudWatch",
+    "category": "operations",
+    "scope": "regional",
+    "capabilities": ["metrics", "logs", "alarms"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::CloudWatch::Alarm", "AWS::Logs::LogGroup"],
+    "documentationUrl": "https://docs.aws.amazon.com/cloudwatch/",
+    "iconAssetId": "aws/cloudwatch",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/cloudwatch/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.xray",
+    "provider": "aws",
+    "displayName": "AWS X-Ray",
+    "category": "operations",
+    "scope": "regional",
+    "capabilities": ["tracing"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::XRay::Group"],
+    "documentationUrl": "https://docs.aws.amazon.com/xray/",
+    "iconAssetId": "aws/xray",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/xray/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.cloudtrail",
+    "provider": "aws",
+    "displayName": "AWS CloudTrail",
+    "category": "operations",
+    "scope": "regional",
+    "capabilities": ["audit-log"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::CloudTrail::Trail"],
+    "documentationUrl": "https://docs.aws.amazon.com/cloudtrail/",
+    "iconAssetId": "aws/cloudtrail",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/cloudtrail/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.ses",
+    "provider": "aws",
+    "displayName": "Amazon SES",
+    "category": "messaging",
+    "scope": "regional",
+    "capabilities": ["email-sending"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::SES::ConfigurationSet", "AWS::SES::EmailIdentity"],
+    "documentationUrl": "https://docs.aws.amazon.com/ses/",
+    "iconAssetId": "aws/ses",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/ses/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.bedrock",
+    "provider": "aws",
+    "displayName": "Amazon Bedrock",
+    "category": "ai",
+    "scope": "regional",
+    "capabilities": ["foundation-models"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Bedrock::Agent"],
+    "documentationUrl": "https://docs.aws.amazon.com/bedrock/",
+    "iconAssetId": "aws/bedrock",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/bedrock/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "aws.athena",
+    "provider": "aws",
+    "displayName": "Amazon Athena",
+    "category": "analytics",
+    "scope": "regional",
+    "capabilities": ["sql-on-s3"],
+    "lifecycle": "active",
+    "reviewStatus": "needs_review",
+    "cfnResourceTypes": ["AWS::Athena::WorkGroup"],
+    "documentationUrl": "https://docs.aws.amazon.com/athena/",
+    "iconAssetId": "aws/athena",
+    "features": [],
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/athena/",
+        "checkedAt": "2026-10-13T20:24:49Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  }
+]

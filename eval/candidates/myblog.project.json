@@ -1,0 +1,260 @@
+{
+  "schemaVersion": "1.1.0",
+  "projectId": "sample-myblog",
+  "name": "MyBlog.com",
+  "revision": 0,
+  "providerContext": ["aws"],
+  "catalogSnapshot": { "aws": "aws-catalog-2026.10.0" },
+  "iconPackSnapshot": {},
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Global static blog site with low latency",
+      "type": "functional",
+      "status": "confirmed"
+    },
+    {
+      "id": "R2",
+      "text": "REST API for posts and subscriptions",
+      "type": "functional",
+      "status": "confirmed"
+    },
+    {
+      "id": "R3",
+      "text": "Read-heavy data with infrequent writes",
+      "type": "non-functional",
+      "status": "confirmed"
+    },
+    {
+      "id": "R4",
+      "text": "Welcome email for new subscribers",
+      "type": "functional",
+      "status": "confirmed"
+    },
+    {
+      "id": "R5",
+      "text": "Photo upload with thumbnails",
+      "type": "functional",
+      "status": "confirmed"
+    },
+    {
+      "id": "R6",
+      "text": "Authors must sign in before writing posts or uploading photos",
+      "type": "functional",
+      "status": "inferred"
+    },
+    {
+      "id": "R7",
+      "text": "Who may subscribe and how bots are blocked",
+      "type": "functional",
+      "status": "open"
+    }
+  ],
+  "containers": [
+    { "id": "cloud", "kind": "aws-cloud", "label": "AWS" },
+    { "id": "region", "kind": "region", "parentId": "cloud", "label": "us-east-1" }
+  ],
+  "nodes": [
+    {
+      "id": "dns",
+      "provider": "aws",
+      "serviceId": "aws.route53",
+      "label": "DNS",
+      "requirementIds": ["R1"],
+      "containerId": "cloud",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "cdn",
+      "provider": "aws",
+      "serviceId": "aws.cloudfront",
+      "label": "CDN",
+      "requirementIds": ["R1"],
+      "containerId": "cloud",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "site",
+      "provider": "aws",
+      "serviceId": "aws.s3",
+      "label": "Static site bucket",
+      "requirementIds": ["R1"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "auth",
+      "provider": "aws",
+      "serviceId": "aws.cognito",
+      "label": "Author sign-in",
+      "requirementIds": ["R6"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "api",
+      "provider": "aws",
+      "serviceId": "aws.apigateway",
+      "label": "Blog API",
+      "requirementIds": ["R2"],
+      "containerId": "region",
+      "configuration": { "authorizer": "cognito" },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "fn-api",
+      "provider": "aws",
+      "serviceId": "aws.lambda",
+      "label": "API handlers",
+      "requirementIds": ["R2"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "db",
+      "provider": "aws",
+      "serviceId": "aws.dynamodb",
+      "label": "Posts & subscribers",
+      "requirementIds": ["R2", "R3"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "mail",
+      "provider": "aws",
+      "serviceId": "aws.ses",
+      "label": "Welcome emails",
+      "requirementIds": ["R4"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "photos",
+      "provider": "aws",
+      "serviceId": "aws.s3",
+      "label": "Photo bucket",
+      "requirementIds": ["R5"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "fn-thumb",
+      "provider": "aws",
+      "serviceId": "aws.lambda",
+      "label": "Thumbnail generator",
+      "requirementIds": ["R5"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "dlq",
+      "provider": "aws",
+      "serviceId": "aws.sqs",
+      "label": "Failed thumbnails",
+      "requirementIds": ["R5"],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "obs",
+      "provider": "aws",
+      "serviceId": "aws.cloudwatch",
+      "label": "Logs & alarms",
+      "requirementIds": [],
+      "containerId": "region",
+      "position": { "x": 0, "y": 0 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "dns",
+      "target": "cdn",
+      "kind": "other",
+      "label": "alias",
+      "requirementIds": ["R1"]
+    },
+    {
+      "id": "e2",
+      "source": "cdn",
+      "target": "site",
+      "kind": "origin",
+      "configuration": { "originAccess": "OAC" },
+      "requirementIds": ["R1"]
+    },
+    {
+      "id": "e3",
+      "source": "cdn",
+      "target": "api",
+      "kind": "origin",
+      "label": "/api/*",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e4",
+      "source": "api",
+      "target": "auth",
+      "kind": "invoke",
+      "label": "validate token",
+      "requirementIds": ["R6"]
+    },
+    {
+      "id": "e5",
+      "source": "api",
+      "target": "fn-api",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e6",
+      "source": "fn-api",
+      "target": "db",
+      "kind": "write",
+      "requirementIds": ["R2", "R3"]
+    },
+    {
+      "id": "e7",
+      "source": "fn-api",
+      "target": "mail",
+      "kind": "invoke",
+      "label": "on subscribe",
+      "requirementIds": ["R4"]
+    },
+    {
+      "id": "e8",
+      "source": "fn-api",
+      "target": "photos",
+      "kind": "write",
+      "label": "presigned upload URL",
+      "configuration": { "presignedUrl": true },
+      "requirementIds": ["R5"]
+    },
+    {
+      "id": "e9",
+      "source": "photos",
+      "target": "fn-thumb",
+      "kind": "event",
+      "label": "ObjectCreated",
+      "configuration": { "eventNotification": "ObjectCreated", "failureDestination": "dlq" },
+      "requirementIds": ["R5"]
+    },
+    {
+      "id": "e10",
+      "source": "fn-thumb",
+      "target": "photos",
+      "kind": "write",
+      "label": "thumbnails",
+      "requirementIds": ["R5"]
+    },
+    {
+      "id": "e11",
+      "source": "fn-thumb",
+      "target": "dlq",
+      "kind": "write",
+      "label": "on failure",
+      "requirementIds": ["R5"]
+    }
+  ],
+  "findings": []
+}

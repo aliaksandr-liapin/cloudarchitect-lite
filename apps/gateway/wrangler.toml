@@ -1,0 +1,37 @@
+name = "cloudarchitect-gateway"
+main = "src/worker.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173"
+FREE_CREDITS = "3"
+DAILY_BUDGET_MICRO_USD = "5000000"
+MONTHLY_BUDGET_MICRO_USD = "50000000"
+FREE_AI_DISABLED = "false"
+RATE_LIMIT_PER_MINUTE = "20"
+
+# Secrets (set with `wrangler secret put`): CLIENT_KEY_SALT, ANTHROPIC_API_KEY, OPENAI_API_KEY
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudarchitect"
+database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create cloudarchitect`
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+[env.production.vars]
+ALLOWED_ORIGINS = "https://app.example.com" # replace with the real web origin
+FREE_CREDITS = "3"
+DAILY_BUDGET_MICRO_USD = "5000000"
+MONTHLY_BUDGET_MICRO_USD = "50000000"
+FREE_AI_DISABLED = "false"
+RATE_LIMIT_PER_MINUTE = "20"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "cloudarchitect"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

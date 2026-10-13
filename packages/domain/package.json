@@ -1,0 +1,22 @@
+{
+  "name": "@cloudarchitect/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project schema, catalog types, graph patches and validation rules shared by web and gateway.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

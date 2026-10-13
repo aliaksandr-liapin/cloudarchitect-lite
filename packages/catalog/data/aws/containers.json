@@ -1,0 +1,8 @@
+[
+  { "kind": "aws-cloud", "displayName": "AWS Cloud", "allowedParents": [] },
+  { "kind": "region", "displayName": "Region", "allowedParents": ["aws-cloud"] },
+  { "kind": "vpc", "displayName": "VPC", "allowedParents": ["region"] },
+  { "kind": "availability-zone", "displayName": "Availability Zone", "allowedParents": ["vpc"] },
+  { "kind": "subnet", "displayName": "Subnet", "allowedParents": ["vpc", "availability-zone"] },
+  { "kind": "group", "displayName": "Group", "allowedParents": [] }
+]

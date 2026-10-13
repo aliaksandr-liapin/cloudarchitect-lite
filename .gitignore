@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.wrangler/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.dev.vars
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+# Original spec archive (kept locally, content lives in docs/product)
+*.zip
+# Icon packs are fetched, not committed (see docs/product/CLOUD_PROVIDER_CATALOG.md §2)
+assets/icons/
+eval/results/

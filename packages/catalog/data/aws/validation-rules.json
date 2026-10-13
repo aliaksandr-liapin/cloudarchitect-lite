@@ -1,0 +1,41 @@
+[
+  { "id": "VR-001", "severity": "warning", "title": "S3 origin behind CloudFront without OAC" },
+  {
+    "id": "VR-002",
+    "severity": "warning",
+    "title": "Clients read S3 directly while CloudFront serves the same content"
+  },
+  {
+    "id": "VR-003",
+    "severity": "warning",
+    "title": "Public API Gateway / ALB without an auth mechanism"
+  },
+  {
+    "id": "VR-004",
+    "severity": "warning",
+    "title": "Asynchronous consumer without DLQ or failure destination"
+  },
+  {
+    "id": "VR-005",
+    "severity": "info",
+    "title": "Lambda connects to RDS/Aurora without RDS Proxy"
+  },
+  {
+    "id": "VR-006",
+    "severity": "warning",
+    "title": "DAX without a justifying latency requirement"
+  },
+  { "id": "VR-007", "severity": "info", "title": "No observability component" },
+  { "id": "VR-008", "severity": "info", "title": "Data store without encryption at rest" },
+  { "id": "VR-009", "severity": "error", "title": "VPC-bound service outside a VPC" },
+  { "id": "VR-010", "severity": "error", "title": "Database in a public subnet" },
+  { "id": "VR-011", "severity": "warning", "title": "Client upload to S3 without authorization" },
+  { "id": "VR-012", "severity": "warning", "title": "Requirement not covered" },
+  { "id": "VR-013", "severity": "info", "title": "Component not linked to any requirement" },
+  {
+    "id": "VR-014",
+    "severity": "warning",
+    "title": "Service lifecycle deprecated, retired or unknown"
+  },
+  { "id": "VR-015", "severity": "info", "title": "Component not in the verified catalog" }
+]

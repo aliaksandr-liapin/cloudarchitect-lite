@@ -1,0 +1,4 @@
+# Copy to .dev.vars for `wrangler dev`, or export for `pnpm dev`. Never commit real values.
+CLIENT_KEY_SALT=change-me-to-a-long-random-string
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=

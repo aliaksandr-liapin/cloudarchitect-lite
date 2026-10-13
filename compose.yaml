@@ -1,0 +1,26 @@
+# Local full stack (works with Rancher Desktop or Docker Desktop):
+#   cp .env.example .env && docker compose up --build
+# Web: http://localhost:8080  ·  Gateway: http://localhost:8787/health
+services:
+  web:
+    build: { context: ., dockerfile: infra/docker/web.Dockerfile }
+    ports: ['8080:8080']
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  gateway:
+    build: { context: ., dockerfile: infra/docker/gateway.Dockerfile }
+    ports: ['8787:8787']
+    env_file: .env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:8080,http://localhost:5173
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 256M }

@@ -1,0 +1,32 @@
+[
+  {
+    "provider": "aws",
+    "sourceUrl": "https://aws.amazon.com/architecture/icons/",
+    "release": "2026-07-31",
+    "formats": ["zip: svg, png, pptx toolkits"],
+    "termsAsPublished": "We allow customers and partners to use these toolkits and assets to create architecture diagrams.",
+    "termsCheckedAt": "2026-10-13",
+    "sha256": null,
+    "status": "not-imported"
+  },
+  {
+    "provider": "azure",
+    "sourceUrl": "https://learn.microsoft.com/en-us/azure/architecture/icons/",
+    "release": "V24 (July 2026)",
+    "formats": ["zip: svg"],
+    "termsAsPublished": "Microsoft permits the use of these icons in architectural diagrams, training materials, or documentation. You can copy, distribute, and display the icons only for the permitted use unless granted explicit permission by Microsoft. Microsoft reserves all other rights. Don't crop, flip, or rotate icons. Don't distort or change icon shape in any way. Don't use Microsoft product icons to represent your product or service.",
+    "termsCheckedAt": "2026-10-13",
+    "sha256": null,
+    "status": "not-imported"
+  },
+  {
+    "provider": "gcp",
+    "sourceUrl": "https://cloud.google.com/icons",
+    "release": "core product + category icons (no version published)",
+    "formats": ["zip: svg, png"],
+    "termsAsPublished": null,
+    "termsCheckedAt": "2026-10-13",
+    "sha256": null,
+    "status": "not-imported"
+  }
+]

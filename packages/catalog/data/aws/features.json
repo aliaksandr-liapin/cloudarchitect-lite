@@ -1,0 +1,65 @@
+[
+  {
+    "id": "aws.cloudfront.oac",
+    "serviceId": "aws.cloudfront",
+    "appliesTo": "edge",
+    "configKey": "originAccess",
+    "displayName": "Origin Access Control (OAC)",
+    "summary": "Lets CloudFront read a private S3 bucket; the bucket stays non-public.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+  },
+  {
+    "id": "aws.s3.transfer-acceleration",
+    "serviceId": "aws.s3",
+    "appliesTo": "node",
+    "configKey": "transferAcceleration",
+    "displayName": "S3 Transfer Acceleration",
+    "summary": "Speeds up long-distance uploads to a bucket via edge locations; it does not serve or cache content.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html"
+  },
+  {
+    "id": "aws.s3.event-notifications",
+    "serviceId": "aws.s3",
+    "appliesTo": "edge",
+    "configKey": "eventNotification",
+    "displayName": "S3 Event Notifications",
+    "summary": "Emits object events (e.g. ObjectCreated) to Lambda, SQS, SNS or EventBridge.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+  },
+  {
+    "id": "aws.s3.presigned-upload",
+    "serviceId": "aws.s3",
+    "appliesTo": "edge",
+    "configKey": "presignedUrl",
+    "displayName": "Presigned URL upload",
+    "summary": "Time-limited signed URL that lets a client upload one object without AWS credentials.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+  },
+  {
+    "id": "aws.apigateway.authorizer",
+    "serviceId": "aws.apigateway",
+    "appliesTo": "node",
+    "configKey": "authorizer",
+    "displayName": "API Gateway authorization",
+    "summary": "Cognito user pool, IAM or Lambda authorizer protecting API routes.",
+    "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html"
+  },
+  {
+    "id": "aws.lambda.failure-destination",
+    "serviceId": "aws.lambda",
+    "appliesTo": "edge",
+    "configKey": "failureDestination",
+    "displayName": "Lambda on-failure destination",
+    "summary": "Sends records of failed asynchronous invocations to SQS, SNS, Lambda or EventBridge.",
+    "documentationUrl": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+  },
+  {
+    "id": "aws.sqs.dlq",
+    "serviceId": "aws.sqs",
+    "appliesTo": "edge",
+    "configKey": "deadLetterQueue",
+    "displayName": "SQS dead-letter queue",
+    "summary": "Holds messages that could not be processed after the maximum receives.",
+    "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+  }
+]

@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/coverage
+**/.wrangler
+**/.dev.vars
+**/.env
+**/.env.*
+.git
+*.zip
+eval/results
+docs
