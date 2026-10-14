@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-corepack enable            # provides pnpm 10
+npm install -g pnpm@10.32.1  # Node 25+ no longer bundles corepack
 pnpm install
 cp .env.example .env       # set CLIENT_KEY_SALT
 pnpm dev                   # web :5173, gateway :8787 (Node runtime)

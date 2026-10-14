@@ -3,7 +3,9 @@
 
 FROM node:24-alpine AS build
 WORKDIR /repo
-RUN corepack enable
+# Node 25+ no longer bundles corepack; keep in sync with "packageManager" in package.json.
+ARG PNPM_VERSION=10.32.1
+RUN npm install -g pnpm@${PNPM_VERSION}
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/web/package.json apps/web/
 COPY packages/domain/package.json packages/domain/
