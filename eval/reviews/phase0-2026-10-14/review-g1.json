@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Route 53 -> CloudFront alias edge is typed kind 'origin'; DNS aliasing is not an origin relationship.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "With a private S3 REST origin via OAC, only the distribution's default root object is served; index documents for sub-paths (e.g. /menu/) need a CloudFront Function or flat filenames. Not mentioned.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DefaultRootObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "HTTP-to-HTTPS redirect (viewer protocol policy) not stated; no open questions raised (e.g. who updates content, domain registrar).",
+          "evidence": ""
+        }
+      ],
+      "summary": "Correct, cheap CloudFront + private S3 (OAC) + ACM(us-east-1) + Route 53 static site with accurate cost and Shield Standard notes; only small modeling gaps."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "States 'No WAF or Shield is added' without noting that Shield Standard is automatically included for CloudFront; slightly misleading.",
+          "evidence": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-standard-summary.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Index-document handling for sub-paths with an OAC/REST origin and HTTP->HTTPS redirect not addressed.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DefaultRootObject.html"
+        }
+      ],
+      "summary": "Same correct CloudFront + private S3 (OAC) + ACM + Route 53 pattern with useful open questions; minor explanation imprecision on Shield."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Worker node group and ElastiCache are placed only in private subnet A and the ALB in a single public subnet; an ALB requires subnets in at least two AZs and a single-AZ node group defeats the Multi-AZ RDS. The assumption says two AZs but the diagram contradicts it.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#availability-zones"
+        },
+        {
+          "severity": "major",
+          "description": "No pod-level IAM (IRSA / EKS Pod Identity): pods read Secrets Manager and write to CloudWatch/X-Ray via the node role, so every pod gets every permission; violates least privilege.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No container registry (ECR) modeled or questioned for the 12 service images.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "WAF -> ALB edge labelled with protocol HTTPS; WAF is an association, not a traffic hop. MySQL/Redis edges typed 'write' only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ElastiCache in-transit encryption/AUTH and Redis credentials not addressed (Secrets Manager holds only MySQL creds).",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound EKS + RDS Multi-AZ + ElastiCache + CloudWatch/X-Ray + WAF design that meets the brief, but diagrams single-AZ compute and lacks IRSA/ECR."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "High availability of the shared MySQL and Redis (Multi-AZ, replicas/failover) is left as an open question instead of a default; for a shared datastore serving 12 services this is a reliability gap.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 -> ALB edge typed 'invoke' with protocol HTTPS; Route 53 only resolves DNS and does not proxy HTTPS traffic.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Public entry point has no WAF by default (only an open question).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ECR left unresolved; ECR->EKS edge direction shows registry pushing to cluster though pulls are initiated by nodes. DB/cache edges typed 'read' while description says reads and writes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Good EKS migration design with IRSA, ECR, separate private data subnets and full observability, but HA for data stores and WAF deferred to questions and a DNS edge mis-described."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Order lookup by order ID is only satisfied by the table key; no API route / read path (GET /orders/{id}) is modeled.",
+          "evidence": ""
+        },
+        {
+          "severity": "major",
+          "description": "Dual write: intake Lambda writes DynamoDB then publishes to SNS non-atomically; if publish fails after the write, downstream steps are silently never triggered. No outbox/DynamoDB Streams or reconciliation mentioned.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No explicit alarm on DLQ depth; messages can sit in DLQs unnoticed, weakening 'never silently lost'.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency of workers under at-least-once delivery only raised for payment as an open question, not designed; customer-managed KMS keys would also require SNS/SQS key-policy grants if extended to queues.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Clean SNS->SQS fan-out with per-step queues, per-step DLQs, Cognito and KMS, but omits the lookup read path and explicit DLQ alerting and has an unhandled dual-write."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Dual write: order Lambda stores in DynamoDB then publishes to SNS non-atomically; a failed publish leaves an order whose steps never run, without any outbox/stream or reconciliation.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Single shared DLQ for three queues makes per-step triage and alarming coarser (redrive-to-source still works).",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-dead-letter-queue-redrive.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito -> API Gateway edge direction is inverted (API Gateway authorizer validates tokens issued by the pool). Lambda logs to CloudWatch not drawn.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No open questions (payment provider idempotency, compensation when payment succeeds but reservation fails).",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers every explicit requirement incl. GET by order ID, retries via SQS, DLQ with depth alarm and idempotent handlers, with the same unaddressed dual-write risk."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "brochure-site",
+      "better": "tie",
+      "why": "Both are the same correct CloudFront + private S3 + ACM + Route 53 design; differences are cosmetic."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "B",
+      "why": "B adds IRSA least-privilege and ECR and separates data subnets, whereas A diagrams single-AZ compute and gives all pods the node role, though A is stronger on Multi-AZ RDS and WAF."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B explicitly serves lookup by order ID and alarms on DLQ depth with stated idempotency, while A omits the lookup path and DLQ alerting despite its nicer per-step DLQs."
+    }
+  ]
+}

@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The monthly retrain has no deploy step. The training job writes an artifact to S3, but nothing creates a new model or endpoint config or updates the endpoint, so the hosted model never changes. There is also no evaluation or approval gate before deploy.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/realtime-endpoints-deploy-models.html"
+        },
+        {
+          "severity": "major",
+          "description": "Retraining failures are only caught when the launcher Lambda fails. StartTrainingJob is asynchronous, so a training job that fails later is never caught. There is no EventBridge rule on SageMaker training job state changes and no alarm on it. The SNS alert covers only the trigger.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/automating-sagemaker-with-eventbridge.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The SNS failureDestination is attached to the EventBridge to Lambda edge. EventBridge target DLQs must be SQS. This only works if it means the Lambda async on-failure destination, and the design does not say so.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No endpoint autoscaling policy, instance count or multi-AZ setup is given, even though autoscaling is an explicit requirement. The design has no edge from the endpoint to CloudWatch and no timeout or fallback on the inline call (it is only raised as an open question).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3-to-endpoint edge is drawn as read from S3. The model artifact is actually pulled only when the model is created or deployed, which the diagram does not show.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound inline scoring path with the right services and good open questions, but the monthly retraining loop never deploys the new model and does not monitor asynchronous training failures."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The SQS DLQ catches only trigger events that EventBridge could not deliver. A pipeline execution that starts and then fails raises no alert: there is no SNS topic and no rule on SageMaker pipeline execution status. That only partly meets the requirement that retraining failures must not be lost.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/automating-sagemaker-with-eventbridge.html"
+        },
+        {
+          "severity": "minor",
+          "description": "openQuestions is empty even though there are clear unknowns: the latency budget, peak TPS, the fallback when the endpoint is down, and who the API callers are. The caller question is buried in an assumption instead.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No endpoint autoscaling policy, instance count, timeout or fallback is configured for the inline call. The edge from the pipeline to S3 is typed read but also writes artifacts.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The claim that Bedrock only serves foundation models oversimplifies. Bedrock Custom Model Import exists, although it does not fit an arbitrary PyTorch fraud classifier, so the conclusion still holds.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html"
+        }
+      ],
+      "summary": "Clean, correct design that triggers a SageMaker pipeline (with evaluation and deploy) directly from an EventBridge schedule, but it does not alert on failed training runs and asks no open questions."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The welcome email is sent synchronously from the API Lambda during subscribe. If SES throttles or errors, the email is lost or the signup fails, because there is no queue or retry.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The API Gateway endpoint type is not stated. Behind CloudFront it should be REGIONAL, to avoid a second edge-optimized CloudFront hop. The CloudFront cache policy for /api/* GETs (TTL, which headers are excluded) and invalidation on writes are also not specified.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-endpoint-types.html"
+        },
+        {
+          "severity": "minor",
+          "description": "openQuestions is empty. The domain, SES production access and thumbnail sizes are stated as assumptions instead of being asked.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Production-grade serverless blog: CloudFront with OAC, separate upload and media buckets, Cognito-protected writes, presigned uploads and a thumbnail failure destination; the only weak point is sending the welcome email synchronously."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design says failures of the SQS-triggered welcome Lambda are routed to the DLQ through a Lambda on-failure destination. Lambda does not support on-failure destinations for SQS event source mappings; only the queue's redrive policy applies. This is an incorrect technical statement, though the separate redrive edge keeps the design working.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html"
+        },
+        {
+          "severity": "major",
+          "description": "Originals and thumbnails share one bucket, and that whole bucket is a CloudFront origin. Full-resolution originals become publicly fetchable through the CDN unless path behaviors restrict them. Writing thumbnails into the triggering bucket also relies entirely on the prefix filter to avoid a recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3-tutorial.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No ACM certificate node is shown for the HTTPS custom domain (only an open question). Edges have no protocols, and there are no edges from components to CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The assumptions reference an internal identifier ('VR-004') that means nothing to the user.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Asynchronous welcome-email queueing is a good idea, but the design claims Lambda on-failure destinations work for an SQS trigger (they do not) and exposes original photos through a shared bucket."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Client authentication is left entirely to the application. The design has no WAF or rate limiting on a public ALB (WAF is raised only as an open question).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Fetching the secret only at startup can break after rotation unless the app refreshes it. A refresh is mentioned but not designed, for example a caching client or the alternating-users rotation strategy.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets_strategies.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The diagram puts the ALB only in pub-a and RDS only in priv-a, in the subnet shared with the app, even though the text describes multi-AZ placement. There is no separate data tier subnet, and no VPC endpoints for ECR, Secrets Manager or CloudWatch to cut NAT data charges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Correct, well-reasoned Fargate design with private tasks, a NAT gateway per AZ, Multi-AZ RDS and Redis, and managed rotation; it relies only on app-level auth behind a public ALB."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The graph is incomplete. fargate-b has no edges to Secrets Manager or CloudWatch. The payments API, an explicit requirement, is not modeled, and there is no egress edge from the NAT gateways to the internet. The ALB and ElastiCache are placed only in AZ A containers. Only RDS and ElastiCache metrics are mentioned, and there are no edges for them.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The open question says Elastic IPs on the NAT gateways would be needed for allow-listing. Public NAT gateways always have an Elastic IP, so this is misleading.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Adding API Gateway, a VPC link and an internal ALB costs more and adds complexity compared with a public ALB plus WAF. It is valid, though: REST APIs can use VPC link v2 to an ALB, and Cognito client credentials suit B2B machine-to-machine clients. There is also no ACM or custom domain, and the Route 53 'invoke' edge to API Gateway is semantically wrong because DNS is not an invocation.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/private-integration.html"
+        }
+      ],
+      "summary": "Stronger perimeter (Cognito-authenticated API Gateway in front of a fully internal ALB through VPC link v2), but the diagram leaves out the payments API and several AZ-B connections."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "tie",
+      "why": "A asks better open questions and has explicit failure alerting, while B has a more complete retrain-to-deploy pipeline; both miss monitoring of failed training runs and endpoint autoscaling config."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A isolates original photos in a private bucket and makes no incorrect claims, while B wrongly says Lambda on-failure destinations work for an SQS trigger and serves originals from a shared CDN-exposed bucket."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "A is complete and consistent across both AZs, including the payments egress, while B's stronger perimeter comes with missing nodes and edges and a misleading NAT EIP statement."
+    }
+  ]
+}

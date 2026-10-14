@@ -28,6 +28,14 @@ const MODELS = {
 } as const;
 type ModelKey = keyof typeof MODELS;
 
+/** A variant is a model, optionally with `+repair`: one extra turn that feeds validator findings back. */
+function parseVariant(v: string): { model: ModelKey; repair: boolean } {
+  const [model, option] = v.split('+');
+  if (!model || !(model in MODELS) || (option && option !== 'repair'))
+    throw new Error(`Unknown variant ${v}`);
+  return { model: model as ModelKey, repair: option === 'repair' };
+}
+
 const { values: args } = parseArgs({
   options: {
     models: { type: 'string', default: 'haiku,sonnet,opus' },
@@ -177,8 +185,10 @@ function toProject(g: Generation, scenarioId: string): Project {
 
 interface RunRecord {
   scenarioId: string;
-  model: ModelKey;
+  model: string;
   repeat: number;
+  /** Set when the repair turn ran: the score before repair. */
+  firstPassScore?: ScenarioResult;
   ok: boolean;
   error?: string;
   latencyMs: number;
@@ -194,8 +204,8 @@ const scenarios = readdirSync(join(root, 'scenarios'))
   .filter((f) => f.endsWith('.json'))
   .map((f) => Scenario.parse(JSON.parse(readFileSync(join(root, 'scenarios', f), 'utf8'))))
   .filter((s) => !args.scenarios || args.scenarios.split(',').includes(s.id));
-const models = args.models.split(',') as ModelKey[];
-for (const m of models) if (!(m in MODELS)) throw new Error(`Unknown model ${m}`);
+const models = args.models.split(',');
+models.forEach(parseVariant);
 const repeats = Number(args.repeats);
 const maxUsd = Number(args['max-usd']);
 
@@ -213,58 +223,91 @@ const jobs = models.flatMap((model) =>
 let spent = 0;
 const records: RunRecord[] = [];
 
-async function runJob({ s, model, repeat }: (typeof jobs)[number]): Promise<RunRecord> {
+async function runJob({ s, model: variant, repeat }: (typeof jobs)[number]): Promise<RunRecord> {
+  const { model, repair } = parseVariant(variant);
   const m = MODELS[model];
   const started = Date.now();
-  const base = { scenarioId: s.id, model, repeat };
-  try {
+  const base = { scenarioId: s.id, model: variant, repeat };
+  const usage = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+  let costUsd = 0;
+  const file = join(outDir, 'outputs', `${variant.replace('+', '_')}-${s.id}-${repeat}.json`);
+
+  const generate = async (messages: Anthropic.MessageParam[]) => {
     const res = await client.messages.create({
       model: m.id,
       max_tokens: 16000,
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
       output_config: { format: outputFormat },
-      messages: [{ role: 'user', content: s.prompt }],
+      messages,
     });
     const u = res.usage;
-    const usage = {
+    const call = {
       input: u.input_tokens,
       output: u.output_tokens,
       cacheWrite: u.cache_creation_input_tokens ?? 0,
       cacheRead: u.cache_read_input_tokens ?? 0,
     };
-    const costUsd =
-      (usage.input * m.input +
-        usage.output * m.output +
-        usage.cacheWrite * m.cacheWrite +
-        usage.cacheRead * m.cacheRead) /
+    for (const k of Object.keys(usage) as (keyof typeof usage)[]) usage[k] += call[k];
+    const cost =
+      (call.input * m.input +
+        call.output * m.output +
+        call.cacheWrite * m.cacheWrite +
+        call.cacheRead * m.cacheRead) /
       1e6;
-    spent += costUsd;
+    costUsd += cost;
+    spent += cost;
     const text = res.content.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join('');
-    let raw: unknown = null;
+    let raw: unknown;
     try {
       raw = JSON.parse(text);
     } catch {
       raw = { unparsedText: text.slice(0, 2000) };
     }
-    const file = join(outDir, 'outputs', `${model}-${s.id}-${repeat}.json`);
-    writeFileSync(file, JSON.stringify({ stopReason: res.stop_reason, raw }, null, 2));
+    return { text, raw, stopReason: res.stop_reason, parsed: Generation.safeParse(raw) };
+  };
+
+  try {
+    const messages: Anthropic.MessageParam[] = [{ role: 'user', content: s.prompt }];
+    let out = await generate(messages);
+    let firstPassScore: ScenarioResult | undefined;
+
+    if (repair && out.parsed.success) {
+      const draft = toProject(out.parsed.data, s.id);
+      const issues = validateProject(draft, awsCatalog).filter((f) => f.severity !== 'info');
+      if (issues.length) {
+        firstPassScore = scoreCandidate(s, draft);
+        const list = issues
+          .map((f) => `- [${f.ruleId ?? 'structural'} ${f.severity}] ${f.explanation}`)
+          .join('\n');
+        messages.push(
+          { role: 'assistant', content: out.text },
+          {
+            role: 'user',
+            content: `The deterministic validator reported these findings on your architecture:\n${list}\n\nReturn the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Do not change anything else.`,
+          },
+        );
+        out = await generate(messages);
+      }
+    }
+
+    writeFileSync(file, JSON.stringify({ stopReason: out.stopReason, raw: out.raw }, null, 2));
     const latencyMs = Date.now() - started;
-    const parsed = Generation.safeParse(raw);
-    if (!parsed.success) {
+    if (!out.parsed.success) {
       return {
         ...base,
         ok: false,
-        error: `generation schema (stop=${res.stop_reason}): ${parsed.error.issues
+        error: `generation schema (stop=${out.stopReason}): ${out.parsed.error.issues
           .slice(0, 2)
           .map((i) => `${i.path.join('.')} ${i.message}`)
           .join('; ')}`,
         latencyMs,
         usage,
         costUsd,
+        firstPassScore,
         score: scoreCandidate(s, null),
       };
     }
-    const project = toProject(parsed.data, s.id);
+    const project = toProject(out.parsed.data, s.id);
     writeFileSync(file.replace(/\.json$/, '.project.json'), JSON.stringify(project, null, 2));
     const score = scoreCandidate(s, project);
     const findingsByRule: Record<string, number> = {};
@@ -280,8 +323,9 @@ async function runJob({ s, model, repeat }: (typeof jobs)[number]): Promise<RunR
       latencyMs,
       usage,
       costUsd,
+      firstPassScore,
       nodes: project.nodes.length,
-      unresolved: parsed.data.nodes.flatMap((n) => (n.unresolved ? [n.unresolved.name] : [])),
+      unresolved: out.parsed.data.nodes.flatMap((n) => (n.unresolved ? [n.unresolved.name] : [])),
       findingsByRule,
       score,
     };
@@ -291,7 +335,8 @@ async function runJob({ s, model, repeat }: (typeof jobs)[number]): Promise<RunR
       ok: false,
       error: err instanceof Error ? err.message : String(err),
       latencyMs: Date.now() - started,
-      costUsd: 0,
+      usage,
+      costUsd,
     };
   }
 }
@@ -305,7 +350,7 @@ async function worker() {
     records.push(r);
     const status = r.ok ? (r.score?.passed ? 'PASS' : 'fail') : `ERROR ${r.error}`;
     console.log(
-      `${r.model.padEnd(6)} ${r.scenarioId.padEnd(26)} #${r.repeat} ${status} $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
+      `${r.model.padEnd(12)} ${r.scenarioId.padEnd(26)} #${r.repeat} ${status} $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
     );
   }
 }
@@ -326,8 +371,17 @@ const summary = models.map((model) => {
   const rs = records.filter((r) => r.model === model);
   const scored = rs.filter((r) => r.score);
   return {
-    model: MODELS[model].id,
+    variant: model,
     runs: rs.length,
+    repaired: rs.filter((r) => r.firstPassScore).length,
+    warningFindingsTotal: rs.reduce(
+      (a, r) =>
+        a +
+        Object.entries(r.findingsByRule ?? {})
+          .filter(([k]) => k.endsWith(':warning'))
+          .reduce((b, [, v]) => b + v, 0),
+      0,
+    ),
     errors: rs.filter((r) => !r.ok).length,
     schemaValidRate: mean(scored.map((r) => (r.score!.schemaValid ? 1 : 0))),
     passRate: mean(scored.map((r) => (r.score!.passed ? 1 : 0))),

@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "clickstream-analytics",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Raw uncompressed JSON kept in S3 Standard for two years with no Parquet/compression and no storage-class tiering. At 5,000 events/s that is roughly 300+ TB of JSON, so both storage and Athena per-TB scans become expensive, which works against the 'store cheaply' requirement. The design pushes this to an open question instead of using Firehose record format conversion.",
+          "evidence": "https://docs.aws.amazon.com/firehose/latest/dev/record-format-conversion.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The HTTP API first-class Kinesis integration supports only Kinesis-PutRecord (one record per call), not PutRecords as the edge label says. Batched browser payloads would need a REST API or a Lambda to fan out.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Kinesis Data Streams plus Firehose adds shard cost and capacity management even though nothing needs replay or multiple consumers. It is defensible but not required.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The anonymous ingest endpoint has no WAF, throttling or auth (raised only as an open question). There is no Firehose S3 error-output prefix or alarm wiring on Kinesis iterator age, and no Athena query-results location.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A working, fully managed ingest-to-Athena pipeline, but raw JSON in S3 Standard with no tiering or columnar conversion makes the 'cheap for two years' and query-cost goals weak."
+    },
+    {
+      "scenario": "clickstream-analytics",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design writes Direct PUT to Firehose from API Gateway without mentioning Firehose throughput quotas. Outside the large regions the default is 1,000 requests/s and 1 MiB/s per stream, which 5,000 events/s of JSON can exceed, so a quota increase or careful batching must be planned.",
+          "evidence": "https://docs.aws.amazon.com/firehose/latest/dev/limits.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Unauthenticated Cognito identity-pool credentials can be obtained by anyone who knows the pool ID. They do not 'only accept events from legitimate website clients' (R6 is overstated), so throttling or WAF is still needed. SigV4 signing in the browser also adds client complexity.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/identity-pools.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A direct Firehose service integration requires a REST API (HTTP API has no Firehose subtype), and the design does not say which API type to use. The design has no open questions despite real ambiguities, such as latency targets and payload size.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Converting to Parquet means the 'raw history' is no longer byte-for-byte raw, and there is no Athena query-results bucket or workgroup scan limits.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A lean and cost-aware Firehose, Parquet, S3-tiering and Athena design that fits the request well, with an unaddressed Firehose quota risk and an overstated claim about endpoint protection."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Per-user push is modeled as an SNS 'topic'. Targeted notifications are published to per-device platform endpoints (APNs/FCM), not to a shared topic, and the design does not show device-token registration (CreatePlatformEndpoint).",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-application-as-subscriber.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch node has no edges, Cognito has no relationship to the API, the record checker has no read path to friend data, and no edge carries a protocol.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Neither the photo bucket's private access nor the presigned-URL constraints (content type, size) are stated, and the design has no throttling or usage plans for the spike.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct serverless baseline (Cognito, API Gateway, Lambda, DynamoDB Streams, SNS, S3 presigned uploads) with sparse wiring and slightly loose push-notification semantics."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The SQS on-failure destination for a DynamoDB stream receives only batch metadata (shard and sequence numbers), not the records, so 'replay' means re-reading the stream within its 24h retention. The text implies the queue itself holds replayable events.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errorhandling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The record processor looks up friends in the table, but there is no read edge for that, and device-token registration with SNS platform endpoints is not shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No API throttling or usage plans are defined for the New Year spike, and the design has no open questions (photo size and retention, friend model).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, well-wired pay-per-use serverless backend that meets every requirement, with only small inaccuracies around DLQ replay semantics."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 0
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design attaches a regional AWS WAF web ACL to an API Gateway HTTP API. AWS WAF supports only REST APIs, not HTTP APIs. Because the HTTP API execute-api endpoint is public and reachable without going through CloudFront, the API path can bypass WAF entirely, which defeats the 'protection against common web exploits' requirement for the API. Fix: use a REST API or restrict the origin.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+        },
+        {
+          "severity": "major",
+          "description": "Shield Advanced costs $3,000/month with a one-year commitment plus data-transfer fees. That may be justified for a bank, but the cost is not called out or offered as an alternative to Shield Standard.",
+          "evidence": "https://aws.amazon.com/shield/pricing/"
+        },
+        {
+          "severity": "minor",
+          "description": "A single NAT Gateway in one AZ is a single point of failure for egress, which conflicts with the stated multi-AZ HA goal (acknowledged in the assumptions). Fargate ephemeral storage CMK encryption is not addressed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Nodes are drawn only in AZ A, and the AZ B subnets are empty. Aurora TLS needs to be enforced, for example with rds.force_ssl, which the design does not state.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thorough, well-layered design (internal ALB via VPC link, CMKs everywhere, CloudTrail, multi-AZ Aurora), undermined by the false claim that WAF can protect an HTTP API, which leaves a bypassable API path."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ALB is internet-facing in public subnets and used as the CloudFront origin, and WAF is attached only to CloudFront. Nothing restricts the ALB to CloudFront (CloudFront managed prefix list in the security group, or a secret origin header), so attackers can bypass WAF and the CloudFront DDoS absorption by hitting the ALB directly.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "major",
+          "description": "Customer-managed KMS keys cover only Aurora, the audit bucket and Secrets Manager. CloudWatch Logs, ALB access logs and Fargate ephemeral storage are left on AWS-owned or AWS-managed keys, so 'all data encrypted at rest with keys we control' is not fully met.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Calling CloudTrail an 'organization trail' assumes an AWS Organizations management account, while the request is about 'the AWS account'. There is no ECS cluster or service node, and subnets are not modeled per AZ.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Relying on ALB authenticate-cognito for API calls only works with browser session cookies. Non-browser API clients would need JWT validation in the app.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        }
+      ],
+      "summary": "A simpler, cheaper CloudFront, ALB and Fargate design with Shield Standard and good open questions, but the publicly reachable ALB allows WAF bypass and CMK coverage is incomplete."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "clickstream-analytics",
+      "better": "B",
+      "why": "B meets 'cheap for two years' and query cost with Parquet, partitioning and lifecycle tiering, and avoids an unnecessary Kinesis stream; A stores uncompressed JSON in S3 Standard."
+    },
+    {
+      "scenario": "mobile-backend",
+      "better": "B",
+      "why": "Both are architecturally equivalent, but B wires observability and failure handling explicitly and explains friend lookup and encryption, where A leaves CloudWatch and auth unconnected."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "Despite its incorrect WAF-on-HTTP-API claim, which REST API easily fixes, A covers more requirements (internal ALB, CMKs on logs, multi-AZ, Shield Advanced) than B, whose public ALB bypasses WAF and whose CMK coverage is incomplete."
+    }
+  ]
+}

@@ -15,7 +15,7 @@ const scenarios = new Map(
 const rows = readdirSync(join(runDir, 'outputs'))
   .filter((f) => f.endsWith('.project.json'))
   .map((f) => {
-    const [, model, scenarioId] = /^([a-z]+)-(.+)-\d+\.project\.json$/.exec(f)!;
+    const [, model, scenarioId] = /^([a-z_]+)-(.+)-\d+\.project\.json$/.exec(f)!;
     const r = scoreCandidate(
       scenarios.get(scenarioId!)!,
       JSON.parse(readFileSync(join(runDir, 'outputs', f), 'utf8')),

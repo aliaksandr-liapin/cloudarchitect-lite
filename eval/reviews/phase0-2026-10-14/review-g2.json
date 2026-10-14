@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The submit Lambda issues presigned upload URLs and calls StartExecution at the same time, so the automated checks can run before the photos and PDFs exist in S3. The design needs an upload-complete signal, such as an S3 event, a 'finalize' API call, or a wait-for-uploads step.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design says the Step Functions execution history 'meets the audit needs', but Standard workflow history is kept for only 90 days after the execution closes. The DynamoDB audit records make up for it, but the rationale overstates what Step Functions provides.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudTrail is described as an immutable log of 'every action', but it does not record Step Functions state transitions or the business content of API Gateway requests. Data events (such as S3 object-level events) have to be enabled explicitly, and the trail needs log file validation or Object Lock to be tamper-evident.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The adjuster-group check on the decision route is mentioned only as an assumption. The Cognito authorizer validates the token but not the group, so the decision Lambda (or the authorizer scopes) must enforce it. Lambda log groups and an alarm on the 14-day timeout or escalation path are also not shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound Step Functions task-token design with adjuster notification, a separate audit bucket and KMS. Its main flaw is a race between starting the workflow and the document uploads finishing."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "An edge goes from API Gateway to the S3 bucket labelled 'Presigned upload URL'. API Gateway cannot generate presigned URLs; a Lambda (such as the intake function) holding s3:PutObject permission must sign them. As drawn, the upload path does not work.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "major",
+          "description": "Nothing notifies the adjuster or records where the task token is kept for the decision function. SES is used only for customer emails, so claims can sit unseen until the 14-day timeout.",
+          "evidence": ""
+        },
+        {
+          "severity": "major",
+          "description": "As in design A, the workflow starts at intake with no signal that the uploads have finished, so the checks can run against missing files.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudTrail is attached to API Gateway for 'API management events', but CloudTrail does not log API invocations (who submitted or decided a claim), only control-plane calls. Auditing user actions depends entirely on the DynamoDB table and the workflow logs.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/cloudtrail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The rationale mentions 'a 14-day wait state'. A Wait state would delay unconditionally; the correct mechanism is a .waitForTaskToken task with a 14-day TimeoutSeconds, which the purpose text implies. Lambda logs are not wired to CloudWatch.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The overall pattern is reasonable and the open questions are good, but the presigned-URL edge is unworkable, there is no adjuster notification, and the CloudTrail audit claim is misleading."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The request is a three-month migration, but there is no migration tooling or hybrid connectivity: no AWS MGN for the VMs, no DMS or a defined dump/restore for MySQL, no DataSync for the NFS data, and no VPN or Direct Connect. DMS appears only as an open question.",
+          "evidence": "https://docs.aws.amazon.com/mgn/latest/ug/what-is-application-migration-service.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Two fixed EC2 instances with no Auto Scaling group or auto-recovery: a failed instance is not replaced automatically. The single NAT Gateway makes patch egress depend on one AZ (an accepted trade-off).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No EFS backup (AWS Backup) for the shared uploads, no security groups shown, and no SSM Session Manager for administrative access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, conventional rehost (ALB + 2x EC2 + RDS Multi-AZ + EFS) with TLS and CMK encryption. It lacks the actual migration path and self-healing for the instances."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "There is no TLS. The assumptions accept 'HTTP or HTTPS' to a public ALB, and ACM/HTTPS is left as an open question, so user traffic, including credentials, may cross the internet in plaintext.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no migration path (MGN, DMS, DataSync) and no hybrid connectivity for a three-month data-center exit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No Auto Scaling group or auto-recovery for the two instances, no EFS backup, and the EFS node is placed in an app subnet in a single AZ (mount targets should be in both AZs, as the assumptions say).",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially the same correct rehost topology with per-AZ NAT, but it leaves HTTPS undecided and also omits the migration tooling."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "OpenSearch sits outside the VPC and is reached by Fargate through the NAT Gateway and by a non-VPC Lambda, which implies a public-endpoint domain. The domain should be VPC-attached, or at minimum use fine-grained access control and an IAM resource policy that are not described. Routing SQS, OpenSearch and CloudWatch traffic through NAT instead of VPC endpoints also adds avoidable data-processing cost.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Standard SQS with Lambda can deliver price events out of order or more than once. Without version or timestamp checks in the indexer, an older price can overwrite a newer one.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The initial bulk index of 2M products is not addressed, nor are price changes made directly in the source-of-truth DB by other systems (dual-write is acknowledged). Nothing in the graph performs the cache invalidation it claims.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ALB Cognito authentication is a browser redirect (OIDC) flow suited to web apps, not to programmatic API clients calling write routes. The Fargate tasks are drawn in only one AZ, and there is a single NAT.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        }
+      ],
+      "summary": "A solid OpenSearch + SQS/Lambda/DLQ sync pattern with WAF, KMS and alarms. The search domain is implicitly public and reached via NAT, and the price-ordering and bulk-load concerns are not handled."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The public API (through CloudFront and the ALB) exposes the price/product write routes with no authentication and no WAF; auth appears only as an open question about shoppers. Anyone could change prices.",
+          "evidence": ""
+        },
+        {
+          "severity": "major",
+          "description": "The topology has one public and one private subnet with no AZs and no Multi-AZ for RDS or ElastiCache. An ALB requires subnets in at least two AZs, and the design has no zone redundancy for the source of truth.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The non-VPC indexer Lambda writes to an OpenSearch domain outside the VPC, which implies a public domain endpoint with no stated access policy. Fargate egress is 'left to implementation'.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The DLQ exists only as configuration text, and CloudWatch has no connections, so the stated alarms on DLQ depth and indexing lag are not wired. The ordering and duplicate concerns of a Standard queue are not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core design (CloudFront + cache + OpenSearch with SQS/Lambda sync, bulk load acknowledged) is right, but it has unauthenticated write routes, a single-AZ topology and weak operability wiring."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A presigns uploads from a Lambda, notifies adjusters, and stores audit evidence separately; B has an unworkable API Gateway presign edge and no adjuster notification."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "A",
+      "why": "The topology is nearly identical, but A commits to HTTPS via ACM and customer-managed encryption, while B leaves TLS undecided (B's per-AZ NAT is the only advantage)."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A adds WAF, authentication on write routes, two AZs, an explicit DLQ and alarms; B leaves price-update routes unauthenticated and is effectively single-AZ."
+    }
+  ]
+}

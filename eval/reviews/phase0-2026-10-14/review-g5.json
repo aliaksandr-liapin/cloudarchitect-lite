@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "iot-telemetry",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Owner-only access (R5) stops at the Cognito authorizer; nothing enforces that the caller owns the requested device, and no owner-to-device mapping is modelled, so any signed-in owner could query any device ID.",
+          "evidence": ""
+        },
+        {
+          "severity": "major",
+          "description": "The IoT rule invokes Lambda once per message (about 833 per second, about 2.2B invocations per month) with no buffering. That is costly, and throttling or a cold-start burst relies only on the async retry queue. There is no IoT rule error action, so failures to invoke the rule action are not captured.",
+          "evidence": "https://docs.aws.amazon.com/iot/latest/developerguide/rule-error-handling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB gets one write per reading (about 72M writes per day, about 6.5B items kept). That is an expensive storage pattern; batching, aggregation or a time-series store is not discussed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SNS SMS needs an origination identity in many countries (for example 10DLC or toll-free numbers in the US) and a higher spend limit than the default. Neither is mentioned, though SMS flood rate limiting is raised as an open question.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/channels-sms-originating-identities.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No CloudWatch alarms are specified for the failure queue or for alert delivery. Encryption at rest is not addressed beyond an open question.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless IoT Core to Lambda to DynamoDB/SNS design with a valid async failure destination, but it has no device-ownership authorization and invokes Lambda once per message at about 833 messages per second."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The SQS batch consumer does not mention ReportBatchItemFailures. One bad reading causes the whole batch to be redelivered, which can duplicate DynamoDB writes and, more importantly, duplicate SMS alerts. Alert idempotency or deduplication is not addressed.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB gets one write per reading (about 2.2B writes per month, billions of items kept for 90 days). This is a significant cost that is not quantified, and alternatives (aggregation, batch writes, a time-series store) are not discussed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are no open questions. SMS origination identity and spend-limit setup, SMS rate limiting, region and threshold ownership are left unaddressed.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/channels-sms-originating-identities.html"
+        }
+      ],
+      "summary": "A well-buffered IoT Core to SQS to Lambda pipeline with a DLQ, explicit device-ownership enforcement and encryption; it is production-reasonable apart from duplicate-alert handling and unexamined DynamoDB write cost."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design says the task generates presigned GET URLs 'valid for 7 days'. A presigned URL signed with the Fargate task role's temporary credentials stops working when those credentials expire (hours, not days), so managers would get dead links. The design is non-working as described.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "major",
+          "description": "'Database credentials are handled through the task role or IAM database authentication' is misleading. A task role cannot authenticate to PostgreSQL by itself, and IAM DB authentication must be enabled on the existing cluster and a DB user granted rds_iam. That changes the 'existing, unchanged' database and is not stated.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no dead-letter queue or retry policy on the EventBridge target, so a failed RunTask at 02:00 relies only on a CloudWatch alarm that is not specified.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html"
+        },
+        {
+          "severity": "minor",
+          "description": "SES sandbox or production access and recipient verification are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cheap Fargate-on-schedule design that is right in shape, but its central delivery mechanism, 7-day presigned links signed with task-role credentials, would not work."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Presigned links last only about 6 hours. This is stated correctly, but it is a usability limitation for managers. The alternative (an IAM user signer or an authenticated download page) is only raised as an open question.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The target DLQ only captures failures to start the task. Task failure mid-run depends on a CloudWatch alarm on ECS task stopped events or exit codes, which is described but not modelled as a concrete rule.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ECR repository is omitted from the diagram (only noted in the assumptions).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal, cheap and correct scheduled Fargate design with Secrets Manager, a schedule DLQ, a private bucket with lifecycle expiry, and an accurate account of how long presigned links last."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "A hand-built RAG pipeline (Lambda PDF parsing, chunking, embedding and an OpenSearch domain) is used where Amazon Bedrock Knowledge Bases offers managed ingestion, chunking and retrieval with source citations. That would be simpler for an MVP that requires citations.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Most edges have no protocol. The Lambda timeout versus SQS visibility timeout, and limits for large PDFs or Bedrock throttling during the bulk load of 20,000 manuals, are not addressed.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html"
+        },
+        {
+          "severity": "minor",
+          "description": "An OpenSearch Service managed domain is an always-on cost. Its sizing, and OpenSearch Serverless as an option, are not discussed. No alarms on DLQ depth or API metrics are specified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct and secure RAG design (Cognito-authorized API, Lambda, Bedrock, OpenSearch, DynamoDB with TTL) with good open questions, but it rebuilds what Bedrock Knowledge Bases provides and its edges are under-specified."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "A hand-built RAG pipeline is used instead of Amazon Bedrock Knowledge Bases, which provides managed ingestion and citation metadata out of the box.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edge direction Cognito to API Gateway for JWT validation is inverted, since the authorizer pulls JWKS from Cognito. Large or scanned PDFs, which would need Textract, are assumed away, and the Lambda timeout versus visibility timeout is not covered.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are no open questions. The always-on cost of the OpenSearch domain is not sized or compared with OpenSearch Serverless.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Nearly the same sound RAG architecture as A, with better-specified protocols, bulk-load and DLQ reasoning, and API logging, but again it does not use Bedrock Knowledge Bases."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "iot-telemetry",
+      "better": "B",
+      "why": "B buffers ingestion through SQS with a DLQ and enforces device ownership in the query path. A has no ownership check and invokes Lambda once per message."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "B",
+      "why": "B correctly states the short validity of presigned links signed with task-role credentials and keeps credentials in Secrets Manager. A promises 7-day links that would not work."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "B",
+      "why": "The two are near-equivalent. B edges ahead on ingestion fault-tolerance reasoning, explicit protocols and API observability, though A asks better open questions."
+    }
+  ]
+}

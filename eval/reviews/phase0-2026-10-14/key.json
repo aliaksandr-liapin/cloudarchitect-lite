@@ -1,0 +1,62 @@
+{
+  "brochure-site": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "claims-approval-workflow": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "clickstream-analytics": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "fraud-model-serving": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "iot-telemetry": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "k8s-microservices": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "legacy-lift-and-shift": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "mobile-backend": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "myblog": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "nightly-reports": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "order-events": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  },
+  "product-search": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "regulated-portal": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "saas-containers": {
+    "A": "sonnet",
+    "B": "haiku_repair"
+  },
+  "support-chatbot": {
+    "A": "haiku_repair",
+    "B": "sonnet"
+  }
+}
