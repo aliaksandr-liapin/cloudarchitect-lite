@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * AI model options (ADR-0011), shared by the gateway, the setup wizard and the editor.
- * Benchmarks come from the Phase 0 round 3 run and blind review (docs/product/PHASE0_SPIKE.md);
+ * Benchmarks come from the Phase 0 round 3 run and blind review (docs/product/phase0-spike.md);
  * update them only from a new eval run.
  */
 export const ModelChoice = z.enum(['haiku', 'sonnet']);

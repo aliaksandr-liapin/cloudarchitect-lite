@@ -37,13 +37,27 @@ The first build takes a few minutes. When it is ready, the terminal shows:
 
 ## 4. Finish setup in the browser
 
-Open that link. The wizard has five steps:
+Open that link. The wizard has five steps.
 
-1. **Welcome:** the setup code from the link proves you can see the server log.
-2. **API key:** paste your key and press **Check key**; Anthropic confirms it before you can continue.
-3. **Models:** choose which models your key serves (Claude Haiku 5.5, Claude Sonnet 5.5) and the default. The table shows the measured quality, cost and speed of each.
-4. **Limits:** free AI operations per visitor, requests per minute, daily and monthly budget. The wizard estimates how many generations the budget covers.
-5. **Review:** check and press **Finish setup**.
+**1. Welcome.** The setup code from the link proves you can see the server log.
+
+<img src="../images/setup-1-welcome.png" alt="Setup step 1: welcome page listing the five steps, with the setup code filled in" width="720">
+
+**2. API key.** Paste your key and press **Check key**; Anthropic confirms it before you can continue.
+
+<img src="../images/setup-2-key.png" alt="Setup step 2: masked API key field with the confirmation 'Key works'" width="720">
+
+**3. Models.** Choose which models your key serves (Claude Haiku 5.5, Claude Sonnet 5.5) and the default. The table shows the measured quality, cost and speed of each.
+
+<img src="../images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
+
+**4. Limits.** Free AI operations per visitor, requests per minute, daily and monthly budget. The wizard estimates how many generations the budget covers.
+
+<img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of generations and visitors the monthly budget covers" width="720">
+
+**5. Review.** Check the summary and press **Finish setup**.
+
+<img src="../images/setup-5-review.png" alt="Setup step 5: summary of key, models, free operations, budget and rate limit" width="720">
 
 Settings apply immediately and survive restarts. Then use the editor at <http://localhost:8080>.
 

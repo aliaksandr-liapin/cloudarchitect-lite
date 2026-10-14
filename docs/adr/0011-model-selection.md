@@ -2,7 +2,7 @@
 
 **Status:** Accepted · **Date:** 2026-10-14
 
-**Context.** Free AI credits are paid by us, so cost per operation sets how many free users the budget cap serves (PRD §7). Quality must meet Gate A. The Phase 0 spike measured Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5 on the 15-scenario benchmark with the eval harness and two blind rubric reviews ([PHASE0_SPIKE.md](../product/PHASE0_SPIKE.md)). The product owner's rule was to use Haiku for the free tier if it met the requirements, otherwise Sonnet for both.
+**Context.** Free AI credits are paid by us, so cost per operation sets how many free users the budget cap serves (PRD §7). Quality must meet Gate A. The Phase 0 spike measured Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5 on the 15-scenario benchmark with the eval harness and two blind rubric reviews ([phase0-spike.md](../product/phase0-spike.md)). The product owner's rule was to use Haiku for the free tier if it met the requirements, otherwise Sonnet for both.
 
 **Acceptance criteria (fixed before the final run):** schema-valid ≥ 99 %, automated pass rate ≥ 90 %, blind median rubric ≥ 2.0, no critical defect in ≥ 90 % of scenarios.
 
