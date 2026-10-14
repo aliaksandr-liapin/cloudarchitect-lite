@@ -75,3 +75,24 @@ jobs:
           severity: CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+
+  install-smoke:
+    name: Install smoke test (docker compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fresh install as documented (no .env)
+        run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Setup link is printed and the API answers through nginx
+        run: |
+          docker compose logs gateway | grep -E 'http://localhost:8080/setup\?code=[0-9a-f]{12}'
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:8080/api/setup/status | grep -q '"configured":false'
+          curl -fsS http://127.0.0.1:8080/api/models | grep -q '"sonnet"'
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Clean up
+        if: always()
+        run: docker compose down --volumes

@@ -33,6 +33,8 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 **E5 — Hybrid AI:** 3 anonymous free operations (configurable), gateway/secrets, provider adapters, **budget cap + kill switch (NFR-009)**, credit transparency (FR-024), **BYOK direct browser** with proxy fallback, anti-abuse.
 
+**E8 — Self-hosted install (new):** one-command `docker compose up`, browser setup wizard (FR-027), installation guide for Windows/macOS/Linux, model choice with benchmark (FR-026). Done 2026-10-14.
+
 **E6 — Export & QA:** PNG/SVG/JSON with containers; Mermaid and draw.io (P1); graph/icon rendering tests, browser QA, accessibility baseline, performance targets (NFR-012).
 
 **E7 — Legal & compliance (new):** Privacy Policy, Terms of Use, GDPR basis, AI provider data settings, icon attribution page, disclaimers.

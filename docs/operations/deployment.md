@@ -9,11 +9,11 @@
 
 ## Environments
 
-| Environment | Trigger                                         | Approval                                           |
-| ----------- | ----------------------------------------------- | -------------------------------------------------- |
-| Local       | `pnpm dev` or `docker compose up --build`       | —                                                  |
-| Staging     | push to `main` (`.github/workflows/deploy.yml`) | none                                               |
-| Production  | published GitHub release                        | required reviewers on the `production` environment |
+| Environment         | Trigger                                                                           | Approval                                           |
+| ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Local / self-hosted | `docker compose up --build` ([installation guide](installation.md)) or `pnpm dev` | —                                                  |
+| Staging             | push to `main` (`.github/workflows/deploy.yml`)                                   | none                                               |
+| Production          | published GitHub release                                                          | required reviewers on the `production` environment |
 
 ## One-time setup
 

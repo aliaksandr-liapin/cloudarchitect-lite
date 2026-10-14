@@ -58,6 +58,8 @@ Let users, without signing up and without knowing any diagram format, turn a des
 | FR-023 | Mermaid export | P1 | Export the graph as a Mermaid flowchart with a subgraph per container; no icon references required. |
 | FR-024 | Credit & cost transparency | P0 | Before an operation, the UI shows remaining credits and exactly what will be sent to the AI provider, and shows "free AI temporarily unavailable" when the kill switch is active. |
 | FR-025 | Clarification round | P0 | If extraction returns critical open questions, the user answers or skips them; generation uses the answers within the **same** credit. At most one round per operation. |
+| FR-026 | Model choice with measured benchmark | P0 | The user picks Claude Haiku 5.5 or Sonnet 5.5 for AI operations. The UI shows each model's measured blind-review score, automated pass rate, critical-defect rate, cost per generation and latency (ADR-0011). Models the instance key does not serve are marked as needing the user's own key. |
+| FR-027 | Self-hosted setup wizard | P0 | `docker compose up` on Windows, macOS or Linux prints a one-time setup link. A five-step browser wizard (code, API key check, models, limits with budget estimate, review) configures the instance without editing files (ADR-0012). |
 
 ## 5. Non-functional requirements
 

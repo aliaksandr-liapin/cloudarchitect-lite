@@ -20,7 +20,11 @@ const month = (d: Date) => d.toISOString().slice(0, 7);
 export class MemoryCreditStore implements CreditStore {
   private used = new Map<string, number>();
   private spendBy = new Map<string, number>();
-  constructor(private readonly freeCredits: number) {}
+  /** A getter follows settings changed by the setup wizard. */
+  constructor(private readonly credits: number | (() => number)) {}
+  private get freeCredits() {
+    return typeof this.credits === 'function' ? this.credits() : this.credits;
+  }
 
   async remaining(clientKey: string) {
     return Math.max(0, this.freeCredits - (this.used.get(clientKey) ?? 0));

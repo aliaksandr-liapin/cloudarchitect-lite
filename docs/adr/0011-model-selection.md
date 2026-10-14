@@ -10,7 +10,8 @@
 
 - **Free tier:** `claude-haiku-5-5` with one validator-driven repair turn. Round 3 results: schema-valid 100 %, pass 95.6 %, median rubric 2.29, no critical defect in 15/15. About $0.006 per generation.
 - **BYOK default (Anthropic key):** `claude-sonnet-5-5`. Round 3: median rubric 2.86, preferred in 15/15 blind pairs. About $0.08 per generation.
-- The policy lives in `packages/domain/src/models.ts`; the gateway reads `FREE_TIER_MODEL` / `FREE_TIER_REPAIR_TURNS` (defaults from that policy).
+- **Users choose per operation** between Haiku and Sonnet. The editor and the setup wizard show the measured benchmark (quality, pass rate, cost, latency) for each, so the choice is informed. The operator decides which models the instance key serves (`AI_MODELS`, default `haiku`) and the default (`DEFAULT_MODEL`); other models need the user's own key (`403 model_not_enabled`).
+- Options and benchmarks live in `packages/domain/src/models.ts` (`MODEL_OPTIONS`); the gateway exposes them at `GET /api/models`.
 
 **Consequences.**
 

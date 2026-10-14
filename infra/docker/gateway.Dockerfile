@@ -19,8 +19,10 @@ COPY apps/gateway apps/gateway
 RUN pnpm --filter @cloudarchitect/gateway build
 
 FROM node:26-alpine AS runtime
-ENV NODE_ENV=production PORT=8787
+ENV NODE_ENV=production PORT=8787 DATA_DIR=/data
 WORKDIR /app
+# Wizard settings (incl. the API key, mode 0600) live on a volume mounted here.
+RUN mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /repo/apps/gateway/dist/node.js ./node.js
 USER node
 EXPOSE 8787

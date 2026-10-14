@@ -20,20 +20,32 @@ Local-first AI cloud architecture designer — AWS first, Azure/GCP ready. The a
 | `docs/adr`                                             | Architecture decision records                                                                                                       |
 | `docs/security`, `docs/operations`, `docs/engineering` | Threat model, deployment, scalability, observability, runbook, development and testing guides                                       |
 
-## Quick start
+## Install and run (Windows, macOS, Linux)
 
-Requirements: Node 26+ (see `.nvmrc`), pnpm 10.32 (`npm install -g pnpm@10.32.1`; Node 25+ no longer bundles corepack), and Docker for containers (Rancher Desktop or Docker Desktop).
+Only Docker is required. Full guide: [docs/operations/installation.md](docs/operations/installation.md).
+
+```bash
+git clone https://github.com/aliaksandr-liapin/cloudarchitect-lite.git
+cd cloudarchitect-lite
+docker compose up --build
+```
+
+Open the setup link printed in the terminal (`http://localhost:8080/setup?code=…`). A five-step wizard checks your Anthropic API key, lets you choose Claude Haiku 5.5 and/or Sonnet 5.5 based on measured quality and cost, and sets budget limits. Then use the editor at <http://localhost:8080>.
+
+| Model             | Blind review score (0–3) | Checks passed | Cost per generation | Typical wait |
+| ----------------- | ------------------------ | ------------- | ------------------- | ------------ |
+| Claude Haiku 5.5  | 2.29                     | 96%           | $0.006              | 44 s         |
+| Claude Sonnet 5.5 | 2.86                     | 93%           | $0.080              | 51 s         |
+
+Measured on 15 benchmark scenarios × 3 with blind expert review; see [PHASE0_SPIKE.md](docs/product/PHASE0_SPIKE.md).
+
+## Development
+
+Requirements: Node 26+ (see `.nvmrc`), pnpm 10.32 (`npm install -g pnpm@10.32.1`; Node 25+ no longer bundles corepack).
 
 ```bash
 pnpm install
-cp .env.example .env            # set CLIENT_KEY_SALT to a long random string
-pnpm dev                        # web on :5173, gateway on :8787
-```
-
-Full stack in containers:
-
-```bash
-docker compose up --build       # web on :8080, gateway on :8787
+pnpm dev                        # web on :5173 (proxies /api), gateway on :8787; setup link in the gateway log
 ```
 
 ## Quality gates

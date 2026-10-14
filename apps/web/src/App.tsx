@@ -16,7 +16,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api } from './api';
 import { applyLayout, needsLayout, toFlow } from './layout';
+import { AiModelPanel } from './models';
 import { nodeTypes } from './nodes';
 import { downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 
@@ -28,6 +30,7 @@ export function App() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
+  const [setupPending, setSetupPending] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   /** Single entry point for project changes: lay out if needed, persist, re-render. */
@@ -46,6 +49,14 @@ export function App() {
       .catch(() => undefined)
       .then((stored) => commit(stored ?? sample));
   }, [commit]);
+
+  useEffect(() => {
+    // Self-hosted installs: point to the wizard, but never block the local-first editor.
+    api.setupStatus().then(
+      (s) => setSetupPending(s.available && !s.configured),
+      () => undefined,
+    );
+  }, []);
 
   const edges = useMemo(() => (project ? toFlow(project, displayName).edges : []), [project]);
   const findings: Finding[] = useMemo(
@@ -98,6 +109,12 @@ export function App() {
           }}
         />
       </header>
+      {setupPending && (
+        <div className="notice">
+          AI features are not set up yet. Open the setup link printed in the server log (
+          <code>docker compose logs gateway</code>) to finish setup; manual editing works meanwhile.
+        </div>
+      )}
       {error && (
         <div role="alert" className="alert" onClick={() => setError(undefined)}>
           {error}
@@ -146,6 +163,7 @@ export function App() {
               ))}
             </ul>
           </section>
+          <AiModelPanel />
           <p className="muted small">
             Generated designs require professional review before production use. Icons shown are
             generic placeholders until the official packs are imported.
