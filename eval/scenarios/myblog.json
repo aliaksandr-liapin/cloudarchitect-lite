@@ -1,13 +1,29 @@
 {
   "id": "myblog",
-  "title": "MyBlog.com — serverless global blog (PRD §16)",
+  "title": "MyBlog.com \u2014 serverless global blog (PRD \u00a716)",
+  "class": "static-web",
   "prompt": "We need a serverless global blog. Traffic is read-heavy with infrequent writes. Static site plus a REST API, with caching. New subscribers get a welcome email. Authors upload photos and we need thumbnails. Keep latency and cost low.",
   "expectedRequirements": [
-    { "id": "static-site", "keywords": ["static"] },
-    { "id": "rest-api", "keywords": ["api"] },
-    { "id": "read-heavy", "keywords": ["read"] },
-    { "id": "welcome-email", "keywords": ["email"] },
-    { "id": "photo-thumbnails", "keywords": ["photo", "thumbnail"] }
+    {
+      "id": "static-site",
+      "keywords": ["static"]
+    },
+    {
+      "id": "rest-api",
+      "keywords": ["api"]
+    },
+    {
+      "id": "read-heavy",
+      "keywords": ["read"]
+    },
+    {
+      "id": "welcome-email",
+      "keywords": ["email"]
+    },
+    {
+      "id": "photo-thumbnails",
+      "keywords": ["photo", "thumbnail"]
+    }
   ],
   "expectedServices": {
     "required": ["aws.cloudfront", "aws.s3", "aws.lambda", "aws.ses"],

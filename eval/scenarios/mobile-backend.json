@@ -1,0 +1,34 @@
+{
+  "id": "mobile-backend",
+  "title": "Mobile app backend with sign-in, uploads and push",
+  "class": "serverless-api",
+  "prompt": "We are building a fitness tracking mobile app. Users sign up with email or Google, log workouts through a REST API and upload progress photos directly from the phone. We send push notifications when a friend beats their record. Expect spiky traffic after New Year; we want pay-per-use and no servers to manage.",
+  "expectedRequirements": [
+    {
+      "id": "sign-in",
+      "keywords": ["sign", "auth", "login"]
+    },
+    {
+      "id": "rest-api",
+      "keywords": ["api"]
+    },
+    {
+      "id": "photo-upload",
+      "keywords": ["photo", "upload"]
+    },
+    {
+      "id": "push",
+      "keywords": ["push", "notification"]
+    },
+    {
+      "id": "spiky",
+      "keywords": ["spik", "burst", "scal"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.cognito", "aws.apigateway", "aws.lambda", "aws.s3", "aws.sns"],
+    "anyOf": [["aws.dynamodb", "aws.aurora"]],
+    "forbidden": ["aws.ec2", "aws.eks"]
+  },
+  "maxErrorFindings": 0
+}

@@ -1,0 +1,41 @@
+{
+  "id": "support-chatbot",
+  "title": "Generative AI support assistant over company documents",
+  "class": "ml-inference",
+  "prompt": "We want a customer support chat assistant that answers questions using our 20,000 product manuals (PDFs). Answers must cite the manual they came from. Only logged-in customers can use it, conversation history is kept for 30 days, and we prefer a managed foundation model rather than hosting our own.",
+  "expectedRequirements": [
+    {
+      "id": "chat",
+      "keywords": ["chat", "assistant", "question"]
+    },
+    {
+      "id": "documents",
+      "keywords": ["manual", "document", "pdf"]
+    },
+    {
+      "id": "citations",
+      "keywords": ["cite", "citation", "source"]
+    },
+    {
+      "id": "auth",
+      "keywords": ["logged", "login", "auth", "sign"]
+    },
+    {
+      "id": "history",
+      "keywords": ["history", "30 days", "conversation"]
+    },
+    {
+      "id": "managed-model",
+      "keywords": ["managed", "foundation model", "model"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.bedrock", "aws.s3", "aws.opensearch", "aws.lambda", "aws.cognito"],
+    "anyOf": [
+      ["aws.apigateway", "aws.alb"],
+      ["aws.dynamodb", "aws.aurora", "aws.rds"]
+    ],
+    "forbidden": ["aws.ec2"]
+  },
+  "maxErrorFindings": 0
+}

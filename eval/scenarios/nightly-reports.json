@@ -1,0 +1,34 @@
+{
+  "id": "nightly-reports",
+  "title": "Scheduled nightly reporting job",
+  "class": "workflow",
+  "prompt": "Every night at 02:00 we need to generate PDF sales reports from our existing Aurora PostgreSQL database, store them for a year, and email a download link to 40 regional managers. The job takes about 25 minutes. Keep it simple and cheap.",
+  "expectedRequirements": [
+    {
+      "id": "schedule",
+      "keywords": ["nightly", "schedule", "02:00", "night"]
+    },
+    {
+      "id": "reports",
+      "keywords": ["report", "pdf"]
+    },
+    {
+      "id": "storage",
+      "keywords": ["store", "year", "retain"]
+    },
+    {
+      "id": "email",
+      "keywords": ["email"]
+    },
+    {
+      "id": "long-job",
+      "keywords": ["25 minutes", "minutes", "duration"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.eventbridge", "aws.aurora", "aws.s3", "aws.ses"],
+    "anyOf": [["aws.fargate", "aws.ecs", "aws.stepfunctions"]],
+    "forbidden": ["aws.eks", "aws.kinesis"]
+  },
+  "maxErrorFindings": 0
+}

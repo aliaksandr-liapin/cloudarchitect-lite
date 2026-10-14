@@ -25,6 +25,7 @@ console.table(
     ...r,
     missingServices: r.missingServices.join(', '),
     forbiddenServices: r.forbiddenServices.join(', '),
+    missingUnresolved: r.missingUnresolved.join(', '),
   })),
 );
 console.log(

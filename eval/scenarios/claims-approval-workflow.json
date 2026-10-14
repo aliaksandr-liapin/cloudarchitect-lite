@@ -1,0 +1,45 @@
+{
+  "id": "claims-approval-workflow",
+  "title": "Insurance claim intake with human approval",
+  "class": "workflow",
+  "prompt": "Customers submit insurance claims with photos and PDF documents through a web form. Each claim goes through automated checks, then waits up to 14 days for an adjuster to approve or reject it, then the customer is emailed the decision. Every step must be auditable and the process must resume correctly after failures.",
+  "expectedRequirements": [
+    {
+      "id": "submit",
+      "keywords": ["submit", "form", "claim"]
+    },
+    {
+      "id": "documents",
+      "keywords": ["photo", "document", "pdf", "upload"]
+    },
+    {
+      "id": "automated-checks",
+      "keywords": ["automated", "check"]
+    },
+    {
+      "id": "human-approval",
+      "keywords": ["approv", "adjuster"]
+    },
+    {
+      "id": "long-wait",
+      "keywords": ["14 days", "wait"]
+    },
+    {
+      "id": "email",
+      "keywords": ["email"]
+    },
+    {
+      "id": "audit",
+      "keywords": ["audit"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.stepfunctions", "aws.lambda", "aws.s3", "aws.ses"],
+    "anyOf": [
+      ["aws.apigateway", "aws.alb"],
+      ["aws.dynamodb", "aws.aurora", "aws.rds"]
+    ],
+    "forbidden": ["aws.kinesis"]
+  },
+  "maxErrorFindings": 0
+}

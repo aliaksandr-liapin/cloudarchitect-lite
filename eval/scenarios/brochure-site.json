@@ -1,0 +1,38 @@
+{
+  "id": "brochure-site",
+  "title": "Small business brochure site on a tiny budget",
+  "class": "static-web",
+  "prompt": "A local bakery wants a simple marketing website: five static pages, a menu and opening hours, served under their own domain with HTTPS. Traffic is a few hundred visits a day. The budget is a few dollars a month and nobody will maintain servers.",
+  "expectedRequirements": [
+    {
+      "id": "static-pages",
+      "keywords": ["static"]
+    },
+    {
+      "id": "custom-domain",
+      "keywords": ["domain", "dns"]
+    },
+    {
+      "id": "https",
+      "keywords": ["https", "tls", "certificate"]
+    },
+    {
+      "id": "low-cost",
+      "keywords": ["cost", "budget", "cheap"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.s3", "aws.cloudfront", "aws.acm", "aws.route53"],
+    "anyOf": [],
+    "forbidden": [
+      "aws.ec2",
+      "aws.alb",
+      "aws.ecs",
+      "aws.eks",
+      "aws.rds",
+      "aws.aurora",
+      "aws.nat-gateway"
+    ]
+  },
+  "maxErrorFindings": 0
+}

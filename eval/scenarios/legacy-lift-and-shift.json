@@ -1,0 +1,38 @@
+{
+  "id": "legacy-lift-and-shift",
+  "title": "Lift-and-shift of a legacy Java monolith",
+  "class": "legacy-migration",
+  "prompt": "We are migrating a legacy Java monolith from our data center. Today it runs on two virtual machines behind a hardware load balancer with a MySQL database. We must move within three months with minimal code changes, keep it highly available across two availability zones, and stop managing database backups ourselves. Shared file uploads are stored on an NFS share.",
+  "expectedRequirements": [
+    {
+      "id": "minimal-change",
+      "keywords": ["minimal", "lift", "rehost", "code change"]
+    },
+    {
+      "id": "load-balancing",
+      "keywords": ["load balanc"]
+    },
+    {
+      "id": "mysql",
+      "keywords": ["mysql", "database"]
+    },
+    {
+      "id": "high-availability",
+      "keywords": ["availab", "multi-az"]
+    },
+    {
+      "id": "managed-backups",
+      "keywords": ["backup", "managed"]
+    },
+    {
+      "id": "shared-files",
+      "keywords": ["nfs", "shared file", "file share"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.ec2", "aws.alb", "aws.efs"],
+    "anyOf": [["aws.rds", "aws.aurora"]],
+    "forbidden": ["aws.lambda", "aws.eks", "aws.dynamodb"]
+  },
+  "maxErrorFindings": 0
+}

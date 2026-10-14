@@ -1,0 +1,36 @@
+{
+  "id": "fraud-model-serving",
+  "title": "Custom ML model needs real-time scoring",
+  "class": "ml-inference",
+  "prompt": "Our data science team trained a custom fraud-detection model in PyTorch. The checkout API must score every payment in real time and store the score with the transaction. We need a managed service to host and autoscale the custom model endpoint, and we retrain it monthly.",
+  "expectedRequirements": [
+    {
+      "id": "custom-model",
+      "keywords": ["custom", "pytorch", "model"]
+    },
+    {
+      "id": "real-time",
+      "keywords": ["real time", "real-time", "every payment"]
+    },
+    {
+      "id": "store-score",
+      "keywords": ["store", "score"]
+    },
+    {
+      "id": "retrain",
+      "keywords": ["retrain", "monthly", "training"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.apigateway", "aws.lambda"],
+    "anyOf": [["aws.dynamodb", "aws.aurora", "aws.rds"]],
+    "forbidden": []
+  },
+  "expectedUnresolved": [
+    {
+      "id": "model-hosting",
+      "keywords": ["sagemaker", "model endpoint", "model hosting", "inference endpoint"]
+    }
+  ],
+  "maxErrorFindings": 0
+}

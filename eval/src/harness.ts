@@ -2,9 +2,23 @@ import { awsCatalog } from '@cloudarchitect/catalog';
 import { Project, validateProject } from '@cloudarchitect/domain';
 import { z } from 'zod';
 
+/** Benchmark classes from PRD §13; the Phase 0 set covers each at least once. */
+export const ScenarioClass = z.enum([
+  'static-web',
+  'serverless-api',
+  'event-driven',
+  'data-pipeline',
+  'containerized-api',
+  'ml-inference',
+  'legacy-migration',
+  'workflow',
+  'security-compliance',
+]);
+
 export const Scenario = z.object({
   id: z.string(),
   title: z.string(),
+  class: ScenarioClass,
   prompt: z.string().max(8000),
   expectedRequirements: z.array(z.object({ id: z.string(), keywords: z.array(z.string()).min(1) })),
   expectedServices: z.object({
@@ -12,6 +26,10 @@ export const Scenario = z.object({
     anyOf: z.array(z.array(z.string())).default([]),
     forbidden: z.array(z.string()).default([]),
   }),
+  /** Needs outside the catalog: each must appear as an unresolved node whose name matches a keyword (FR-020). */
+  expectedUnresolved: z
+    .array(z.object({ id: z.string(), keywords: z.array(z.string()).min(1) }))
+    .default([]),
   maxErrorFindings: z.number().int().min(0).default(0),
 });
 export type Scenario = z.infer<typeof Scenario>;
@@ -22,6 +40,7 @@ export interface ScenarioResult {
   requirementRecall: number;
   missingServices: string[];
   forbiddenServices: string[];
+  missingUnresolved: string[];
   errorFindings: number;
   passed: boolean;
 }
@@ -42,6 +61,7 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
       requirementRecall: 0,
       missingServices: [],
       forbiddenServices: [],
+      missingUnresolved: [],
       errorFindings: 0,
       passed: false,
     };
@@ -60,6 +80,15 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
       .map((g) => g.join('|')),
   ];
   const forbiddenServices = scenario.expectedServices.forbidden.filter((s) => used.has(s));
+  const unresolvedNames = p.nodes.flatMap((n) =>
+    n.unresolved ? [n.unresolved.name.toLowerCase()] : [],
+  );
+  const missingUnresolved = scenario.expectedUnresolved
+    .filter(
+      (u) =>
+        !unresolvedNames.some((name) => u.keywords.some((k) => name.includes(k.toLowerCase()))),
+    )
+    .map((u) => u.id);
   const errorFindings = validateProject(p, awsCatalog).filter((f) => f.severity === 'error').length;
   const requirementRecall = scenario.expectedRequirements.length
     ? recalled.length / scenario.expectedRequirements.length
@@ -71,11 +100,13 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
     requirementRecall,
     missingServices,
     forbiddenServices,
+    missingUnresolved,
     errorFindings,
     passed:
       requirementRecall >= THRESHOLDS.requirementRecall &&
       missingServices.length === 0 &&
       forbiddenServices.length === 0 &&
+      missingUnresolved.length === 0 &&
       errorFindings <= scenario.maxErrorFindings,
   };
 }

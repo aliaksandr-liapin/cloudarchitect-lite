@@ -1,0 +1,34 @@
+{
+  "id": "order-events",
+  "title": "Event-driven order processing with retries",
+  "class": "event-driven",
+  "prompt": "An online shop accepts orders through an API. After an order is placed, payment capture, inventory reservation and the confirmation email must happen independently, so a failure in one does not block the others. Failed steps must be retried and never silently lost. Orders are looked up by order ID.",
+  "expectedRequirements": [
+    {
+      "id": "order-api",
+      "keywords": ["api"]
+    },
+    {
+      "id": "decoupled",
+      "keywords": ["independ", "decoupl", "asynchron"]
+    },
+    {
+      "id": "retries",
+      "keywords": ["retr", "dead-letter", "dlq", "lost"]
+    },
+    {
+      "id": "confirmation-email",
+      "keywords": ["email"]
+    },
+    {
+      "id": "lookup-by-id",
+      "keywords": ["order id", "lookup", "look up"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.apigateway", "aws.lambda", "aws.sqs", "aws.dynamodb", "aws.ses"],
+    "anyOf": [["aws.sns", "aws.eventbridge"]],
+    "forbidden": ["aws.kinesis"]
+  },
+  "maxErrorFindings": 0
+}

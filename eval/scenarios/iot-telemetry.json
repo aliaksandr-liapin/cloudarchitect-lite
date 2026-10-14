@@ -1,0 +1,40 @@
+{
+  "id": "iot-telemetry",
+  "title": "Device telemetry with out-of-catalog ingestion",
+  "class": "event-driven",
+  "prompt": "We manufacture 50,000 smart thermostats that publish temperature readings over MQTT every minute. We need secure device connectivity with per-device certificates, alerts to the owner by SMS when a reading is out of range, and a dashboard of the last 90 days per device.",
+  "expectedRequirements": [
+    {
+      "id": "mqtt",
+      "keywords": ["mqtt", "device"]
+    },
+    {
+      "id": "scale",
+      "keywords": ["50,000", "50000", "thermostat"]
+    },
+    {
+      "id": "device-certs",
+      "keywords": ["certificate", "secure"]
+    },
+    {
+      "id": "sms-alerts",
+      "keywords": ["sms", "alert"]
+    },
+    {
+      "id": "history",
+      "keywords": ["90 days", "dashboard", "history"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.lambda", "aws.sns"],
+    "anyOf": [["aws.dynamodb", "aws.opensearch", "aws.s3"]],
+    "forbidden": []
+  },
+  "expectedUnresolved": [
+    {
+      "id": "iot-ingest",
+      "keywords": ["iot core", "iot", "mqtt broker"]
+    }
+  ],
+  "maxErrorFindings": 0
+}

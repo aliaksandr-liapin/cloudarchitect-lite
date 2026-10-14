@@ -1,0 +1,30 @@
+{
+  "id": "clickstream-analytics",
+  "title": "Clickstream ingestion and ad-hoc SQL analytics",
+  "class": "data-pipeline",
+  "prompt": "Our website emits about 5,000 click events per second. We need to ingest them in near real time, store everything cheaply for two years, and let analysts run ad-hoc SQL queries over the raw history without managing a database cluster.",
+  "expectedRequirements": [
+    {
+      "id": "ingest",
+      "keywords": ["ingest", "stream", "real time", "real-time"]
+    },
+    {
+      "id": "throughput",
+      "keywords": ["5,000", "5000", "per second", "throughput"]
+    },
+    {
+      "id": "retention",
+      "keywords": ["two years", "2 years", "retention", "archive"]
+    },
+    {
+      "id": "sql",
+      "keywords": ["sql", "quer"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.kinesis", "aws.firehose", "aws.s3", "aws.athena"],
+    "anyOf": [],
+    "forbidden": ["aws.rds", "aws.aurora", "aws.dynamodb", "aws.ec2"]
+  },
+  "maxErrorFindings": 0
+}
