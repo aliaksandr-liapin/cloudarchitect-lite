@@ -4,16 +4,6 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
-### Added
-
-- Apache-2.0 license, NOTICE, code of conduct, support guide and changelog.
-- README screenshots and an illustrated setup guide; `pnpm screenshots` regenerates them.
-
-### Changed
-
-- Product docs renamed to lowercase kebab-case (`docs/product/prd.md`, …).
-- CodeQL fails the build on any finding while code scanning uploads are off; gitleaks image pinned by digest.
-
 ## [0.1.0] - 2026-10-14
 
 First tagged pre-alpha. AI generation is not implemented yet.
@@ -27,7 +17,8 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - Phase 0 AI quality spike: 15 benchmark scenarios, spike runner with a validator repair loop, blind rubric reviews ([report](docs/product/phase0-spike.md)).
 - Model choice between Claude Haiku 5.5 and Sonnet 5.5, with measured quality, cost and latency shown wherever a model is chosen ([ADR-0011](docs/adr/0011-model-selection.md)).
 - Self-hosted install with `docker compose up` and a browser setup wizard ([ADR-0012](docs/adr/0012-self-hosted-setup-wizard.md), [guide](docs/operations/installation.md)).
-- CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL, `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
+- CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
+- Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
 [Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/releases/tag/v0.1.0
