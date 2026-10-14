@@ -75,8 +75,9 @@ export function ModelComparison({
         )}
       </tbody>
       <caption className="muted small">
-        Measured {options[0]?.benchmark.measuredAt} on 15 benchmark scenarios ×3; blind expert
-        review per PRD §14. {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
+        Measured {options[0]?.benchmark.measuredAt} on 15 benchmark scenarios ×3; blind rubric
+        review by isolated AI reviewer sessions (PRD §14).{' '}
+        {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
       </caption>
     </table>
   );

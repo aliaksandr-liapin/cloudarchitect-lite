@@ -16,6 +16,6 @@ coverage/
 !.vscode/extensions.json
 # Original spec archive (kept locally, content lives in docs/product)
 *.zip
-# Icon packs are fetched, not committed (see docs/product/CLOUD_PROVIDER_CATALOG.md §2)
+# Icon packs are fetched, not committed (see docs/product/cloud-provider-catalog.md §2)
 assets/icons/
 eval/results/

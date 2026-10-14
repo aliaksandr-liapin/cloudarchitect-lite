@@ -60,7 +60,7 @@ const BASELINE = [
  * Deterministic rules from PRD §11. Each rule's metadata lives in the catalog
  * (`validation-rules.json`); logic lives here, keyed by rule ID.
  * Rules not yet implemented: VR-002, VR-003, VR-008, VR-011 (tracked in ROADMAP E4).
- * VR-016…VR-018 come from the Phase 0 blind review (docs/product/PHASE0_SPIKE.md).
+ * VR-016…VR-018 come from the Phase 0 blind review (docs/product/phase0-spike.md).
  */
 const RULES: Rule[] = [
   {

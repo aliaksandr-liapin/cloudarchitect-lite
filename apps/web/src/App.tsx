@@ -83,6 +83,17 @@ export function App() {
     [project, commit],
   );
 
+  /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
+  const locate = (f: Finding) => {
+    const id =
+      f.nodeIds[0] ??
+      f.containerIds[0] ??
+      project?.edges.find((e) => e.id === f.edgeIds[0])?.target;
+    if (!id) return;
+    setSelected(id);
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+  };
+
   const detail = project && selected ? describe(project, selected) : undefined;
 
   return (
@@ -151,10 +162,7 @@ export function App() {
             <ul className="findings">
               {findings.map((f) => (
                 <li key={f.id} className={`sev-${f.severity}`}>
-                  <button
-                    className="link"
-                    onClick={() => setSelected(f.nodeIds[0] ?? f.containerIds[0])}
-                  >
+                  <button className="link" onClick={() => locate(f)}>
                     <span className="badge">{f.severity}</span> {f.ruleId}
                   </button>
                   <div>{f.explanation}</div>

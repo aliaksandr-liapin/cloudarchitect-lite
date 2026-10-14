@@ -1,0 +1,12 @@
+CloudArchitect Lite
+Copyright 2026 Aliaksandr Liapin
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Amazon Web Services, AWS and the names of AWS services are trademarks of Amazon.com, Inc. or its
+affiliates. Microsoft Azure and Google Cloud names are trademarks of their respective owners.
+This project is not affiliated with or endorsed by any cloud provider.
+
+Cloud provider architecture icons are not included in this repository. They are downloaded from
+the providers' official icon pages under the providers' own terms
+(see docs/product/cloud-provider-catalog.md, section 2).

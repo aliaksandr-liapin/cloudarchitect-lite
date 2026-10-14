@@ -5,7 +5,7 @@
 1. Branch from `main`: `feat/<topic>`, `fix/<topic>` or `docs/<topic>`.
 2. Keep changes small and linked to a PRD item (FR-/NFR-/VR-) or roadmap epic.
 3. Run `pnpm run ci` and `pnpm eval` before opening a pull request.
-4. Open a PR using the template; CI must be green and CODEOWNERS approval is required.
+4. Open a PR using the template. `main` is protected: changes land only through pull requests with all required checks green. Code-owner approval becomes mandatory once the project has a second maintainer.
 5. Squash-merge with a [Conventional Commits](https://www.conventionalcommits.org/) title, e.g. `feat(domain): add VR-003 rule`.
 
 ## Rules of the road

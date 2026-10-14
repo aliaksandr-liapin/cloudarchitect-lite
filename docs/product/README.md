@@ -48,15 +48,15 @@ Text-to-diagram is already offered by Eraser, Cloudairy, Lucid, Brainboard, Clou
 
 ## 6. Documents
 
-- [PRD.md](PRD.md) — scenarios, requirements, credit semantics, cost model, validation rules, rubric, expert review.
-- [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) — components, API, graph model, BYOK, security, eval harness, ADRs.
-- [CLOUD_PROVIDER_CATALOG.md](CLOUD_PROVIDER_CATALOG.md) — catalog, features, containers, icon sources and terms, update process.
-- [ROADMAP.md](ROADMAP.md) — phases, epics, gates, metrics, risks.
+- [prd.md](prd.md) — scenarios, requirements, credit semantics, cost model, validation rules, rubric, expert review.
+- [technical-architecture.md](technical-architecture.md) — components, API, graph model, BYOK, security, eval harness, ADRs.
+- [cloud-provider-catalog.md](cloud-provider-catalog.md) — catalog, features, containers, icon sources and terms, update process.
+- [roadmap.md](roadmap.md) — phases, epics, gates, metrics, risks.
 
 ## 7. Open decisions
 
 - Branding and trademark for **CloudArchitect Lite** (working name).
-- Monthly free-AI budget cap and final quota. Cost per operation is measured (PHASE0_SPIKE.md); the cap is the remaining decision.
+- Monthly free-AI budget cap and final quota. Cost per operation is measured (phase0-spike.md); the cap is the remaining decision.
 - Accountless anti-abuse UX; optional email magic link for extra credits.
 - Product license (not chosen yet: all rights reserved).
 - Availability of a human expert for spot checks before public beta.

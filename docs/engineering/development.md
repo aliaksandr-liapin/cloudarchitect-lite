@@ -14,12 +14,15 @@ Containers: `docker compose up --build` (tested with Rancher Desktop).
 
 ## Commands
 
-| Command       | What it does                                             |
-| ------------- | -------------------------------------------------------- |
-| `pnpm run ci` | Lint, format check, typecheck, tests, build — same as CI |
-| `pnpm test`   | Unit tests in all packages (Vitest)                      |
-| `pnpm eval`   | Score `eval/candidates` against `eval/scenarios`         |
-| `pnpm format` | Prettier write                                           |
+| Command            | What it does                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `pnpm run ci`      | Lint, format check, typecheck, tests, build — same as CI                                     |
+| `pnpm test`        | Unit tests in all packages (Vitest)                                                          |
+| `pnpm eval`        | Score `eval/candidates` against `eval/scenarios`                                             |
+| `pnpm format`      | Prettier write                                                                               |
+| `pnpm screenshots` | Rebuild the web app and regenerate `docs/images` (needs Google Chrome; API calls are mocked) |
+
+Regenerate the screenshots whenever a change alters what they show, and commit the images with that change.
 
 ## TypeScript versions
 
