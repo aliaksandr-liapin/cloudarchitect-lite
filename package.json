@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.32.1",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @cloudarchitect/web --filter @cloudarchitect/gateway dev",
