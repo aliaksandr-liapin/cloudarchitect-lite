@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # AI gateway (Node runtime). The esbuild bundle is self-contained, so the runtime image has no node_modules.
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /repo
 # Node 25+ no longer bundles corepack; keep in sync with "packageManager" in package.json.
 ARG PNPM_VERSION=10.32.1
@@ -18,7 +18,7 @@ COPY packages/catalog packages/catalog
 COPY apps/gateway apps/gateway
 RUN pnpm --filter @cloudarchitect/gateway build
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production PORT=8787
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/gateway/dist/node.js ./node.js
