@@ -169,7 +169,13 @@ function describe(project: Project, id: string) {
       <dt>Component</dt>
       <dd>{node.label}</dd>
       <dt>Service</dt>
-      <dd>{svc ? svc.displayName : `${node.unresolved?.name} (not in verified catalog)`}</dd>
+      <dd>
+        {svc
+          ? svc.displayName
+          : node.external
+            ? `${node.external.name} (external ${node.external.kind}, outside the AWS account)`
+            : `${node.unresolved?.name} (not in verified catalog)`}
+      </dd>
       {svc && (
         <>
           <dt>Verification</dt>

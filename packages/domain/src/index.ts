@@ -3,3 +3,4 @@ export * from './catalog.js';
 export * from './validation.js';
 export * from './patch.js';
 export * from './migrate.js';
+export * from './models.js';

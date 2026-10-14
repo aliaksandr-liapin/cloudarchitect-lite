@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Default root object (index.html) only applies to the distribution root; with an S3 REST origin behind OAC, pretty URLs such as /menu/ will not resolve to /menu/index.html without a CloudFront Function. The design assumes separate HTML files, which avoids this, but it does not say so explicitly.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is drawn inside the generic regional container. CloudFront metrics and alarms live in us-east-1, which is not stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A textbook private S3 + OAC + CloudFront + ACM (us-east-1) + Route 53 static site that fits the budget, with a sensible error-rate alarm and clear assumptions."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Observability is limited to viewing metrics. No alarm is defined, so errors go unnoticed unless the owner checks the console.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The whole region container is labelled us-east-1 and the S3 bucket sits in it. That is valid, but it conflates the ACM certificate's region requirement with the bucket's region choice.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The visitor EXTERNAL node has no 'external' descriptor block, which is inconsistent with the schema.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The same correct S3 + OAC + CloudFront + ACM + Route 53 pattern, with good open questions (www redirect, custom 404) but slightly thinner monitoring."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The assumption 'Messages in a DLQ are retained until redriven, so they are not lost' is false. SQS retention is at most 14 days, and for standard queues the expiry uses the original enqueue timestamp, so unprocessed DLQ messages are deleted silently. The design sets no DLQ retention, which directly undermines the requirement that failures are 'never silently lost'. The DLQ retention should be set to the maximum and longer than the source queue's, with a redrive process.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html ; https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The stream on-failure queue holds only batch metadata, and records must be replayed from the stream before they expire. The design states this correctly but defines no time-bound replay runbook. An S3 on-failure destination, which includes the payload, would remove that time pressure.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No stream event filter (INSERT only) is described, so later order updates could republish OrderPlaced. Idempotent consumers mitigate this.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not mention the SQS queue policies for the SNS subscriptions, or that the visibility timeout must exceed the Lambda timeout.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong outbox (DynamoDB Streams) -> SNS -> per-step SQS/Lambda/DLQ design with idempotency, Secrets Manager and alarms, marred by an incorrect claim that DLQ messages are kept indefinitely."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream DLQ is described as holding 'stream records that the publisher could not process'. In reality an SQS on-failure destination receives only metadata, and the actual records stay in the stream until they expire. The design also sets no bounded MaximumRetryAttempts or bisect, so with the defaults a bad record blocks the shard for up to one day and the metadata arrives when the records are about to expire. Orders can be lost without anyone noticing, despite the 'never silently lost' requirement.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The payment provider credentials have no secure storage (no Secrets Manager or Parameter Store).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The email worker deduplicates on 'the message ID'. A duplicate publish from a stream retry creates a new SNS/SQS message ID, so the dedup key should be the order ID.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The rationale references an internal 'FACT-006' that the user cannot see.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A REST API is chosen only to allow WAF later. That is defensible but costs more per request than an HTTP API with a JWT authorizer.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same sound fan-out architecture with good open questions (DLQ retention, PCI), but the stream-failure path is misdescribed and left at unsafe defaults, and no secret store is included."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no IAM for pods (IRSA / EKS Pod Identity) and no secret store for the MySQL and Redis credentials. Security groups between nodes, RDS and ElastiCache are not described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The container registry (ECR) is left as an open question. Without ECR plus VPC endpoints, all image pulls and AWS API traffic go through the NAT gateways, which adds data-processing cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Two NAT gateways and a customer-managed KMS key raise the baseline cost. That is justified for AZ resilience but not quantified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Splitting the single ALB into per-AZ nodes with duplicated edges is a diagram artifact. It is explained in the assumptions, but it could mislead.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-reasoned EKS migration with Multi-AZ RDS, an ElastiCache replica, a NAT gateway per AZ, CloudWatch plus ADOT/X-Ray and DMS for the data load. It correctly explains why EC2 nodes are used over Fargate (DaemonSets)."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The single NAT gateway, the single RDS instance and the single ElastiCache node all sit in AZ A. If AZ A fails, the AZ B nodes lose egress and the shared database and cache are both gone, so the multi-AZ compute placement buys no real resilience. RDS Multi-AZ is only raised as an open question.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Inferred requirement R10 (initial MySQL load) has no component in the design. DMS or dump/restore appears only as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no pod IAM (IRSA / Pod Identity), no credential store for the database and cache, and no container registry.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Saying that X-Ray 'shows calls across services, the database and the cache' overstates what X-Ray does without instrumentation. Whether the services are instrumented is not asked.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch 'sends alarms', but no alarms are defined, and EKS control-plane logging is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct EKS/ALB/RDS/ElastiCache/CloudWatch/X-Ray skeleton with a good question about Prometheus, but the data tier and egress are single-AZ and the migration is left undesigned."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "brochure-site",
+      "better": "A",
+      "why": "The two designs are nearly identical, but A adds an error-rate alarm and states the encryption and Shield Standard assumptions explicitly."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "A bounds and bisects stream retries, describes the on-failure queue correctly as metadata plus replay, and stores the payment credentials in Secrets Manager. Its DLQ-retention claim is wrong, but B's stream-failure gap is the bigger loss risk."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A delivers real AZ fault tolerance (Multi-AZ RDS, a cache replica, a NAT gateway per AZ) and a concrete DMS migration path, where B's data tier and egress are concentrated in one AZ."
+    }
+  ]
+}

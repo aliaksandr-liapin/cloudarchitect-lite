@@ -1,0 +1,213 @@
+{
+  "reviews": [
+    {
+      "scenario": "clickstream-analytics",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Assumes a server-side emitter that holds IAM credentials. If the clicks come from browsers, which 'our website emits' allows, there is no ingestion endpoint and no auth path. This is raised only as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no Firehose error-output prefix or S3 backup for failed deliveries, and no Athena results bucket node, although the assumptions mention one.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Records stay as compressed raw JSON. Parquet conversion is only an open question, so analysts' Athena scan cost over two years of data is higher than it needs to be.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Sizing at '5 to 6 shards' for about 5 MB/s and 5,000 records/s leaves almost no headroom for peaks, and on-demand mode is not considered. The lifecycle rule to 'colder storage classes' could also make data unqueryable by Athena if it moves objects to Glacier Flexible Retrieval or Deep Archive.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, cheap and correct KDS, Firehose, S3 and Athena pipeline, but it assumes server-side producers and lacks delivery-failure handling and columnar conversion."
+    },
+    {
+      "scenario": "clickstream-analytics",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 1,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Each click is sent as its own REST API request with a PutRecord integration, and every request also passes through WAF. At 5,000 req/s that is about 13 billion requests per month, so API Gateway alone costs roughly $30k per month at the published tiers ($3.50, $2.80 and $2.38 per million), plus WAF per-request fees. The design does not discuss client-side batching (PutRecords) or a cheaper collector.",
+          "evidence": "https://aws.amazon.com/api-gateway/pricing/"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito guest credentials can be obtained by anyone, so SigV4 here is effectively abuse friction rather than real caller authentication. WAF rate rules carry the actual protection, which the design only partly acknowledges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, secure, well-explained browser-ingestion pipeline with Parquet conversion, partition projection and a 730-day lifecycle, let down by an expensive per-event API Gateway and WAF front door."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "AWS nodes are not placed in the region container. This is cosmetic only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The HTTP API cannot use WAF and the design gives no explicit throttling configuration for the spiky public API. Upload size limits are left as an open question.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A production-grade serverless design: Cognito with Google federation, HTTP API with a JWT authorizer, presigned S3 uploads, a filtered DynamoDB Streams consumer with an SQS on-failure destination, and device-token registration through SNS."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no path for registering device tokens or creating SNS platform endpoints, so push targets are never created.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge 'API handler -> S3: Generate presigned PUT URL' implies a call to S3, but presigning is a local signing operation. The notifier also has no read edge to the table for friend and record lookups.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "'Idempotent by stream event ID' needs a dedupe store that is not designed. Lambda and API Gateway logs to CloudWatch are not shown, and the stream mapping has no event filter to avoid processing non-workout writes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The architecture is sound and essentially the same as A, but it misses device-token registration and has several thinner connection and reliability details."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The API Gateway to internal ALB hop is labeled 'HTTP over VPC link', which contradicts the explicit 'TLS everywhere' requirement and the design's own TLS assumption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The open question on whether an NLB is needed for VPC link is outdated. REST APIs can now integrate privately with an ALB through VPC link v2.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/private-integration.html"
+        },
+        {
+          "severity": "minor",
+          "description": "WAF protects only the API stage, and the CloudFront distribution and static site have no web ACL (left as an open question). The regional API endpoint can also be reached directly, bypassing CloudFront.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is a single NAT Gateway, and Fargate and Aurora nodes are drawn in AZ A only. The KMS key has no edges to the resources it encrypts. CloudTrail has no multi-Region setting and no CloudWatch integration for alarming on admin activity, and Object Lock is deferred.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A workable, layered CloudFront, WAF-on-API-Gateway, VPC link and Fargate design that meets the core asks, with TLS-hop, WAF-coverage and single-AZ gaps and more moving parts than needed."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB authenticate-cognito action fits browser sessions but suits programmatic API clients poorly. Those clients cannot follow the redirect flow, so the API would need a JWT-validation path.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "'Organization/multi-Region trail' assumes AWS Organizations and the management or delegated-admin account. This is not stated and is not needed for a single-account audit trail.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are no VPC endpoints for ECR, Secrets Manager or CloudWatch Logs, so all AWS API traffic goes through two NAT Gateways, which adds cost and widens the egress surface.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, coherent and HA design: WAF and Shield on a public ALB with Cognito MFA authentication, Fargate tasks in two private subnets, Aurora with a reader, customer-managed KMS keys throughout, and CloudTrail to an encrypted bucket and CloudWatch."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "clickstream-analytics",
+      "better": "B",
+      "why": "B covers browser ingestion securely and adds Parquet, partition projection, error prefixes and expiry, but its per-event API Gateway and WAF cost must be fixed with batching. A is cheaper but leaves browser ingestion unsolved."
+    },
+    {
+      "scenario": "mobile-backend",
+      "better": "A",
+      "why": "A includes device-token registration, stream event filtering, an explicit idempotency design and logging edges, which B lacks."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B is simpler and fully multi-AZ, applies WAF and Shield to the single entry point and keeps TLS on every hop, while A has an HTTP hop, partial WAF coverage and a single NAT."
+    }
+  ]
+}

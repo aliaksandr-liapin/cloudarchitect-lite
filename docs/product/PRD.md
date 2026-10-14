@@ -152,6 +152,9 @@ Rule findings are deterministic and versioned; advisory findings (FR-021) are a 
 | VR-013 | Node without a linked requirement (except the observability/security baseline) | info |
 | VR-014 | Service with lifecycle `deprecated` / `retired` / `unknown` | warning |
 | VR-015 | `unresolved` node (FR-020) | info |
+| VR-016 | AWS WAF attached to an API Gateway HTTP or WebSocket API (WAF supports REST APIs only) | error |
+| VR-017 | Lambda on-failure destination used for an SQS event source (use the queue's redrive DLQ) | warning |
+| VR-018 | Application Load Balancer placed in a single Availability Zone | warning |
 
 Every rule has positive and negative fixture tests.
 
@@ -258,8 +261,7 @@ No IaC deployment, deep price engine, multi-user cloud storage, enterprise compl
 
 **Decisions requiring product validation**
 
-- Monthly free-AI budget cap and final quota after measurement (§7).
-- Models for the free tier and the BYOK default (based on benchmark results).
+- Monthly free-AI budget cap and final quota after measurement (§7). Models are decided in ADR-0011.
 - Accountless anti-abuse UX; whether an email magic link is needed as an optional way to get more credits.
 - Depth of requirement extraction in the first public beta.
 - Branding, trademark and pricing of an eventual Pro plan.

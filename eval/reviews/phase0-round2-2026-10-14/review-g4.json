@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Retraining replaces the live endpoint model with no evaluation gate or rollback step. This is raised as an open question but not designed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no data path from the transactions table or labeled outcomes such as chargebacks into the training bucket, so monthly retraining depends on manual uploads. This is raised as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no fallback or timeout behaviour on the synchronous scoring path. The Lambda calls the endpoint before the idempotency check, so a retry re-scores the payment before the conditional put returns the stored item.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The API Gateway node has no edge to CloudWatch, although R7 lists API monitoring.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A coherent, well-justified MVP: SigV4-authorized REST API, Lambda, a SageMaker endpoint with autoscaling, an idempotent DynamoDB write, and Step Functions orchestrating monthly retraining and the endpoint update."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Monthly retraining is not closed-loop. The schedule triggers the training job directly, the new artifact is never promoted to the live endpoint ('not modelled'), and there is no orchestration, failure handling or alarm for failed training runs. The model is effectively never refreshed in production.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "An EventBridge rule cannot start a SageMaker training job as a native target. It needs EventBridge Scheduler's universal target, a pipeline, or Step Functions, and the design does not say which.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The authorizer for a machine-to-machine checkout caller is left open (Cognito user pool or Lambda authorizer). IAM/SigV4 would be simpler, and the protection is unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Nothing ensures idempotent writes for retried scoring requests (no conditional write), so a retry can overwrite the stored score with a conflicting one.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch node has no edges, so it is unclear what is monitored. Endpoint autoscaling configuration (Application Auto Scaling policy) is not described. The UNRESOLVED nodes do not name the intended service (SageMaker).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct basic real-time scoring path, but retraining stops at writing an artifact: there is no promotion, orchestration or failure monitoring, and idempotency and auth are left vague."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design does not say the API Gateway REST API behind CloudFront should be a Regional endpoint (not edge-optimized). It also does not mention that the CloudFront cache and origin request policies must forward the Authorization header to author routes without caching them.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome function's conditional 'welcome-sent' write to the subscribers table, and the thumbnail function's read of the uploads bucket, are described but have no edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The public subscribe endpoint has no abuse protection (WAF or throttling). This is raised only as an open question.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A strong, cost-conscious serverless design: CloudFront with OAC in front of private buckets and a cached REST API, Cognito-protected author routes, separate buckets that avoid S3 trigger loops, and a stream-driven welcome email with on-failure destinations and alarms."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Originals and thumbnails share one media bucket, and an ObjectCreated notification triggers thumbnail generation, which writes back to the same bucket. No prefix or suffix filter is specified, so thumbnails re-trigger processing in a recursive loop.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront serves the whole media bucket, which exposes full-size originals publicly, not just thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The API config states a Cognito user pool authorizer without limiting it to author routes. Public reads and subscribe must remain unauthenticated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome failure queue rationale is muddled. A DynamoDB Streams failure destination is an event source mapping on-failure destination, not an asynchronous-invocation destination. The thumbnail queue to DLQ redrive edge is missing. The text contains leaked internal references (FACT-004, FACT-006).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound overall serverless blog, but a single media bucket with an unfiltered ObjectCreated trigger risks a recursive thumbnail loop and exposes originals via CloudFront."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "DB credentials are 'injected' from Secrets Manager into Fargate tasks. ECS injects secrets only at container start, so after automatic rotation the running tasks keep the stale password. The design has no in-app secret refresh or forced redeploy, so new DB connections fail after rotation.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no WAF or other edge protection on the internet-facing ALB, and client authentication is deferred to the application.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The RDS standby and ElastiCache replica are not drawn. ElastiCache Multi-AZ automatic failover and in-transit encryption are not explicitly configured. KMS has no edges, and Route 53 is not connected.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The explanation says the ALB is drawn twice 'so the validator sees ALB placement in two AZs', which is tooling leakage rather than architectural rationale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct Fargate, ALB, Multi-AZ RDS and ElastiCache layout with per-AZ NAT, but credential rotation as drawn breaks running tasks because injected secrets are not refreshed."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The application uses the RDS master secret, which is not least privilege. A dedicated application user with alternating-users rotation would be safer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are diagram inconsistencies: each ALB node forwards only to same-AZ tasks (cross-zone routing is not shown), WAF and ACM attach only to alb-a, and only fargate-a has an ECR pull edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Image pulls and Secrets Manager calls go through NAT. VPC endpoints for ECR, S3, Secrets Manager and CloudWatch Logs would cut NAT cost and keep that traffic private.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A production-grade MVP: private Fargate tasks behind a WAF-protected ALB, Multi-AZ RDS and ElastiCache with failover, per-AZ NAT, and rotation handled by tasks re-reading the secret."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "A",
+      "why": "A closes the retraining loop with Step Functions and endpoint update, and specifies IAM auth and idempotent writes; B leaves promotion, auth and idempotency unresolved."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A separates upload and thumbnail buckets, avoiding the S3 recursive-trigger loop and public exposure of originals that B's single media bucket introduces."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B handles rotated credentials by refreshing the secret in tasks, adds WAF, and models standby and replica failover, whereas A injects static secrets that go stale on rotation."
+    }
+  ]
+}

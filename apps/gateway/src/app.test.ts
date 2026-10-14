@@ -24,6 +24,12 @@ describe('gateway', () => {
     expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
   });
 
+  it('defaults the free tier to the ADR-0011 model with one repair turn', () => {
+    const config = loadConfig({ CLIENT_KEY_SALT: 'test-salt-0123456789' });
+    expect(config.FREE_TIER_MODEL).toBe('claude-haiku-5-5');
+    expect(config.FREE_TIER_REPAIR_TURNS).toBe(1);
+  });
+
   it('refuses to start without a salt', () => {
     expect(() => loadConfig({})).toThrow(/CLIENT_KEY_SALT/);
   });

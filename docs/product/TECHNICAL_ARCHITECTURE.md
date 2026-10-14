@@ -173,7 +173,7 @@ Provider browser support can change; the adapter declares `supportsBrowserDirect
 
 1. **Structural:** schema, IDs, dangling edges, duplicate IDs, valid container nesting, node in ≤ 1 container.
 2. **Catalog:** known service, icon mapping, lifecycle/status freshness, unresolved nodes.
-3. **Semantic rules:** VR-001…VR-015 (PRD §11) — deterministic, versioned, each with positive and negative fixtures.
+3. **Semantic rules:** VR-001…VR-018 (PRD §11) — deterministic, versioned, each with positive and negative fixtures.
 4. **Advisory AI review:** class `advisory`, shown separately, never labelled verified.
 
 Rules are declared as data in `catalog/aws/validation-rules.json` (id, severity, description, docs URL) with the check logic in the shared package keyed by rule ID.

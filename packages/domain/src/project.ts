@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Current project schema version. Bump with a migration in `migrate.ts`. */
-export const PROJECT_SCHEMA_VERSION = '1.1.0';
+export const PROJECT_SCHEMA_VERSION = '1.2.0';
 
 export const ProviderId = z.enum(['aws', 'azure', 'gcp']);
 export type ProviderId = z.infer<typeof ProviderId>;
@@ -54,6 +54,13 @@ export const UnresolvedService = z.object({
   rationale: z.string().max(2000),
 });
 
+/** Actors outside the cloud account: people, client apps, third-party and on-premises systems. */
+export const ExternalKind = z.enum(['user', 'client-app', 'third-party', 'on-premises']);
+export const ExternalActor = z.object({
+  kind: ExternalKind,
+  name: z.string().min(1).max(200),
+});
+
 const NodeBase = z.object({
   id: Id,
   provider: ProviderId,
@@ -66,10 +73,26 @@ const NodeBase = z.object({
   position: Position,
 });
 
-/** A node references a catalog service, or is explicitly unresolved (PRD FR-020). Never both. */
+/**
+ * A node is exactly one of: a catalog service, an explicitly unresolved service (PRD FR-020),
+ * or an external actor that is not part of the cloud architecture.
+ */
 export const ArchNode = z.union([
-  NodeBase.extend({ serviceId: Id, unresolved: z.undefined().optional() }),
-  NodeBase.extend({ serviceId: z.undefined().optional(), unresolved: UnresolvedService }),
+  NodeBase.extend({
+    serviceId: Id,
+    unresolved: z.undefined().optional(),
+    external: z.undefined().optional(),
+  }),
+  NodeBase.extend({
+    serviceId: z.undefined().optional(),
+    unresolved: UnresolvedService,
+    external: z.undefined().optional(),
+  }),
+  NodeBase.extend({
+    serviceId: z.undefined().optional(),
+    unresolved: z.undefined().optional(),
+    external: ExternalActor,
+  }),
 ]);
 export type ArchNode = z.infer<typeof ArchNode>;
 

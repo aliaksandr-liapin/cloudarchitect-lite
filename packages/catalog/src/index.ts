@@ -2,12 +2,14 @@ import {
   CatalogManifest,
   CloudService,
   ContainerDefinition,
+  IntegrationFact,
   ServiceFeature,
   ValidationRuleMeta,
   type CatalogSnapshot,
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
 import containers from '../data/aws/containers.json' with { type: 'json' };
+import facts from '../data/aws/facts.json' with { type: 'json' };
 import features from '../data/aws/features.json' with { type: 'json' };
 import manifest from '../data/aws/manifest.json' with { type: 'json' };
 import rules from '../data/aws/validation-rules.json' with { type: 'json' };
@@ -21,6 +23,7 @@ export const awsCatalog: CatalogSnapshot = {
   features: z.array(ServiceFeature).parse(features),
   containers: z.array(ContainerDefinition).parse(containers),
   rules: z.array(ValidationRuleMeta).parse(rules),
+  facts: z.array(IntegrationFact).parse(facts),
 };
 
 /** Sample projects for demos, tests and the eval harness (unvalidated JSON; use migrateProject). */

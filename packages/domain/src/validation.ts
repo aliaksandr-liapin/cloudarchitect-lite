@@ -60,6 +60,7 @@ const BASELINE = [
  * Deterministic rules from PRD §11. Each rule's metadata lives in the catalog
  * (`validation-rules.json`); logic lives here, keyed by rule ID.
  * Rules not yet implemented: VR-002, VR-003, VR-008, VR-011 (tracked in ROADMAP E4).
+ * VR-016…VR-018 come from the Phase 0 blind review (docs/product/PHASE0_SPIKE.md).
  */
 const RULES: Rule[] = [
   {
@@ -100,7 +101,8 @@ const RULES: Rule[] = [
             ASYNC_SOURCES.includes(svc(s) ?? '') &&
             svc(t) === 'aws.lambda' &&
             !e.configuration?.deadLetterQueue &&
-            !e.configuration?.failureDestination
+            // On-failure destinations do not apply to SQS event sources (VR-017).
+            !(svc(s) !== 'aws.sqs' && e.configuration?.failureDestination)
           );
         })
         .map((e) => ({
@@ -217,7 +219,9 @@ const RULES: Rule[] = [
     severity: 'info',
     check: (ctx) =>
       ctx.project.nodes
-        .filter((n) => n.requirementIds.length === 0 && !BASELINE.includes(svc(n) ?? ''))
+        .filter(
+          (n) => !n.external && n.requirementIds.length === 0 && !BASELINE.includes(svc(n) ?? ''),
+        )
         .map((n) => ({
           ruleId: 'VR-013',
           severity: 'info',
@@ -255,6 +259,89 @@ const RULES: Rule[] = [
           remediation:
             'Replace it with a catalog service or keep it as an explicitly unverified component.',
         })),
+  },
+  {
+    id: 'VR-016',
+    severity: 'error',
+    check: (ctx) =>
+      ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          const api = [s, t].find((n) => n && svc(n) === 'aws.apigateway');
+          const waf = [s, t].some((n) => n && svc(n) === 'aws.waf');
+          const type = String(api?.configuration?.apiType ?? '').toUpperCase();
+          return waf && api && (type === 'HTTP' || type === 'WEBSOCKET');
+        })
+        .map((e) => ({
+          ruleId: 'VR-016',
+          severity: 'error',
+          edgeIds: [e.id],
+          explanation:
+            'AWS WAF cannot be associated with an API Gateway HTTP or WebSocket API; this API is unprotected.',
+          remediation:
+            'Use a REST API, or put CloudFront with WAF in front and block direct access to the API.',
+          evidence: [
+            'https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html',
+          ],
+        })),
+  },
+  {
+    id: 'VR-017',
+    severity: 'warning',
+    check: (ctx) =>
+      ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          return (
+            s &&
+            t &&
+            svc(s) === 'aws.sqs' &&
+            svc(t) === 'aws.lambda' &&
+            e.configuration?.failureDestination !== undefined
+          );
+        })
+        .map((e) => ({
+          ruleId: 'VR-017',
+          severity: 'warning',
+          edgeIds: [e.id],
+          explanation:
+            'Lambda on-failure destinations do not apply to SQS event sources; failed messages are not captured this way.',
+          remediation:
+            "Configure a dead-letter queue on the source queue's redrive policy and enable ReportBatchItemFailures.",
+          evidence: [
+            'https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html',
+          ],
+        })),
+  },
+  {
+    id: 'VR-018',
+    severity: 'warning',
+    check: (ctx) => {
+      // Group ALBs by VPC; only placements inside availability-zone containers are conclusive.
+      const zonesByVpc = new Map<string, { zones: Set<string>; nodeIds: string[] }>();
+      for (const n of nodesOf(ctx, 'aws.alb')) {
+        const vpc = enclosing(ctx, n.containerId, 'vpc');
+        const az = enclosing(ctx, n.containerId, 'availability-zone');
+        if (!vpc || !az) continue;
+        const entry = zonesByVpc.get(vpc.id) ?? { zones: new Set(), nodeIds: [] };
+        entry.zones.add(az.id);
+        entry.nodeIds.push(n.id);
+        zonesByVpc.set(vpc.id, entry);
+      }
+      return [...zonesByVpc.values()]
+        .filter((v) => v.zones.size < 2)
+        .map((v) => ({
+          ruleId: 'VR-018',
+          severity: 'warning',
+          nodeIds: v.nodeIds,
+          explanation: 'The Application Load Balancer is placed in a single Availability Zone.',
+          remediation:
+            'An ALB needs subnets in at least two Availability Zones; place it across both.',
+          evidence: [
+            'https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html',
+          ],
+        }));
+    },
   },
 ];
 

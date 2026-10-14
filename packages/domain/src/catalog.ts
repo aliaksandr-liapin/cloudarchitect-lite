@@ -61,10 +61,23 @@ export const CatalogManifest = z.object({
 });
 
 /** Everything the validator and generator need from a provider catalog. */
+/**
+ * A verified statement about how services behave or integrate. Facts are given to the generator
+ * and shown in details so explanations do not rely on model memory (PHASE0_SPIKE critical defects).
+ */
+export const IntegrationFact = z.object({
+  id: z.string().regex(/^FACT-\d{3}$/),
+  serviceIds: z.array(z.string()).min(1),
+  statement: z.string(),
+  evidence: z.array(VerifiedEvidence).min(1),
+});
+export type IntegrationFact = z.infer<typeof IntegrationFact>;
+
 export interface CatalogSnapshot {
   manifest: z.infer<typeof CatalogManifest>;
   services: CloudService[];
   features: ServiceFeature[];
   containers: z.infer<typeof ContainerDefinition>[];
   rules: z.infer<typeof ValidationRuleMeta>[];
+  facts: IntegrationFact[];
 }

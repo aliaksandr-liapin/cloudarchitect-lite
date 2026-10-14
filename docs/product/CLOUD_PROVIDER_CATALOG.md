@@ -87,7 +87,8 @@ catalog/
     containers.json          # container kinds, nesting, icons
     integration-patterns.json
     architecture-patterns.json
-    validation-rules.json    # VR-001…VR-015 metadata (logic lives in shared package)
+    validation-rules.json    # VR-001…VR-018 metadata (logic lives in shared package)
+    facts.json               # verified integration facts with evidence (given to the generator)
     lifecycle.json
     icon-pack.json           # release id, source URL, terms text, SHA-256
   azure/

@@ -1,0 +1,79 @@
+[
+  {
+    "id": "FACT-001",
+    "serviceIds": ["aws.waf", "aws.apigateway"],
+    "statement": "AWS WAF can be associated with API Gateway REST API stages only. HTTP APIs and WebSocket APIs have no AWS WAF integration; protect them through CloudFront with WAF and block direct access, or use a REST API.",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "FACT-002",
+    "serviceIds": ["aws.lambda", "aws.sqs"],
+    "statement": "Lambda on-failure destinations apply to asynchronous invocations, not to SQS event source mappings. For an SQS-triggered Lambda, failed messages go to the source queue's dead-letter queue via its redrive policy; enable ReportBatchItemFailures so one bad message does not fail the whole batch.",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      },
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "FACT-003",
+    "serviceIds": ["aws.alb"],
+    "statement": "An Application Load Balancer requires subnets in at least two Availability Zones.",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "FACT-004",
+    "serviceIds": ["aws.s3"],
+    "statement": "A presigned URL is valid for at most 7 days, and never longer than the credentials that signed it. URLs signed with IAM role or STS temporary credentials (Lambda, ECS/Fargate task roles) expire when those credentials expire, typically within hours.",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "FACT-005",
+    "serviceIds": ["aws.firehose"],
+    "statement": "Firehose Direct PUT default quotas per stream are 500,000 records/s, 2,000 requests/s and 5 MiB/s in US East (N. Virginia), US West (Oregon) and Europe (Ireland), and 100,000 records/s, 1,000 requests/s and 1 MiB/s in other Regions; higher rates need a quota increase or Kinesis Data Streams as the source.",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/firehose/latest/dev/limits.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  },
+  {
+    "id": "FACT-006",
+    "serviceIds": ["aws.dynamodb"],
+    "statement": "Writing to DynamoDB and then publishing an event in a separate call can lose the event if the publish fails. DynamoDB Streams captures item changes so downstream processing can be triggered from the committed write (transactional outbox).",
+    "evidence": [
+      {
+        "sourceUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html",
+        "checkedAt": "2026-10-14T06:00:00Z",
+        "evidenceType": "documentation"
+      }
+    ]
+  }
+]

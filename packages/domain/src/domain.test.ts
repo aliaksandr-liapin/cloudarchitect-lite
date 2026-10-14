@@ -3,6 +3,7 @@ import {
   applyPatch,
   migrateProject,
   Project,
+  PROJECT_SCHEMA_VERSION,
   StalePatchError,
   UnsupportedSchemaError,
   validateProject,
@@ -45,8 +46,13 @@ const catalog: CatalogSnapshot = {
     service('aws.dax', 'vpc'),
     service('aws.cloudwatch', 'regional'),
     service('aws.legacy', 'regional', 'deprecated'),
+    service('aws.waf', 'regional'),
+    service('aws.apigateway', 'regional'),
+    service('aws.sqs', 'regional'),
+    service('aws.alb', 'vpc'),
   ],
   features: [],
+  facts: [],
   containers: [
     { kind: 'aws-cloud', displayName: 'AWS Cloud', allowedParents: [] },
     { kind: 'region', displayName: 'Region', allowedParents: ['aws-cloud'] },
@@ -60,7 +66,7 @@ const catalog: CatalogSnapshot = {
 
 const base = (over: Partial<Project> = {}): Project =>
   Project.parse({
-    schemaVersion: '1.1.0',
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     projectId: 'p',
     name: 'Test',
     revision: 0,
@@ -97,6 +103,20 @@ describe('Project schema', () => {
       position: pos,
     };
     expect(() => base({ nodes: [bad as never] })).toThrow();
+  });
+
+  it('accepts external actors and rejects a node with no service, unresolved or external', () => {
+    const user = {
+      id: 'u',
+      provider: 'aws',
+      external: { kind: 'user', name: 'Shopper' },
+      label: 'Shopper',
+      position: pos,
+    };
+    expect(base({ nodes: [user as never] }).nodes[0]?.external?.kind).toBe('user');
+    expect(() =>
+      base({ nodes: [{ id: 'n', provider: 'aws', label: 'n', position: pos } as never] }),
+    ).toThrow();
   });
 });
 
@@ -274,6 +294,99 @@ describe('validateProject', () => {
   });
 });
 
+describe('integration rules from the Phase 0 review', () => {
+  const node = (id: string, serviceId: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      provider: 'aws',
+      serviceId,
+      label: id,
+      requirementIds: [],
+      position: pos,
+      containerId: 'region',
+      ...extra,
+    }) as never;
+  const edge = (
+    source: string,
+    target: string,
+    kind: string,
+    configuration?: Record<string, string>,
+  ) =>
+    ({
+      id: `${source}-${target}`,
+      source,
+      target,
+      kind,
+      requirementIds: [],
+      configuration,
+    }) as never;
+
+  it('VR-016: WAF on an HTTP API is an error; on a REST API it is clean', () => {
+    const p = (apiType: string) =>
+      base({
+        nodes: [
+          node('waf', 'aws.waf'),
+          node('api', 'aws.apigateway', { configuration: { apiType } }),
+          node('cw', 'aws.cloudwatch'),
+        ],
+        edges: [edge('waf', 'api', 'other')],
+      });
+    expect(ruleIds(p('HTTP'))).toContain('VR-016');
+    expect(ruleIds(p('REST'))).not.toContain('VR-016');
+  });
+
+  it('VR-017 / VR-004: an on-failure destination does not cover an SQS event source', () => {
+    const p = (configuration: Record<string, string>) =>
+      base({
+        nodes: [node('q', 'aws.sqs'), node('fn', 'aws.lambda'), node('cw', 'aws.cloudwatch')],
+        edges: [edge('q', 'fn', 'event', configuration)],
+      });
+    expect(ruleIds(p({ failureDestination: 'dlq' }))).toEqual(
+      expect.arrayContaining(['VR-017', 'VR-004']),
+    );
+    expect(ruleIds(p({ deadLetterQueue: 'dlq' }))).not.toEqual(expect.arrayContaining(['VR-017']));
+    expect(ruleIds(p({ deadLetterQueue: 'dlq' }))).not.toContain('VR-004');
+  });
+
+  it('VR-018: an ALB in one availability zone warns; across two is clean', () => {
+    const containers = [
+      { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+      { id: 'region', kind: 'region', parentId: 'cloud', label: 'r' },
+      { id: 'vpc', kind: 'vpc', parentId: 'region', label: 'v' },
+      { id: 'az1', kind: 'availability-zone', parentId: 'vpc', label: 'a' },
+      { id: 'az2', kind: 'availability-zone', parentId: 'vpc', label: 'b' },
+      {
+        id: 's1',
+        kind: 'subnet',
+        parentId: 'az1',
+        label: 's1',
+        properties: { subnetType: 'public' },
+      },
+      {
+        id: 's2',
+        kind: 'subnet',
+        parentId: 'az2',
+        label: 's2',
+        properties: { subnetType: 'public' },
+      },
+    ] as Project['containers'];
+    const one = base({
+      containers,
+      nodes: [node('alb', 'aws.alb', { containerId: 's1' }), node('cw', 'aws.cloudwatch')],
+    });
+    const two = base({
+      containers,
+      nodes: [
+        node('alb', 'aws.alb', { containerId: 's1' }),
+        node('alb2', 'aws.alb', { containerId: 's2' }),
+        node('cw', 'aws.cloudwatch'),
+      ],
+    });
+    expect(ruleIds(one)).toContain('VR-018');
+    expect(ruleIds(two)).not.toContain('VR-018');
+  });
+});
+
 describe('applyPatch', () => {
   it('applies ops, bumps revision and removes edges of removed nodes', () => {
     const p = base({
@@ -323,9 +436,16 @@ describe('migrateProject', () => {
       warnings: ['free text'],
     };
     const p = migrateProject(v1);
-    expect(p.schemaVersion).toBe('1.1.0');
+    expect(p.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(p.containers[0]?.kind).toBe('aws-cloud');
     expect(p.nodes[0]?.containerId).toBe(p.containers[0]?.id);
+  });
+
+  it('upgrades 1.1.0 projects without touching nodes', () => {
+    const v11 = { ...base(), schemaVersion: '1.1.0' };
+    const p = migrateProject(v11);
+    expect(p.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
+    expect(p.nodes).toEqual(base().nodes);
   });
 
   it('rejects unknown versions', () => {

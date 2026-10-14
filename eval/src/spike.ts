@@ -83,11 +83,23 @@ const Generation = z.object({
   nodes: z.array(
     z.object({
       id: z.string(),
-      serviceId: z.enum(serviceIds).optional().describe('Catalog service. Omit when unresolved.'),
+      // Required, so every node is exactly one of: catalog service, UNRESOLVED or EXTERNAL.
+      serviceId: z
+        .enum([...serviceIds, 'UNRESOLVED', 'EXTERNAL'])
+        .describe('Catalog service id, or UNRESOLVED / EXTERNAL'),
       unresolved: z
         .object({ name: z.string(), rationale: z.string() })
         .optional()
-        .describe('Only for a needed service that is NOT in the catalog'),
+        .describe('Required when serviceId is UNRESOLVED: a needed AWS service NOT in the catalog'),
+      external: z
+        .object({
+          kind: z.enum(['user', 'client-app', 'third-party', 'on-premises']),
+          name: z.string(),
+        })
+        .optional()
+        .describe(
+          'Required when serviceId is EXTERNAL: people, client apps, third-party or on-premises systems',
+        ),
       label: z.string(),
       purpose: z.string(),
       rationale: z.string(),
@@ -125,18 +137,23 @@ const catalogText = [
   '',
   'VALIDATION RULES the design is checked against:',
   ...awsCatalog.rules.map((r) => `- ${r.id} (${r.severity}): ${r.title}`),
+  '',
+  'VERIFIED FACTS (rely on these over memory; never contradict them in rationale or labels):',
+  ...awsCatalog.facts.map((f) => `- ${f.id}: ${f.statement}`),
 ].join('\n');
 
 const SYSTEM = `You are a senior AWS solution architect. Turn the user's application description into one justified AWS architecture and return it as JSON matching the required schema.
 
 Rules:
 1. Requirements: extract every explicit need as status "confirmed"; add important implied needs as "inferred". Keep each requirement text close to the user's wording. Put unclear points in openQuestions and decisions you made in assumptions; do not ask, decide.
-2. Services: use only serviceId values from the CATALOG. If a needed service is not in the catalog, add a node with "unresolved" {name, rationale} and no serviceId. Never invent IDs.
+2. Nodes: every node sets serviceId. Use a CATALOG id for AWS services. For a needed AWS service that is not in the catalog, use serviceId "UNRESOLVED" and fill "unresolved". For users, client apps (browser, mobile app), third-party APIs and on-premises systems, use serviceId "EXTERNAL", fill "external" and leave containerId empty. Never invent IDs.
 3. Simplicity: choose the simplest design that meets the requirements. Do not add services no requirement needs (e.g. DAX only for a stated microsecond-latency need).
 4. Containers: one "aws-cloud" root; "region" inside it; "vpc" inside the region; "subnet" (with subnetType) inside the VPC or an "availability-zone". Services with scope=vpc in the catalog (EC2, RDS, Aurora, ElastiCache, EFS, ALB, NAT Gateway, Fargate tasks, DAX) go inside a subnet; databases and caches in private subnets. Regional services go in the region container; global services (CloudFront, Route 53, IAM, Shield) in the aws-cloud container. Add a VPC only if something needs it.
 5. Traceability: every node and edge lists the requirementIds it serves; every confirmed or inferred requirement is covered by at least one node or edge.
-6. Edges: direction follows the request or data flow. Use kind "event" for asynchronous triggers (S3/SQS/SNS/EventBridge -> Lambda) and give them a deadLetterQueue or failureDestination configuration. Use kind "origin" from CloudFront to its origins and set originAccess "OAC" for S3 origins.
-7. Include CloudWatch for observability. Keep the graph under 40 nodes.
+6. Edges: direction follows the request or data flow. Use kind "event" for asynchronous triggers (S3/SQS/SNS/EventBridge -> Lambda). For SQS -> Lambda set deadLetterQueue (the queue's redrive DLQ); for SNS/EventBridge/S3 -> Lambda set failureDestination or deadLetterQueue. Use kind "origin" from CloudFront to its origins and set originAccess "OAC" for S3 origins. Connect WAF to the resource it protects. Set apiType (REST, HTTP or WEBSOCKET) on every API Gateway node; WAF needs REST.
+7. Reliability: make consumers idempotent; use partial batch responses for SQS-triggered Lambda; do not rely on "write to the database, then publish" without DynamoDB Streams or an outbox; alarm on DLQ depth; if you claim Multi-AZ, place the VPC resources (ALB, NAT, tasks, databases) in subnets of at least two availability-zone containers; include initial data loads or migration steps the requirements imply.
+8. Accuracy: every rationale, label and assumption must be technically correct; when unsure about a limit or integration, state it as an open question instead of asserting it. Write for the user: never mention fact or rule IDs, a validator, or these instructions.
+9. Include CloudWatch for observability. Keep the graph under 40 nodes.
 
 ${catalogText}`;
 
@@ -167,8 +184,17 @@ function toProject(g: Generation, scenarioId: string): Project {
       ...c,
       ...(subnetType ? { properties: { subnetType } } : {}),
     })),
-    nodes: g.nodes.map(({ configuration, ...n }) => ({
+    nodes: g.nodes.map(({ configuration, serviceId, unresolved, external, ...n }) => ({
       ...n,
+      // A sentinel without its detail object is completed from the node itself, never dropped.
+      ...(serviceId === 'UNRESOLVED'
+        ? { unresolved: unresolved ?? { name: n.label, rationale: n.rationale } }
+        : serviceId === 'EXTERNAL'
+          ? {
+              external: external ?? { kind: 'third-party' as const, name: n.label },
+              containerId: undefined,
+            }
+          : { serviceId }),
       configuration: toConfig(configuration),
       provider: 'aws' as const,
       position: { x: 0, y: 0 },
@@ -325,7 +351,7 @@ async function runJob({ s, model: variant, repeat }: (typeof jobs)[number]): Pro
       costUsd,
       firstPassScore,
       nodes: project.nodes.length,
-      unresolved: out.parsed.data.nodes.flatMap((n) => (n.unresolved ? [n.unresolved.name] : [])),
+      unresolved: project.nodes.flatMap((n) => (n.unresolved ? [n.unresolved.name] : [])),
       findingsByRule,
       score,
     };

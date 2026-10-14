@@ -1,5 +1,9 @@
 [
-  { "id": "VR-001", "severity": "warning", "title": "S3 origin behind CloudFront without OAC" },
+  {
+    "id": "VR-001",
+    "severity": "warning",
+    "title": "S3 origin behind CloudFront without OAC"
+  },
   {
     "id": "VR-002",
     "severity": "warning",
@@ -25,17 +29,67 @@
     "severity": "warning",
     "title": "DAX without a justifying latency requirement"
   },
-  { "id": "VR-007", "severity": "info", "title": "No observability component" },
-  { "id": "VR-008", "severity": "info", "title": "Data store without encryption at rest" },
-  { "id": "VR-009", "severity": "error", "title": "VPC-bound service outside a VPC" },
-  { "id": "VR-010", "severity": "error", "title": "Database in a public subnet" },
-  { "id": "VR-011", "severity": "warning", "title": "Client upload to S3 without authorization" },
-  { "id": "VR-012", "severity": "warning", "title": "Requirement not covered" },
-  { "id": "VR-013", "severity": "info", "title": "Component not linked to any requirement" },
+  {
+    "id": "VR-007",
+    "severity": "info",
+    "title": "No observability component"
+  },
+  {
+    "id": "VR-008",
+    "severity": "info",
+    "title": "Data store without encryption at rest"
+  },
+  {
+    "id": "VR-009",
+    "severity": "error",
+    "title": "VPC-bound service outside a VPC"
+  },
+  {
+    "id": "VR-010",
+    "severity": "error",
+    "title": "Database in a public subnet"
+  },
+  {
+    "id": "VR-011",
+    "severity": "warning",
+    "title": "Client upload to S3 without authorization"
+  },
+  {
+    "id": "VR-012",
+    "severity": "warning",
+    "title": "Requirement not covered"
+  },
+  {
+    "id": "VR-013",
+    "severity": "info",
+    "title": "Component not linked to any requirement"
+  },
   {
     "id": "VR-014",
     "severity": "warning",
     "title": "Service lifecycle deprecated, retired or unknown"
   },
-  { "id": "VR-015", "severity": "info", "title": "Component not in the verified catalog" }
+  {
+    "id": "VR-015",
+    "severity": "info",
+    "title": "Component not in the verified catalog"
+  },
+  {
+    "id": "VR-016",
+    "severity": "error",
+    "title": "AWS WAF attached to an API Gateway HTTP or WebSocket API",
+    "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+  },
+  {
+    "id": "VR-017",
+    "severity": "warning",
+    "title": "Lambda on-failure destination used for an SQS event source",
+    "documentationUrl": "https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html"
+  },
+  {
+    "id": "VR-018",
+    "severity": "warning",
+    "title": "Application Load Balancer placed in a single Availability Zone",
+    "documentationUrl": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+  }
 ]

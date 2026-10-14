@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The download links are presigned with the Fargate task role's temporary credentials. They are emailed at about 02:25 and will probably expire before managers open them in the morning. The design states this correctly and offers an API Gateway + Lambda re-sign endpoint as an open question, but it does not adopt that fix, so R4 (a usable emailed download link) is not reliably met.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html (\"If you created a presigned URL using a temporary credential, the URL expires when the credential expires\"; \"For Amazon Elastic Container Service tasks or containers, role credentials typically rotate every 1-6 hours.\")"
+        },
+        {
+          "severity": "minor",
+          "description": "The Scheduler DLQ only catches failures to start the task. A task that starts and then exits non-zero is not covered: no EventBridge rule on ECS Task State Change and no metric filter is modelled, even though CloudWatch claims to alarm on failed runs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The task runs in a public subnet with a public IP so it can skip NAT. This is acceptable with no inbound rules, but the internet-reachable ENI should be acknowledged as a trade-off. The S3 bucket policy should also deny non-TLS access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A lean, correct Scheduler -> Fargate -> S3/SES design with good alerting, but the emailed presigned links will likely expire before managers use them, and that fix is left as an open question."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Like A, the links are presigned with task-role temporary credentials, which expire within hours. The design acknowledges this but provides no working alternative, so managers reading email in the morning will probably get expired links.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html (\"For Amazon Elastic Container Service tasks or containers, role credentials typically rotate every 1-6 hours.\")"
+        },
+        {
+          "severity": "major",
+          "description": "R8 (a failed or missed run is detected and alerted) has no delivery path. There is a CloudWatch alarm but no SNS topic or recipient, no DLQ or retry policy on the schedule target, and no ECS task-state event rule. A missed run would go unnoticed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A NAT Gateway, billed hourly plus per-GB processed, is added only for egress. For a ~25-minute nightly job under a 'cheap' constraint it will likely be the largest line item. Gateway endpoints or a public-IP task would be cheaper.",
+          "evidence": "https://aws.amazon.com/vpc/pricing/"
+        },
+        {
+          "severity": "minor",
+          "description": "ECR (the image source) is not modelled. The rationale also contains a leaked tool-internal reference ('fixes VR-009').",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally similar to A, but it pays for a NAT Gateway, omits the image registry, and its failure alerting has no notification target."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Alerts are published to a single SNS 'Alert topic'. Publishing to a topic delivers to every subscribed phone number, so with SMS subscriptions all owners would get every device's alerts. The design has no owner/phone/threshold registry for targeting each owner's number with a direct Publish to PhoneNumber.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sms_sending-overview.html (\"When you publish a message to a topic, Amazon SNS attempts to deliver that message to every phone number that is subscribed to the topic.\")"
+        },
+        {
+          "severity": "major",
+          "description": "R5 claims owners can view only their own device data, but there is no device-to-owner mapping. The query Lambda reads by deviceId without any ownership check, so any authenticated user could query any device (an IDOR flaw).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no alert deduplication or cooldown. A device that stays out of range would send an SMS every minute; the deviceId+timestamp dedupe key does not prevent this. This hurts both cost and user experience.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Every reading (~833/s, ~2.16B/month) goes through Lambda before reaching DynamoDB. The IoT rule DynamoDBv2 action could write directly, with only alert evaluation in Lambda. No IoT rule error action is configured.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless IoT Core/DynamoDB/Cognito skeleton, but SMS targeting via a shared topic, missing owner-to-device authorization and missing alert dedupe are significant gaps."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The alert Lambda is invoked asynchronously for every reading (~2.16B invocations/month). An IoT rule WHERE pre-filter, or batching, could cut this substantially.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Downsampling 90 days of per-minute data (~129,600 items) on every dashboard read is costly in DynamoDB RCUs and latency. Pre-aggregated rollups would be better; the design raises this only as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No IoT rule error action is modelled for DynamoDBv2 or Lambda action failures, so failed rule actions surface only as metrics.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A production-grade MVP: per-device topic-scoped IoT policies, direct rule-to-DynamoDB writes with TTL, a registry for ownership and SMS targeting, deduplicated alerts and a DLQ."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The failure destination is described as configured 'on the S3 ObjectCreated edge'. S3 notifications have no failure destination; it is part of the Lambda asynchronous invocation config. The edge from ingest-fn reading the PDF from the bucket is also missing.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Loading the initial 20,000 PDFs triggers Lambda directly with no buffering or concurrency control, so Bedrock embedding throttling during bulk load would exhaust async retries and flood the failure queue.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "HTTP API integrations time out at 30 seconds. RAG retrieval plus LLM generation can approach this, and neither streaming nor the timeout is addressed.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html (Maximum integration timeout: 30 seconds)"
+        },
+        {
+          "severity": "minor",
+          "description": "Per-customer history isolation and the OpenSearch access policy are not specified. Customer-managed KMS keys add cost and key management with no stated requirement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct basic Bedrock + OpenSearch RAG design with Cognito-gated chat and TTL history, but ingestion is unbuffered and a few configuration details are imprecise."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "HTTP API integrations time out at 30 seconds. Streaming is raised as an open question, but the hard timeout risk for non-streamed LLM answers is not stated.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html (Maximum integration timeout: 30 seconds)"
+        },
+        {
+          "severity": "minor",
+          "description": "A provisioned OpenSearch domain has a fixed baseline cost. Sizing and the choice of domain vs serverless collection are not discussed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-built RAG pipeline: S3 -> SQS -> Lambda with partial batch responses, a DLQ and idempotent chunk IDs, plus per-user history keyed by Cognito sub and explicit citation metadata."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "nightly-reports",
+      "better": "A",
+      "why": "A avoids the NAT Gateway cost, models ECR, and has a complete alerting path (Scheduler DLQ -> CloudWatch -> SNS -> ops), while both share the presigned-link expiry gap."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "better": "B",
+      "why": "B has a device registry for ownership checks and per-owner SMS, deduplicated alerts and direct rule-to-DynamoDB writes, where A has none of these."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "B",
+      "why": "B buffers ingestion through SQS with a DLQ and idempotent upserts, and it explicitly isolates history per customer and defines citation metadata."
+    }
+  ]
+}

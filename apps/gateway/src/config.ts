@@ -1,3 +1,4 @@
+import { MODEL_POLICY } from '@cloudarchitect/domain';
 import { z } from 'zod';
 
 /**
@@ -15,6 +16,14 @@ export const Config = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
+  /** Model for free credits (ADR-0011); overriding it requires a new eval run. */
+  FREE_TIER_MODEL: z.string().min(1).default(MODEL_POLICY.freeTier.model),
+  FREE_TIER_REPAIR_TURNS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(2)
+    .default(MODEL_POLICY.freeTier.repairTurns),
   /** Salt for hashing client identifiers; required so raw IPs are never stored. */
   CLIENT_KEY_SALT: z.string().min(16),
   ANTHROPIC_API_KEY: z.string().optional(),

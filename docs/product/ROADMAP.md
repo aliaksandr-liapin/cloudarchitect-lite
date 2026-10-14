@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 0. Discovery / Benchmark | Week 1 | 10–15 reference prompts with labels, rubric, project schema 1.1 (incl. containers), icon packs downloaded and terms recorded, **AI quality spike** (one-shot generation on the benchmark), **token/cost measurement** | Benchmark + rubric ready; spike shows schema-valid output and acceptable recall; cost per operation measured; budget cap decided |
 | 1. Visual PoC | Weeks 2–3 | React Flow canvas, **nested containers + ELK layout spike**, official AWS icons, JSON roundtrip, undo/redo | Editable, saveable diagram with containers, no AI dependency |
-| 2. AI PoC | Weeks 3–4 | Requirements extraction, clarification round, catalog retrieval, constrained generation, unresolved nodes, rule set VR-001…015, **eval harness in CI** | Gate A |
+| 2. AI PoC | Weeks 3–4 | Requirements extraction, clarification round, catalog retrieval, constrained generation, unresolved nodes, rule set VR-001…018, **eval harness in CI** | Gate A |
 | 3. MVP engineering | Weeks 5–7 | Gateway, credits, **budget cap + kill switch**, BYOK direct browser, Review, exports, Privacy Policy / Terms | End-to-end workflow; Gate B |
 | 4. Private beta | Weeks 8–9 | 15–30 testers, full benchmark blind review, bug fixes | Meaningful user acceptance and reliable core |
 | 5. Public beta | ~Weeks 9–10+ | Release, analytics, user feedback | Usage, cost and reliability monitored |
@@ -29,7 +29,7 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 **E3 — AI Generation:** requirements extraction, clarification round (FR-025), catalog retrieval, structured generation with service enum, unresolved nodes (FR-020), error handling, **eval harness (NFR-013)**.
 
-**E4 — Knowledge & Validation UX:** node/edge/container details, requirement traceability, docs links, rule engine VR-001…015, finding display, **Review (FR-021)**.
+**E4 — Knowledge & Validation UX:** node/edge/container details, requirement traceability, docs links, rule engine VR-001…018, finding display, **Review (FR-021)**.
 
 **E5 — Hybrid AI:** 3 anonymous free operations (configurable), gateway/secrets, provider adapters, **budget cap + kill switch (NFR-009)**, credit transparency (FR-024), **BYOK direct browser** with proxy fallback, anti-abuse.
 

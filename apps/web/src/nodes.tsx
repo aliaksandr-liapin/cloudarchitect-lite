@@ -6,12 +6,13 @@ import type { ContainerNodeData, ServiceNodeData } from './layout';
  * shows a generic tile that is visibly marked as generic — never a look-alike of an official icon.
  */
 export function ServiceNode({ data, selected }: NodeProps) {
-  const { node, displayName, unresolved } = data as ServiceNodeData;
+  const { node, displayName, variant } = data as ServiceNodeData;
+  const unresolved = variant === 'unresolved';
   return (
-    <div className={`svc ${selected ? 'is-selected' : ''} ${unresolved ? 'is-unresolved' : ''}`}>
+    <div className={`svc ${selected ? 'is-selected' : ''} is-${variant}`}>
       <Handle type="target" position={Position.Left} />
       <div className="svc-icon" aria-hidden="true" title="Generic icon">
-        {unresolved ? '?' : '▢'}
+        {unresolved ? '?' : variant === 'external' ? '○' : '▢'}
       </div>
       <div className="svc-text">
         <div className="svc-label">{node.label}</div>

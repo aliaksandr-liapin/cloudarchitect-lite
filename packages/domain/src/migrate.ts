@@ -6,6 +6,7 @@ type Migration = { from: string; to: string; up: (p: Raw) => Raw };
 /**
  * Ordered migrations (NFR-004). Each step must be pure and lossless where possible.
  * 1.0.0 → 1.1.0: introduce containers (wrap nodes in a default aws-cloud) and rename warnings → findings.
+ * 1.1.0 → 1.2.0: add external actor nodes; existing nodes are unchanged.
  */
 const MIGRATIONS: Migration[] = [
   {
@@ -26,6 +27,7 @@ const MIGRATIONS: Migration[] = [
       };
     },
   },
+  { from: '1.1.0', to: '1.2.0', up: (p) => ({ ...p, schemaVersion: '1.2.0' }) },
 ];
 
 export class UnsupportedSchemaError extends Error {

@@ -19,7 +19,7 @@ CloudArchitect Lite turns a text description of an application into an **editabl
 - **BYOK:** the browser calls the AI provider directly; the key stays in tab memory only and never passes through our servers. A proxy is the fallback.
 - **Official icons** only from the three sources in §8, within their published terms, never redrawn or distorted.
 - **Current knowledge:** a curated catalog of ~40 AWS services cross-checked against the CloudFormation resource specification, with sources, check dates, lifecycle and snapshots. Services outside the catalog are shown as *unresolved*, never as verified.
-- **Verifiable architecture:** explainable components and connections, traceability to requirements, 15 deterministic validation rules and a separate AI **Review** (advisory).
+- **Verifiable architecture:** explainable components and connections, traceability to requirements, 18 deterministic validation rules and a separate AI **Review** (advisory).
 - **Independent expert review:** Claude acts as the independent cloud architect in an isolated, blind session using the rubric in PRD §14.
 
 ## 3. MVP scope
@@ -28,7 +28,7 @@ CloudArchitect Lite turns a text description of an application into an **editabl
 2. Interactive canvas: nodes, edges, **nested containers**, labels, drag and drop, auto layout, undo/redo.
 3. Verified catalog of AWS services, features (e.g. CloudFront OAC) and official icons.
 4. Component and connection details with documentation links.
-5. Validation (structure, catalog, VR-001…015, requirement coverage) and AI Review.
+5. Validation (structure, catalog, VR-001…018, requirement coverage) and AI Review.
 6. Local save/open, PNG/SVG/JSON export; Mermaid and draw.io are P1.
 7. 3 free AI operations through a protected gateway with a budget cap; BYOK after the limit.
 8. AI Edit and Ask are P1.
@@ -56,14 +56,15 @@ Text-to-diagram is already offered by Eraser, Cloudairy, Lucid, Brainboard, Clou
 ## 7. Open decisions
 
 - Branding and trademark for **CloudArchitect Lite** (working name).
-- Monthly free-AI budget cap and final quota — after measurement in Phase 0.
-- Models for the free tier and the BYOK default — based on benchmark results.
+- Monthly free-AI budget cap and final quota. Cost per operation is measured (PHASE0_SPIKE.md); the cap is the remaining decision.
 - Accountless anti-abuse UX; optional email magic link for extra credits.
 - Product license (not chosen yet: all rights reserved).
 - Availability of a human expert for spot checks before public beta.
 - Pricing of an eventual Pro plan.
 
 **Closed in v0.2:** icon sources (only the official AWS/Azure/GCP pages; terms recorded in PRD §12); BYOK direction; independent reviewer role; container model; catalog scope.
+
+**Closed 2026-10-14:** AI models: free tier Claude Haiku 5.5 with one repair turn, BYOK default Claude Sonnet 5.5 ([ADR-0011](../adr/0011-model-selection.md)).
 
 ## 8. Sources
 

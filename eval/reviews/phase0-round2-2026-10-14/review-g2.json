@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design says Fargate tasks 'reach OpenSearch ... through one NAT Gateway per AZ' (edges e21-e23). That implies a public-endpoint OpenSearch domain, which contradicts R11 ('database is private'), sends all search and indexing traffic through NAT data-processing charges, and adds a NAT dependency to the search path. A VPC domain in the private data subnets needs no NAT, and the endpoint type cannot be changed after the domain is created.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "One ALB is drawn as two 'zonal node' resources, each wired to only the same-AZ tasks, and CloudFront is shown with two origins. In reality it is one ALB DNS origin with cross-zone routing, so the diagram misrepresents how traffic flows.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The OpenSearch domain has two data nodes and no dedicated master nodes or third AZ. A two-node cluster risks split-brain and losing write availability when one AZ fails, which weakens the Multi-AZ claim in R8.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The indexer egresses only through nat-a, so when AZ A fails the indexer has no network path until the task is rescheduled. Interface VPC endpoints for Secrets Manager, CloudWatch Logs and ECR would remove most of the need for NAT.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Product pages are read from the Aurora reader, so replica lag combined with the 30 s CloudFront TTL can show stale prices. The design does raise this as an open question.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thorough, well-reasoned design (transactional outbox, idempotent indexer, backfill, Multi-AZ, admin authentication), but it routes OpenSearch traffic through NAT, implying a public search endpoint and extra cost."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design assumes the index 'stores a denormalized copy of product, brand, price and size fields', yet relies on DMS CDC to build it. DMS creates one OpenSearch index per source table and cannot join tables, so the denormalized documents needed for brand/size filters would not be produced without custom work.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Elasticsearch.html"
+        },
+        {
+          "severity": "major",
+          "description": "The same Fargate API accepts price and product writes (edge e4), yet there is no authentication for those writes. The only auth statement is that shoppers are anonymous, and there is no back-office actor, authorizer or Cognito.",
+          "evidence": ""
+        },
+        {
+          "severity": "major",
+          "description": "The design is single-AZ in practice: one Aurora instance in data subnet a (Multi-AZ is left as an open question), one NAT Gateway, one DMS replication instance, and no data subnet in AZ b. Losing one AZ takes down the source of truth and the sync pipeline.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no handling for DMS apply failures (DMS writes errors only to CloudWatch Logs for OpenSearch targets), no reconciliation or reindex path, and the 2M-product initial load/backfill is not described. DMS also does not support domains that use fine-grained access control with a master user and password.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Elasticsearch.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no Secrets Manager for database credentials, and the OpenSearch domain is placed at region level, so it is unclear whether it is a VPC domain. Edge e4 is typed 'read' but also performs writes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A lean design with the right core (CloudFront, Fargate, Aurora, OpenSearch), but the DMS sync cannot produce the denormalized index it assumes, price writes are unauthenticated, and the data tier is single-AZ."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Step Functions execution history, cited as part of the audit trail, is kept only 90 days after an execution closes. The DynamoDB audit items and CloudTrail cover this gap, and retention is raised as an open question.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Uploaded files are not scanned for malware and there is no S3 event check that uploads finished before finalize. This is raised only as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no explicit redrive or DLQ procedure for executions that fail after retries are exhausted; failures are only alarmed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A production-grade serverless design: a Standard Step Functions workflow with a 14-day task-token wait, a defined timeout escalation, idempotent starts, presigned uploads, Cognito JWT authentication with group checks, KMS, and an audit trail in DynamoDB plus CloudTrail S3 data events."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The callback path is incomplete. No workflow step persists the task token (there is no edge from the state machine to the table) and adjusters are never notified that a claim is waiting. The decision Lambda's 'stored task token' therefore has no defined source, and a token must be passed out through an integration before SendTaskSuccess can be called.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The 14-day timeout outcome is left entirely open; the workflow behavior after States.Timeout is undefined.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudTrail has no S3 destination and records only management events, not S3 data events on the documents bucket. Only Step Functions is wired to CloudWatch; the Lambdas are not.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choosing a REST API with WAF is valid (WAF is not supported on HTTP APIs), but WAF was not requested and adds a fixed monthly cost.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+        }
+      ],
+      "summary": "A sound Step Functions and Cognito design with accurate claims, but the task-token handoff and adjuster notification are missing, and the timeout outcome and audit logging are underspecified."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Clients use HTTPS to the ALB, but no certificate (ACM) is modeled and TLS termination is left as an open question.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The data migration method and the hybrid connectivity needed for the cutover within the three-month deadline are deferred entirely to the team (R9 is not designed).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is one standalone EC2 instance per AZ with no Auto Scaling group or auto-recovery, so a failed instance is not replaced automatically.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "'Mount logic stays unchanged' assumes the current share is NFSv4. EFS supports NFSv4.0/4.1 only, so an NFSv3 client configuration would need changes. The RDS and EFS edges are typed read/write inconsistently.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, minimal rehost (EC2 in two AZs, ALB, RDS MySQL Multi-AZ, EFS, a NAT per AZ) that leaves TLS, data migration and instance recovery as open items."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Each ALB zonal node is wired only to the same-AZ instance, and the Route 53 alias, ACM certificate and DataSync edges point only to the AZ-A nodes. This is a simplification of a single cross-zone ALB and a single EFS file system, but it reads as zonal pinning.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Hybrid connectivity (VPN or Direct Connect) for DMS and DataSync is identified only as an open question, and Secrets Manager for database credentials is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, accurate rehost plan with HA (an Auto Scaling group assumed, RDS Multi-AZ with standby, EFS mount targets in both AZs), ACM TLS, and a DMS plus DataSync migration path for the cutover."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A provides authenticated admin writes, a Multi-AZ data tier, a lossless idempotent outbox indexer and a backfill, whereas B's DMS sync cannot build the denormalized index and B is single-AZ with unauthenticated writes."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A fully specifies task-token persistence, adjuster notification, the 14-day timeout escalation and S3 data-event auditing, all of which B leaves missing or open."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "B",
+      "why": "B adds the TLS certificate, the data migration tooling (DMS and DataSync) and auto-recovery through an Auto Scaling group, which A defers or omits."
+    }
+  ]
+}

@@ -5,7 +5,11 @@ import type { ElkNode } from 'elkjs/lib/elk-api.js';
 export const NODE_SIZE = { width: 168, height: 64 };
 const CONTAINER_PADDING = '[top=40,left=16,bottom=16,right=16]';
 
-export type ServiceNodeData = { node: ArchNode; displayName: string; unresolved: boolean };
+export type ServiceNodeData = {
+  node: ArchNode;
+  displayName: string;
+  variant: 'service' | 'unresolved' | 'external';
+};
 export type ContainerNodeData = { container: Container };
 
 /** ELK is ~1.5 MB, so it is loaded on first layout instead of blocking first paint. TODO(E1): run in a Web Worker. */
@@ -99,8 +103,12 @@ export function toFlow(
       position: n.position,
       data: {
         node: n,
-        displayName: n.serviceId ? displayName(n.serviceId) : n.unresolved!.name,
-        unresolved: !n.serviceId,
+        displayName: n.serviceId
+          ? displayName(n.serviceId)
+          : n.external
+            ? `${n.external.name} · external ${n.external.kind}`
+            : (n.unresolved?.name ?? n.label),
+        variant: n.serviceId ? 'service' : n.external ? 'external' : 'unresolved',
       } satisfies ServiceNodeData,
       ...parented(n.containerId),
     });

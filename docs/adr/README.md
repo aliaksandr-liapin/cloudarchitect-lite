@@ -14,3 +14,4 @@ Format: context → decision → consequences. Status is one of Proposed, Accept
 | [0008](0008-rule-vs-advisory-findings.md)           | Rule findings vs advisory findings        | Accepted |
 | [0009](0009-eval-harness-release-gate.md)           | Evaluation harness as release gate        | Accepted |
 | [0010](0010-monorepo-and-portable-gateway.md)       | pnpm monorepo and a portable gateway      | Accepted |
+| [0011](0011-model-selection.md)                     | AI model selection for free tier and BYOK | Accepted |

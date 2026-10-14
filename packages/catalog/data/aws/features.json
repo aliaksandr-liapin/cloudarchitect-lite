@@ -61,5 +61,14 @@
     "displayName": "SQS dead-letter queue",
     "summary": "Holds messages that could not be processed after the maximum receives.",
     "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+  },
+  {
+    "id": "aws.apigateway.api-type",
+    "serviceId": "aws.apigateway",
+    "appliesTo": "node",
+    "configKey": "apiType",
+    "displayName": "API Gateway API type",
+    "summary": "REST, HTTP or WEBSOCKET. REST APIs support AWS WAF, API keys, usage plans and request validation; HTTP APIs are cheaper and simpler.",
+    "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
   }
 ]

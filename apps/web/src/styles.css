@@ -161,6 +161,10 @@ button.link {
 .svc.is-unresolved {
   border-style: dashed;
 }
+.svc.is-external {
+  border-style: dotted;
+  background: transparent;
+}
 .svc-icon {
   width: 32px;
   height: 32px;
