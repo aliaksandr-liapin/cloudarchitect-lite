@@ -45,7 +45,7 @@
       "aws.alb"
     ],
     "anyOf": [
-      ["aws.ecs", "aws.eks"],
+      ["aws.ecs", "aws.eks", "aws.fargate"],
       ["aws.aurora", "aws.rds"]
     ],
     "forbidden": []

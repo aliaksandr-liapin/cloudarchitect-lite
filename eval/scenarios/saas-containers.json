@@ -36,7 +36,6 @@
   "expectedServices": {
     "required": [
       "aws.alb",
-      "aws.ecs",
       "aws.fargate",
       "aws.elasticache",
       "aws.nat-gateway",

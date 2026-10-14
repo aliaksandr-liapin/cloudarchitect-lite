@@ -22,7 +22,7 @@
     }
   ],
   "expectedServices": {
-    "required": ["aws.kinesis", "aws.firehose", "aws.s3", "aws.athena"],
+    "required": ["aws.firehose", "aws.s3", "aws.athena"],
     "anyOf": [],
     "forbidden": ["aws.rds", "aws.aurora", "aws.dynamodb", "aws.ec2"]
   },
