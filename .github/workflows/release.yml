@@ -16,6 +16,7 @@ jobs:
     name: Publish ${{ matrix.image }} to GHCR
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         image: [web, gateway]
     steps:
@@ -44,7 +45,10 @@ jobs:
           provenance: mode=max
           sbom: true
           cache-from: type=gha,scope=${{ matrix.image }}
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      # GitHub attestations are unavailable for private repositories on personal accounts; the
+      # image still carries its BuildKit SBOM and provenance. Runs automatically once public.
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ghcr.io/${{ github.repository }}/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
