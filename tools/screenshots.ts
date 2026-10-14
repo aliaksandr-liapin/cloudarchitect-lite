@@ -4,7 +4,7 @@
  * fixed response, so no gateway, API key or network access is needed and the images are repeatable.
  */
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
@@ -72,7 +72,10 @@ async function sampleWithFinding() {
     .map((e: { id: string; configuration?: Record<string, unknown> }) =>
       e.id === 'e9' ? { ...e, configuration: { eventNotification: 'ObjectCreated' } } : e,
     );
-  const file = join(tmpdir(), 'myblog-with-finding.project.json');
+  const file = join(
+    await mkdtemp(join(tmpdir(), 'screenshots-')),
+    'myblog-with-finding.project.json',
+  );
   await writeFile(file, JSON.stringify(sample));
   return file;
 }
