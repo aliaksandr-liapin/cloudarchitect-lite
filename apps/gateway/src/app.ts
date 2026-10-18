@@ -1,5 +1,6 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import { LIMITS, MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
+import { MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
+import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -7,6 +8,7 @@ import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 import { z } from 'zod';
 import type { Config } from './config.js';
+import { registerGenerateRoutes } from './generate.js';
 import { SetupError, SetupInput, type SetupService } from './setup.js';
 import type { CreditStore } from './store.js';
 
@@ -18,14 +20,13 @@ export interface Deps {
   store: CreditStore;
   /** Structured logger. Must never receive prompts, graphs or keys (NFR-006). */
   log?: (event: Record<string, unknown>) => void;
+  /** Provider client factory; tests inject a fake. */
+  llm?: (apiKey: string) => LlmClient;
+  /** Clock in epoch ms for operation tokens; tests inject one. */
+  now?: () => number;
 }
 
-type Env = { Variables: { clientKey: string } };
-
-const GenerateBody = z.object({
-  prompt: z.string().min(1).max(LIMITS.maxPromptChars),
-  catalogVersion: z.string(),
-});
+export type Env = { Variables: { clientKey: string } };
 
 async function sha256(text: string) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -46,7 +47,14 @@ function rateLimiter(limitPerMinute: () => number) {
   };
 }
 
-export function createApp({ config: configSource, setup, store, log = () => {} }: Deps) {
+export function createApp({
+  config: configSource,
+  setup,
+  store,
+  log = () => {},
+  llm = anthropicClient,
+  now = Date.now,
+}: Deps) {
   const app = new Hono<Env>();
   const cfg = typeof configSource === 'function' ? configSource : () => configSource;
   const allow = rateLimiter(() => cfg().RATE_LIMIT_PER_MINUTE);
@@ -157,9 +165,11 @@ export function createApp({ config: configSource, setup, store, log = () => {} }
     }),
   );
 
+  registerGenerateRoutes(app, { cfg, setup, store, log, freeAiAvailable, llm, now });
+
   /**
-   * AI operations. Request validation, kill switch and credit checks are live; the LLM pipeline is not
-   * implemented yet (ROADMAP Phase 2), so a valid request returns 501 without charging a credit.
+   * Edit, Review and Ask are Phase 3. Request validation, kill switch and credit checks are live; a
+   * valid request returns 501 without charging a credit.
    */
   const aiOperation = (schema: z.ZodType) => async (c: Context<Env>) => {
     const raw: unknown = await c.req.json().catch(() => null);
@@ -186,11 +196,6 @@ export function createApp({ config: configSource, setup, store, log = () => {} }
     return c.json({ error: 'not_implemented' }, 501);
   };
 
-  app.post('/api/ai/generate', aiOperation(GenerateBody));
-  app.post(
-    '/api/ai/generate/continue',
-    aiOperation(z.object({ operationId: z.string(), answers: z.record(z.string(), z.string()) })),
-  );
   app.post(
     '/api/ai/edit',
     aiOperation(z.object({ project: z.unknown(), instruction: z.string().min(1).max(2000) })),

@@ -105,12 +105,11 @@ Graph uses stable resource IDs, never icon file names as the primary key. Servic
 Operations (1 credit each, PRD §6): **Generate**, **Edit**, **Review**, **Ask** (P1).
 
 **Generate**
-1. Prompt → extract structured requirements, assumptions and open questions.
-2. If critical open questions exist → return them with an `operationId`; the user answers or skips; continuation uses the same `operationId` and no new credit (max one round).
-3. Retrieve the catalog subset relevant to the requirements (services, features, integration patterns) to keep input tokens bounded.
-4. Generate architecture JSON with structured output; `serviceId` is an enum of the retrieved subset; anything else must use `unresolved`.
-5. Parse and schema-validate; on schema failure retry once with the error, then fail without charging.
-6. Client: run the rule set (§10), layout with ELK, render findings.
+1. Prompt → extract structured requirements, assumptions and open questions. Extraction always runs `claude-haiku-5-5`.
+2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; no credit is charged. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
+3. Generate architecture JSON with structured output (`output_config.format`) against the catalog contract with the selected model; anything outside the catalog must use `unresolved`. Haiku gets one repair turn with the deterministic validator's findings.
+4. Parse and schema-validate; a schema failure fails the operation without charging.
+5. Client: run the rule set (§10), layout with ELK, render findings.
 
 **Edit** — returns a patch (§8) against `baseRevision`; preview + confirm.  
 **Review** — input: current graph + requirements + catalog subset; output: advisory findings only. Never mutates the graph.  
@@ -123,12 +122,27 @@ A single orchestrated request can implement Generate stages during PoC, but pres
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/ai/generate` | create draft graph from text + catalog version; may return clarification questions + `operationId` |
-| POST | `/api/ai/generate/continue` | continue an operation with clarification answers (no new credit) |
+| POST | `/api/ai/generate/continue` | continue an operation with clarification answers and edited requirements (one credit per operation, charged once) |
 | POST | `/api/ai/edit` | return graph patch and rationale; confirmation on client |
 | POST | `/api/ai/review` | return advisory findings for the current graph |
 | POST | `/api/ai/ask` | P1 — answer a question about the design with cited sources |
 | GET | `/api/catalog/manifest` | current provider manifest / version URLs (can be static) |
 | GET | `/api/credits/status` | remaining free credits + `freeAiAvailable` (false when kill switch is active) |
+
+**Generate contract** (schemas in `packages/domain/src/ai.ts`):
+
+- `POST /api/ai/generate` takes `GenerateRequest` `{ prompt, catalogVersion, model?, toggles, reviewRequirements }` and returns `GenerateResponse`: either `{ status: 'questions', operationId, operationToken, requirements, assumptions, questions }` or `{ status: 'done', project, usage: { costUsd } }`.
+- `POST /api/ai/generate/continue` takes `ContinueRequest` `{ operationId, operationToken, answers, requirements? }` and returns the `done` shape. Edited requirements (1–100, unique ids, text 1–2 000 characters) replace the extracted ones; a requirement whose text changed, or whose id is new, gets `provenance: 'user'`.
+- Errors, in check order: `400 invalid_request`, `503 setup_required`, `403 model_not_enabled`, `503 free_ai_unavailable`, `402 no_credits`, `409 catalog_mismatch` (generate only, `catalogVersion` differs from the served catalog); on continue, `400 invalid_operation` and `410 operation_expired` come before the model, kill-switch and credit checks. Model failures: `502 generation_failed` (schema-invalid output) and `502 provider_error` (any provider error).
+
+**Operation token.** The server is stateless between the two calls: the token is `base64url(JSON state) + '.' + base64url(HMAC-SHA256)` with the secret `operation-token:<CLIENT_KEY_SALT>`. The state holds the operation id, the client key, model, toggles, prompt, project name, extracted requirements, assumptions and questions, and an expiry 15 minutes out. `/continue` rejects a token that fails the signature or the state check, or whose `clientKey` or `operationId` does not match the caller and the body (`400 invalid_operation`), and an expired one (`410 operation_expired`), before any model call. The token is signed, not encrypted; it only goes back to the client that wrote the prompt.
+
+**Charging rules.**
+
+- Every completed model call is priced and added to the daily and monthly spend counters straight away, including calls of failed, aborted and question-only operations.
+- A credit is charged once per operation, only after a schema-valid project, and only if the client is still connected. Questions cost no credit; `/continue` re-checks the kill switch, the model and the credit.
+- The charge is an atomic `consume`; if it fails (a parallel request took the last credit), the response is `402 no_credits` with no project, and the model cost stays in the spend counters.
+- Each AI request logs one event `{ requestId, event: 'ai_generate' | 'ai_continue', model, calls, inputTokens, outputTokens, costMicroUsd, outcome }` and nothing else (NFR-006).
 
 - Reject oversized inputs: prompt ≤ 8 000 characters; graph ≤ 150 nodes.
 - Per-request input/output token ceilings, per-session throttles, idempotency key, max parallel jobs per session, upstream timeouts.
