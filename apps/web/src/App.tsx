@@ -3,7 +3,10 @@ import {
   migrateProject,
   validateProject,
   type Finding,
+  type GapTopic,
+  type GenerateResponse,
   type Project,
+  type Requirement,
 } from '@cloudarchitect/domain';
 import {
   Background,
@@ -16,14 +19,66 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from './api';
+import { api, ApiError } from './api';
+import { ClarifyCard } from './ClarifyCard';
+import { GeneratePanel, type GenerateInput } from './GeneratePanel';
 import { applyLayout, needsLayout, toFlow } from './layout';
-import { AiModelPanel } from './models';
+import { AiModelPanel, readModelChoice } from './models';
 import { nodeTypes } from './nodes';
 import { downloadJson, loadProject, readJsonFile, saveProject } from './storage';
+import { idbVersionStore, replaceDecision, saveVersion, type ProjectVersion } from './versions';
+import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
 const displayName = (id: string) => services.get(id)?.displayName ?? id;
+
+type Questions = Extract<GenerateResponse, { status: 'questions' }>;
+
+const STAGE = {
+  reading: 'Reading your requirements…',
+  designing: 'Designing…',
+  checking: 'Checking…',
+} as const;
+/** Extraction is quick; after this the request is almost always in the generation step. */
+const DESIGNING_AFTER_MS = 8000;
+const CANCELLED = 'Generation cancelled — no credit used.';
+const SETUP_REQUIRED = 'AI features are not set up yet — see the setup notice above.';
+
+/** Plain messages for gateway error codes (spec §5); manual editing stays available for all of them. */
+const ERROR_MESSAGES: Record<string, string> = {
+  no_credits: 'Free generations used up. Bring your own key arrives in a later version.',
+  model_not_enabled: 'This model needs your own API key.',
+  free_ai_unavailable: 'AI generation is paused right now. Manual editing still works.',
+  setup_required: SETUP_REQUIRED,
+  generation_failed: 'Generation failed — no credit used. Try again.',
+  provider_error: 'Generation failed — no credit used. Try again.',
+  operation_expired: 'The questions expired. Generate again.',
+  catalog_mismatch: 'Reload the page to get the latest service catalog.',
+};
+const GENERIC_ERROR = 'Something went wrong — try again';
+
+interface DialogSpec {
+  message: string;
+  actions: { label: string; value: string; primary?: boolean }[];
+}
+const EDITED_DIALOG: DialogSpec = {
+  message: 'You edited this diagram by hand. Replace it? Your edited version is kept in Versions.',
+  actions: [
+    { label: 'Cancel', value: 'cancel' },
+    { label: 'Replace', value: 'replace', primary: true },
+  ],
+};
+const STORAGE_DIALOG: DialogSpec = {
+  message:
+    'Could not keep a copy of the current diagram in browser storage. Export it as JSON first, or replace it anyway?',
+  actions: [
+    { label: 'Cancel', value: 'cancel' },
+    { label: 'Replace anyway', value: 'replace' },
+    { label: 'Export JSON', value: 'export', primary: true },
+  ],
+};
+
+type Toast = { text: string; restore?: ProjectVersion };
 
 export function App() {
   const [project, setProject] = useState<Project>();
@@ -31,11 +86,21 @@ export function App() {
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
+  const [stage, setStage] = useState<string>();
+  const [clarify, setClarify] = useState<Questions>();
+  const [versions, setVersions] = useState<ProjectVersion[]>([]);
+  const [toast, setToast] = useState<Toast>();
+  const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   const fileInput = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const abortRef = useRef<AbortController>(undefined);
+  /** Latest committed project, for async flows that outlive a render. */
+  const projectRef = useRef<Project>(undefined);
 
   /** Single entry point for project changes: lay out if needed, persist, re-render. */
   const commit = useCallback(async (next: Project, forceLayout = false) => {
     const laid = forceLayout || needsLayout(next) ? await applyLayout(next) : next;
+    projectRef.current = laid;
     setProject(laid);
     setNodes(toFlow(laid, displayName).nodes);
     await saveProject(laid).catch(() =>
@@ -57,6 +122,176 @@ export function App() {
       () => undefined,
     );
   }, []);
+
+  const projectId = project?.projectId;
+  const refreshVersions = useCallback(async (id: string) => {
+    setVersions(await idbVersionStore.list(id).catch(() => []));
+  }, []);
+  useEffect(() => {
+    if (!projectId) return;
+    idbVersionStore.list(projectId).then(setVersions, () => setVersions([]));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (dialog) dialogRef.current?.showModal();
+  }, [dialog]);
+
+  /** In-app confirmation; resolves with the chosen action's value ('cancel' on Escape). */
+  const ask = (spec: DialogSpec) =>
+    new Promise<string>((resolve) =>
+      setDialog({
+        ...spec,
+        resolve: (value) => {
+          dialogRef.current?.close();
+          setDialog(undefined);
+          resolve(value);
+        },
+      }),
+    );
+
+  /**
+   * Stores the current diagram as a version before something replaces it. Returns the version, `null`
+   * when storage failed and the user chose to go on anyway, or `undefined` when the user cancelled.
+   */
+  const keepCurrent = async (current: Project): Promise<ProjectVersion | null | undefined> => {
+    try {
+      const saved = await saveVersion(idbVersionStore, current);
+      await refreshVersions(current.projectId);
+      return saved;
+    } catch {
+      const choice = await ask(STORAGE_DIALOG);
+      if (choice === 'cancel') return undefined;
+      if (choice === 'export') downloadJson(current);
+      return null;
+    }
+  };
+
+  /** Replace step (spec §2.4): confirm hand edits, keep the current diagram, then show the result. */
+  const replaceWith = async (generated: Project) => {
+    const current = projectRef.current;
+    if (replaceDecision(current) === 'confirm-edits' && (await ask(EDITED_DIALOG)) !== 'replace')
+      return;
+    const saved = current ? await keepCurrent(current) : null;
+    if (saved === undefined) return;
+    setStage(STAGE.checking);
+    await commit(
+      {
+        ...migrateProject(generated),
+        projectId: current?.projectId ?? generated.projectId,
+        revision: (current?.revision ?? 0) + 1,
+      },
+      true,
+    );
+    setToast({ text: 'New diagram generated', restore: saved ?? undefined });
+  };
+
+  /** Restores a kept version; the diagram it replaces is kept as a version too. */
+  const restore = async (v: ProjectVersion) => {
+    const current = projectRef.current;
+    setToast(undefined);
+    if (current && (await keepCurrent(current)) === undefined) return;
+    await commit({
+      ...migrateProject(v.project),
+      projectId: current?.projectId ?? v.project.projectId,
+      revision: (current?.revision ?? 0) + 1,
+    });
+  };
+
+  const showError = (err: unknown) => {
+    const code = err instanceof ApiError ? err.code : undefined;
+    if (code === 'setup_required') setSetupPending(true);
+    setError((code && ERROR_MESSAGES[code]) ?? GENERIC_ERROR);
+  };
+
+  /** Runs one gateway call with stage text and Cancel; handles questions, results and errors. */
+  const run = async (call: (signal: AbortSignal) => Promise<GenerateResponse>, first: string) => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setError(undefined);
+    setToast(undefined);
+    setClarify(undefined);
+    setStage(first);
+    const timer =
+      first === STAGE.reading
+        ? setTimeout(() => !ac.signal.aborted && setStage(STAGE.designing), DESIGNING_AFTER_MS)
+        : undefined;
+    try {
+      const res = await call(ac.signal);
+      clearTimeout(timer);
+      if (ac.signal.aborted) return;
+      // The response is here: nothing left to cancel, the rest happens in the browser.
+      abortRef.current = undefined;
+      if (res.status === 'questions') setClarify(res);
+      else await replaceWith(res.project);
+    } catch (err) {
+      if (ac.signal.aborted) return; // cancel() already reported it
+      if (err instanceof ApiError && err.code === 'client_closed') setToast({ text: CANCELLED });
+      else showError(err);
+    } finally {
+      clearTimeout(timer);
+      // A newer run owns the stage text; otherwise this run is over.
+      if (abortRef.current === ac || abortRef.current === undefined) {
+        abortRef.current = undefined;
+        setStage(undefined);
+      }
+    }
+  };
+
+  const generate = (input: GenerateInput) =>
+    run(
+      (signal) =>
+        api.generate(
+          {
+            prompt: input.prompt,
+            toggles: input.toggles,
+            reviewRequirements: input.reviewRequirements,
+            catalogVersion: awsCatalog.manifest.catalogVersion,
+            model: readModelChoice(),
+          },
+          signal,
+        ),
+      STAGE.reading,
+    );
+
+  const continueWith = (
+    op: Questions,
+    answers: Partial<Record<GapTopic, string>>,
+    requirements: Requirement[],
+  ) =>
+    run(
+      (signal) =>
+        api.continueGenerate(
+          {
+            operationId: op.operationId,
+            operationToken: op.operationToken,
+            answers,
+            requirements,
+          },
+          signal,
+        ),
+      STAGE.designing,
+    );
+
+  const cancel = () => {
+    if (!abortRef.current && !clarify) return;
+    abortRef.current?.abort();
+    abortRef.current = undefined;
+    setStage(undefined);
+    setClarify(undefined);
+    setToast({ text: CANCELLED });
+  };
+
+  /** A hand edit: after this, generating again asks before replacing (replaceDecision). */
+  const rename = (id: string, label: string) => {
+    const node = project?.nodes.find((n) => n.id === id);
+    if (!project || !node || !label.trim() || label.trim() === node.label) return;
+    void commit({
+      ...project,
+      revision: project.revision + 1,
+      nodes: project.nodes.map((n) => (n.id === id ? { ...n, label: label.trim() } : n)),
+    });
+  };
 
   const edges = useMemo(() => (project ? toFlow(project, displayName).edges : []), [project]);
   const findings: Finding[] = useMemo(
@@ -93,8 +328,6 @@ export function App() {
     setSelected(id);
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
   };
-
-  const detail = project && selected ? describe(project, selected) : undefined;
 
   return (
     <div className="app">
@@ -133,6 +366,18 @@ export function App() {
       )}
       <main className="main">
         <section className="canvas" aria-label="Architecture canvas">
+          {clarify && (
+            <div className="overlay">
+              <ClarifyCard
+                key={clarify.operationId}
+                questions={clarify.questions}
+                requirements={clarify.requirements}
+                assumptions={clarify.assumptions}
+                onContinue={(answers, reqs) => continueWith(clarify, answers, reqs)}
+                onCancel={cancel}
+              />
+            </div>
+          )}
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -150,12 +395,14 @@ export function App() {
           </ReactFlow>
         </section>
         <aside className="side">
-          {detail && (
-            <section>
-              <h2>Details</h2>
-              {detail}
-            </section>
-          )}
+          <GeneratePanel
+            hasDiagram={Boolean(project?.nodes.length)}
+            busy={stage !== undefined}
+            stage={stage}
+            onGenerate={generate}
+            onCancel={cancel}
+          />
+          {project && selected && <Details project={project} id={selected} onRename={rename} />}
           <section>
             <h2>Findings ({findings.length})</h2>
             {findings.length === 0 && <p className="muted">No rule findings.</p>}
@@ -171,6 +418,7 @@ export function App() {
               ))}
             </ul>
           </section>
+          <VersionsPanel versions={versions} onRestore={restore} />
           <AiModelPanel />
           <p className="muted small">
             Generated designs require professional review before production use. Icons shown are
@@ -178,11 +426,75 @@ export function App() {
           </p>
         </aside>
       </main>
+      {toast && (
+        <div className="toast" role="status">
+          <span>{toast.text}</span>
+          {toast.restore && (
+            <>
+              {' · '}
+              <button className="link" onClick={() => toast.restore && restore(toast.restore)}>
+                Restore previous
+              </button>
+            </>
+          )}
+          <button className="link muted" aria-label="Dismiss" onClick={() => setToast(undefined)}>
+            ×
+          </button>
+        </div>
+      )}
+      <dialog
+        ref={dialogRef}
+        className="confirm"
+        onCancel={(e) => {
+          e.preventDefault();
+          dialog?.resolve('cancel');
+        }}
+      >
+        {dialog && (
+          <>
+            <p>{dialog.message}</p>
+            <div className="row">
+              <span className="spacer" />
+              {dialog.actions.map((a) => (
+                <button
+                  key={a.value}
+                  className={a.primary ? 'primary' : undefined}
+                  onClick={() => dialog.resolve(a.value)}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </dialog>
     </div>
   );
 }
 
-function describe(project: Project, id: string) {
+function Details(props: {
+  project: Project;
+  id: string;
+  onRename: (id: string, label: string) => void;
+}) {
+  const body = describe(props);
+  return body ? (
+    <section>
+      <h2>Details</h2>
+      {body}
+    </section>
+  ) : null;
+}
+
+function describe({
+  project,
+  id,
+  onRename,
+}: {
+  project: Project;
+  id: string;
+  onRename: (id: string, label: string) => void;
+}) {
   const node = project.nodes.find((n) => n.id === id);
   if (!node) {
     const c = project.containers.find((x) => x.id === id);
@@ -193,7 +505,17 @@ function describe(project: Project, id: string) {
   return (
     <dl className="detail">
       <dt>Component</dt>
-      <dd>{node.label}</dd>
+      <dd>
+        <input
+          key={`${node.id}:${node.label}`}
+          className="input"
+          aria-label="Component name"
+          defaultValue={node.label}
+          maxLength={200}
+          onBlur={(e) => onRename(node.id, e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        />
+      </dd>
       <dt>Service</dt>
       <dd>
         {svc

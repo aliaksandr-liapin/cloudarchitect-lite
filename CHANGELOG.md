@@ -4,6 +4,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- AI generation in the editor: a Generate panel with a prompt box, six design-priority toggles (Serverless-first, Backups, Disaster recovery, High availability, Cost-optimized, Security hardening), stage text and Cancel.
+- One clarification round: up to three questions with quick answers, "You decide" and free text, plus editable requirements before drawing (optional review pause when there are no questions).
+- Versions: the current diagram is kept in browser storage (last 10 per project) before a generated one replaces it; a toast offers "Restore previous" and a Versions list restores any earlier diagram. Hand-edited diagrams ask before they are replaced.
+- Component names can be edited in the Details panel.
+
 ## [0.1.0] - 2026-10-14
 
 First tagged pre-alpha. AI generation is not implemented yet.
