@@ -65,6 +65,51 @@ export function replaceDecision(current: Project | undefined): ReplaceDecision {
     : 'replace';
 }
 
+/** The dialogs the replace step needs; App implements them with its in-app confirmation. */
+export interface ReplaceUi {
+  /** The diagram was edited by hand: true to replace it anyway. */
+  confirmEdits(): Promise<boolean>;
+  /** Keeping a version failed: stop, go on, or export JSON and go on. */
+  storageFailed(): Promise<'cancel' | 'replace' | 'export'>;
+  exportJson(p: Project): void;
+}
+
+/** `saved` is null when there was nothing to keep or the user went on without a version. */
+export type Kept = { saved: ProjectVersion | null };
+
+/**
+ * Stores the current diagram as a version before something replaces it; on a storage failure the
+ * user decides. Returns undefined when the user cancelled.
+ */
+export async function keepCurrent(
+  store: VersionStore,
+  current: Project | undefined,
+  ui: ReplaceUi,
+): Promise<Kept | undefined> {
+  if (!current) return { saved: null };
+  try {
+    return { saved: await saveVersion(store, current) };
+  } catch {
+    const choice = await ui.storageFailed();
+    if (choice === 'cancel') return undefined;
+    if (choice === 'export') ui.exportJson(current);
+    return { saved: null };
+  }
+}
+
+/**
+ * The replace step of Generate (spec §2.4), run before the request so a charged result is never
+ * thrown away: confirm hand edits, then keep the current diagram. Undefined means "do not generate".
+ */
+export async function prepareReplace(
+  store: VersionStore,
+  current: Project | undefined,
+  ui: ReplaceUi,
+): Promise<Kept | undefined> {
+  if (replaceDecision(current) === 'confirm-edits' && !(await ui.confirmEdits())) return undefined;
+  return keepCurrent(store, current, ui);
+}
+
 export class MemoryVersionStore implements VersionStore {
   private readonly items: ProjectVersion[] = [];
 
@@ -100,4 +145,11 @@ export const idbVersionStore: VersionStore = {
   async remove(projectId, createdAt) {
     await inTx(STORE, 'readwrite', (s) => s.delete([projectId, createdAt]));
   },
+};
+
+/** Used when browser storage failed at startup: nothing is written, every save fails. */
+export const unavailableVersionStore: VersionStore = {
+  list: async () => [],
+  put: () => Promise.reject(new Error('Browser storage is unavailable')),
+  remove: async () => undefined,
 };

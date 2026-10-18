@@ -27,7 +27,14 @@ import { applyLayout, needsLayout, toFlow } from './layout';
 import { AiModelPanel, readModelChoice } from './models';
 import { nodeTypes } from './nodes';
 import { downloadJson, loadProject, readJsonFile, saveProject } from './storage';
-import { idbVersionStore, replaceDecision, saveVersion, type ProjectVersion } from './versions';
+import {
+  idbVersionStore,
+  keepCurrent,
+  prepareReplace,
+  type Kept,
+  type ProjectVersion,
+  type ReplaceUi,
+} from './versions';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -63,10 +70,11 @@ interface DialogSpec {
   actions: { label: string; value: string; primary?: boolean }[];
 }
 const EDITED_DIALOG: DialogSpec = {
-  message: 'You edited this diagram by hand. Replace it? Your edited version is kept in Versions.',
+  message:
+    'You edited this diagram by hand. Generating replaces it; your edited version is kept in Versions.',
   actions: [
     { label: 'Cancel', value: 'cancel' },
-    { label: 'Replace', value: 'replace', primary: true },
+    { label: 'Generate', value: 'replace', primary: true },
   ],
 };
 const STORAGE_DIALOG: DialogSpec = {
@@ -106,6 +114,8 @@ export function App() {
   const abortRef = useRef<AbortController>(undefined);
   /** Latest committed project, for async flows that outlive a render. */
   const projectRef = useRef<Project>(undefined);
+  /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
+  const preparedRef = useRef<Kept & { project: Project | undefined }>(undefined);
 
   /** Single entry point for project changes: lay out if needed, persist, re-render. */
   const commit = useCallback(async (next: Project, forceLayout = false) => {
@@ -182,30 +192,31 @@ export function App() {
     }
   };
 
-  /**
-   * Stores the current diagram as a version before something replaces it. Returns the version, `null`
-   * when storage failed and the user chose to go on anyway, or `undefined` when the user cancelled.
-   */
-  const keepCurrent = async (current: Project): Promise<ProjectVersion | null | undefined> => {
-    try {
-      const saved = await saveVersion(idbVersionStore, current);
-      await refreshVersions(current.projectId);
-      return saved;
-    } catch {
-      const choice = await ask(STORAGE_DIALOG);
-      if (choice === 'cancel') return undefined;
-      if (choice === 'export') downloadJson(current);
-      return null;
-    }
+  const replaceUi: ReplaceUi = {
+    confirmEdits: async () => (await ask(EDITED_DIALOG)) === 'replace',
+    storageFailed: async () => (await ask(STORAGE_DIALOG)) as 'cancel' | 'replace' | 'export',
+    exportJson: downloadJson,
   };
 
-  /** Replace step (spec §2.4): confirm hand edits, keep the current diagram, then show the result. */
-  const replaceWith = async (generated: Project) => {
+  /**
+   * Replace step (spec §2.4), before any request: confirm hand edits and keep the current diagram
+   * as a version. False means "do not generate": no request is sent, no credit is used.
+   */
+  const prepare = async (): Promise<boolean> => {
     const current = projectRef.current;
-    if (replaceDecision(current) === 'confirm-edits' && (await ask(EDITED_DIALOG)) !== 'replace')
-      return;
-    const saved = current ? await keepCurrent(current) : null;
-    if (saved === undefined) return;
+    if (preparedRef.current && preparedRef.current.project === current) return true;
+    const kept = await prepareReplace(idbVersionStore, current, replaceUi);
+    if (!kept) return false;
+    if (kept.saved && current) await refreshVersions(current.projectId);
+    preparedRef.current = { ...kept, project: current };
+    return true;
+  };
+
+  /** Shows a generated (already charged) project. Nothing here can discard it. */
+  const showGenerated = async (generated: Project) => {
+    const current = projectRef.current;
+    const saved = preparedRef.current?.saved ?? undefined;
+    preparedRef.current = undefined;
     setStage(STAGE.checking);
     fitPendingRef.current = true;
     await commit(
@@ -216,7 +227,7 @@ export function App() {
       },
       true,
     );
-    setToast({ text: 'New diagram generated', restore: saved ?? undefined });
+    setToast({ text: 'New diagram generated', restore: saved });
   };
 
   /** Restores a kept version; the diagram it replaces is kept as a version too. */
@@ -224,7 +235,9 @@ export function App() {
     exclusive(async () => {
       const current = projectRef.current;
       setToast(undefined);
-      if (current && (await keepCurrent(current)) === undefined) return;
+      const kept = await keepCurrent(idbVersionStore, current, replaceUi);
+      if (!kept) return;
+      if (kept.saved && current) await refreshVersions(current.projectId);
       fitPendingRef.current = true;
       await commit({
         ...migrateProject(v.project),
@@ -261,7 +274,7 @@ export function App() {
       abortRef.current = undefined;
       setCancellable(false);
       if (res.status === 'questions') setClarify(res);
-      else await exclusive(() => replaceWith(res.project));
+      else await showGenerated(res.project);
     } catch (err) {
       if (ac.signal.aborted) return; // cancel() already reported it
       if (err instanceof ApiError && err.code === 'client_closed') setToast({ text: CANCELLED });
@@ -277,20 +290,28 @@ export function App() {
     }
   };
 
+  /** Generate and Continue: the replace step first, then the request, as one exclusive flow. */
+  const generateFlow = (request: () => Promise<void>) =>
+    exclusive(async () => {
+      if (await prepare()) await request();
+    }).catch(showError);
+
   const generate = (input: GenerateInput) =>
-    run(
-      (signal) =>
-        api.generate(
-          {
-            prompt: input.prompt,
-            toggles: input.toggles,
-            reviewRequirements: input.reviewRequirements,
-            catalogVersion: awsCatalog.manifest.catalogVersion,
-            model: readModelChoice(),
-          },
-          signal,
-        ),
-      STAGE.reading,
+    generateFlow(() =>
+      run(
+        (signal) =>
+          api.generate(
+            {
+              prompt: input.prompt,
+              toggles: input.toggles,
+              reviewRequirements: input.reviewRequirements,
+              catalogVersion: awsCatalog.manifest.catalogVersion,
+              model: readModelChoice(),
+            },
+            signal,
+          ),
+        STAGE.reading,
+      ),
     );
 
   const continueWith = (
@@ -298,18 +319,20 @@ export function App() {
     answers: Partial<Record<GapTopic, string>>,
     requirements: Requirement[],
   ) =>
-    run(
-      (signal) =>
-        api.continueGenerate(
-          {
-            operationId: op.operationId,
-            operationToken: op.operationToken,
-            answers,
-            requirements,
-          },
-          signal,
-        ),
-      STAGE.designing,
+    generateFlow(() =>
+      run(
+        (signal) =>
+          api.continueGenerate(
+            {
+              operationId: op.operationId,
+              operationToken: op.operationToken,
+              answers,
+              requirements,
+            },
+            signal,
+          ),
+        STAGE.designing,
+      ),
     );
 
   const cancel = () => {

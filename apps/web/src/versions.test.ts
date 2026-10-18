@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_VERSIONS,
   MemoryVersionStore,
+  prepareReplace,
   replaceDecision,
+  unavailableVersionStore,
+  type ReplaceUi,
   saveVersion,
   versionLabel,
   type VersionStore,
@@ -76,5 +79,72 @@ describe('replaceDecision', () => {
       nodes: p.nodes.map((n, i) => (i === 0 ? { ...n, label: `${n.label} edited` } : n)),
     };
     expect(replaceDecision(renamed)).toBe('confirm-edits');
+  });
+});
+
+describe('prepareReplace', () => {
+  const failing: VersionStore = {
+    list: async () => [],
+    put: () => Promise.reject(new Error('quota')),
+    remove: async () => undefined,
+  };
+  const edited = (): Project => {
+    const p = generated();
+    return { ...p, nodes: p.nodes.map((n, i) => (i === 0 ? { ...n, label: 'edited' } : n)) };
+  };
+  function ui(edits: boolean, storage: 'cancel' | 'replace' | 'export' = 'replace') {
+    const calls: string[] = [];
+    const u: ReplaceUi = {
+      confirmEdits: async () => (calls.push('edits'), edits),
+      storageFailed: async () => (calls.push('storage'), storage),
+      exportJson: () => void calls.push('export'),
+    };
+    return { u, calls };
+  }
+
+  it('keeps the current diagram as a version without asking when it was not edited', async () => {
+    const store = new MemoryVersionStore();
+    const { u, calls } = ui(true);
+    const r = await prepareReplace(store, generated(), u);
+    expect(r?.saved?.project.projectId).toBe(sample.projectId);
+    expect(await store.list(sample.projectId)).toHaveLength(1);
+    expect(calls).toEqual([]);
+  });
+
+  it('asks about hand edits first; Cancel stores nothing and stops', async () => {
+    const store = new MemoryVersionStore();
+    const { u, calls } = ui(false);
+    expect(await prepareReplace(store, edited(), u)).toBeUndefined();
+    expect(await store.list(sample.projectId)).toHaveLength(0);
+    expect(calls).toEqual(['edits']);
+  });
+
+  it('keeps the edited diagram after the user confirms', async () => {
+    const store = new MemoryVersionStore();
+    const { u } = ui(true);
+    expect((await prepareReplace(store, edited(), u))?.saved).toBeTruthy();
+    expect(await store.list(sample.projectId)).toHaveLength(1);
+  });
+
+  it('asks on a storage failure: Cancel stops, Replace anyway goes on, Export JSON exports and goes on', async () => {
+    const cancel = ui(true, 'cancel');
+    expect(await prepareReplace(failing, sample, cancel.u)).toBeUndefined();
+    const replace = ui(true, 'replace');
+    expect(await prepareReplace(failing, sample, replace.u)).toEqual({ saved: null });
+    const exp = ui(true, 'export');
+    expect(await prepareReplace(failing, sample, exp.u)).toEqual({ saved: null });
+    expect(exp.calls).toEqual(['storage', 'export']);
+  });
+
+  it('treats unavailable storage like a failed save', async () => {
+    const { u, calls } = ui(true, 'replace');
+    expect(await prepareReplace(unavailableVersionStore, sample, u)).toEqual({ saved: null });
+    expect(calls).toEqual(['storage']);
+  });
+
+  it('goes on without a version when there is no diagram yet', async () => {
+    const { u, calls } = ui(false);
+    expect(await prepareReplace(failing, undefined, u)).toEqual({ saved: null });
+    expect(calls).toEqual([]);
   });
 });
