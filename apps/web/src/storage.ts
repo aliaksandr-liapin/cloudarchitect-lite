@@ -16,21 +16,41 @@ export function open(): Promise<IDBDatabase> {
         versions.createIndex('byProject', 'projectId');
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Close when another tab wants to upgrade, so this tab never blocks it.
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
+    req.onblocked = () =>
+      reject(new Error('Another tab holds an older version of the database open; close it.'));
   });
 }
 
-function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+/**
+ * Runs one request in its own transaction and settles when the transaction ends:
+ * quota errors surface at commit (abort), after the request itself has succeeded.
+ */
+export function inTx<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  run: (s: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
   return open().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
-        const req = run(db.transaction(STORE, mode).objectStore(STORE));
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        const t = db.transaction(store, mode);
+        const req = run(t.objectStore(store));
+        t.oncomplete = () => resolve(req.result);
+        t.onerror = () => reject(t.error ?? req.error);
+        t.onabort = () => reject(t.error ?? new Error('Transaction aborted'));
       }),
   );
 }
+
+const tx = <T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>) =>
+  inTx(STORE, mode, run);
 
 export const saveProject = (p: Project) => tx('readwrite', (s) => s.put(p)).then(() => undefined);
 

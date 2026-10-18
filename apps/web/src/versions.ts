@@ -4,7 +4,7 @@ import {
   type DesignToggles,
   type Project,
 } from '@cloudarchitect/domain';
-import { open } from './storage';
+import { inTx } from './storage';
 
 /** Snapshot of a project taken before an AI result replaces it. Not part of JSON export. */
 export interface ProjectVersion {
@@ -85,33 +85,19 @@ export class MemoryVersionStore implements VersionStore {
 
 const STORE = 'versions';
 
-function done<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 export const idbVersionStore: VersionStore = {
   async list(projectId) {
-    const db = await open();
-    const all = await done(
-      db
-        .transaction(STORE, 'readonly')
-        .objectStore(STORE)
-        .index('byProject')
-        .getAll(projectId) as IDBRequest<ProjectVersion[]>,
+    const all = await inTx(
+      STORE,
+      'readonly',
+      (s) => s.index('byProject').getAll(projectId) as IDBRequest<ProjectVersion[]>,
     );
     return all.sort(newestFirst);
   },
   async put(v) {
-    const db = await open();
-    await done(db.transaction(STORE, 'readwrite').objectStore(STORE).put(v));
+    await inTx(STORE, 'readwrite', (s) => s.put(v));
   },
   async remove(projectId, createdAt) {
-    const db = await open();
-    await done(
-      db.transaction(STORE, 'readwrite').objectStore(STORE).delete([projectId, createdAt]),
-    );
+    await inTx(STORE, 'readwrite', (s) => s.delete([projectId, createdAt]));
   },
 };
