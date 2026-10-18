@@ -34,14 +34,16 @@ Return only one JSON object, with no text before or after it, in exactly this sh
       },
       "criticalDefect": false,
       "defects": [
-        { "severity": "minor", "description": "...", "evidence": "<documentation URL, or empty string for minor>" }
+        {
+          "severity": "minor",
+          "description": "...",
+          "evidence": "<documentation URL, or empty string for minor>"
+        }
       ],
       "summary": "..."
     }
   ],
-  "preference": [
-    { "scenario": "<scenario id>", "better": "A", "why": "..." }
-  ]
+  "preference": [{ "scenario": "<scenario id>", "better": "A", "why": "..." }]
 }
 ```
 

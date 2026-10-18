@@ -6,15 +6,15 @@ Scenarios in this packet: claims-approval-workflow, order-events, k8s-microservi
 
 Score each design on seven dimensions, each 0-3 (0 = critical defect, 3 = production-grade for an MVP-level design).
 
-| Dimension | What is checked |
-|---|---|
-| requirementCoverage | All explicit requirements are reflected; assumptions are marked |
-| serviceFitness | Service choices are justified; nothing redundant or expensive without reason |
-| connectionCorrectness | Direction, semantics, protocols and integrations are correct |
-| securityBaseline | Auth, least privilege, private data not public, encryption |
-| reliabilityOperability | Error handling, DLQs, observability, fault tolerance |
-| costAwareness | No obvious overspend; serverless/managed where appropriate |
-| explanationAccuracy | Rationale and connection descriptions are technically correct |
+| Dimension              | What is checked                                                              |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| requirementCoverage    | All explicit requirements are reflected; assumptions are marked              |
+| serviceFitness         | Service choices are justified; nothing redundant or expensive without reason |
+| connectionCorrectness  | Direction, semantics, protocols and integrations are correct                 |
+| securityBaseline       | Auth, least privilege, private data not public, encryption                   |
+| reliabilityOperability | Error handling, DLQs, observability, fault tolerance                         |
+| costAwareness          | No obvious overspend; serverless/managed where appropriate                   |
+| explanationAccuracy    | Rationale and connection descriptions are technically correct                |
 
 **Critical defect:** any dimension scored 0, or any incorrect technical statement that would lead the user to an insecure or non-working solution.
 
