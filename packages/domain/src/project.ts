@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { DesignToggles } from './toggles.js';
+import { ModelChoice } from './models.js';
 
 /** Current project schema version. Bump with a migration in `migrate.ts`. */
-export const PROJECT_SCHEMA_VERSION = '1.2.0';
+export const PROJECT_SCHEMA_VERSION = '1.3.0';
 
 export const ProviderId = z.enum(['aws', 'azure', 'gcp']);
 export type ProviderId = z.infer<typeof ProviderId>;
@@ -19,7 +21,7 @@ export const Requirement = z.object({
   text: z.string().min(1).max(2000),
   type: z.enum(['functional', 'non-functional', 'constraint']).default('functional'),
   status: RequirementStatus,
-  provenance: z.enum(['user', 'ai', 'clarification']).optional(),
+  provenance: z.enum(['user', 'ai', 'clarification', 'toggle']).optional(),
 });
 export type Requirement = z.infer<typeof Requirement>;
 
@@ -150,5 +152,56 @@ export const Project = z.object({
   nodes: z.array(ArchNode).max(LIMITS.maxNodes),
   edges: z.array(ArchEdge).default([]),
   findings: z.array(Finding).default([]),
+  /** Set when the graph was produced by AI generation. `contentHash` detects later manual edits. */
+  generation: z
+    .object({
+      toggles: DesignToggles,
+      model: ModelChoice,
+      generatedAt: z.iso.datetime(),
+      contentHash: z.string(),
+    })
+    .optional(),
 });
 export type Project = z.infer<typeof Project>;
+
+const stripLayout = (key: string, value: unknown) =>
+  key === 'position' || key === 'size' ? undefined : value;
+
+const canonical = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([k, v]) => stripLayout(k, v) !== undefined && v !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, canonical(v)]),
+    );
+  }
+  return value;
+};
+
+const byId = <T extends { id: string }>(items: readonly T[]) =>
+  [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+/**
+ * Synchronous FNV-1a 32-bit hex hash of the graph content (requirements, containers, nodes, edges).
+ * Layout (`position`, `size`) is excluded and items are sorted by id, so only meaningful edits change it.
+ */
+export function graphContentHash(
+  p: Pick<Project, 'requirements' | 'containers' | 'nodes' | 'edges'>,
+): string {
+  const json = JSON.stringify(
+    canonical({
+      requirements: byId(p.requirements),
+      containers: byId(p.containers),
+      nodes: byId(p.nodes),
+      edges: byId(p.edges),
+    }),
+  );
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < json.length; i++) {
+    hash ^= json.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}

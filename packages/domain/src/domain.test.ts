@@ -448,6 +448,14 @@ describe('migrateProject', () => {
     expect(p.nodes).toEqual(base().nodes);
   });
 
+  it('upgrades 1.2.0 projects to 1.3.0 unchanged otherwise', () => {
+    expect(PROJECT_SCHEMA_VERSION).toBe('1.3.0');
+    const v12 = { ...base(), schemaVersion: '1.2.0' };
+    const p = migrateProject(v12);
+    expect(p.schemaVersion).toBe('1.3.0');
+    expect(p).toEqual(Project.parse({ ...base(), schemaVersion: '1.3.0' }));
+  });
+
   it('rejects unknown versions', () => {
     expect(() => migrateProject({ schemaVersion: '9.9.9' })).toThrow(UnsupportedSchemaError);
   });
