@@ -73,14 +73,36 @@ Post-fix Sonnet: `product-search` is missing ElastiCache (no error findings).
 | Sonnet re-measure on the fixed generator | $0.682 |
 | **Phase total** | **$2.899** of the $5.59 budget |
 
+## Phase 0 → Gate A
+
+The `MODEL_OPTIONS` benchmarks were updated from the Phase 0 spike (Round 3) to the Gate A figures. Several numbers moved down:
+
+| Model | Metric | Phase 0 (Round 3) | Gate A |
+|---|---|---|---|
+| Haiku 5.5 | Automated pass rate | 0.956 | 0.932 |
+| Haiku 5.5 | No critical defect | 1.0 | 0.917 |
+| Haiku 5.5 | Median latency | 44 s | 49 s |
+| Haiku 5.5 | Mean cost / generation | $0.0061 | $0.0067 |
+| Haiku 5.5 | Blind median score | 2.29 | 2.29 per-scenario (12 scenarios); 2.00 on the 9 base scenarios only |
+| Sonnet 5.5 | Automated pass rate | 0.933 | 0.933 |
+| Sonnet 5.5 | Blind median score | 2.86 | 2.57 |
+| Sonnet 5.5 | Mean cost / generation | $0.08 | $0.0454 |
+
+Caveats:
+
+- **Different scenario sets.** Phase 0 used the 15 base scenarios; Gate A uses 22 (15 base + 7 toggle scenarios) for the live runs and 12 reviewed scenarios (9 base + 3 toggle) for the blind review, so the rates are not measured on the same population.
+- **Pre-fix packets.** The blind review scored pre-fix outputs (flat diagrams without container ids); the shipped generator was not re-reviewed.
+- **Cost and latency.** The spec (§7) accepts a cost or latency increase up to 1.5× over the Phase 0 single-call numbers for the added extraction call; Haiku's +10% cost and +11% latency are inside that.
+- **Anti-goal.** Spec §4 lists "any regression on the Phase 0 benchmark numbers in `MODEL_OPTIONS`" as an anti-goal. The Haiku pass rate, no-critical-defect rate and Sonnet blind median are below Phase 0. **The product owner's acceptance of these regressions is pending.**
+
 ## Verdict against Gate A
 
 | Criterion | Target | Measured | Result |
 |---|---|---|---|
-| Haiku blind median | ≥ 2.0 | 2.29 (per-scenario median, 12 scenarios) | **Met** |
+| Haiku blind median | ≥ 2.0 | 2.29 (per-scenario median, 12 scenarios); 2.00 on the 9 base scenarios only | **Met** (base-only exactly at the bar) |
 | No critical defect | ≥ 90% of scenarios | 11/12 = 91.7% | **Met** (thin margin: one critical defect) |
 | Live gate (Haiku) | green | PASS: schema-valid 100%, pass 93.2% | **Met** |
 
-**Gate A: passed.** Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
+**Gate A: passed** (the base-only Haiku median is 2.00, exactly at the bar; the Phase 0 regressions above await the product owner's acceptance). Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
 
 **Limits:** one reviewed design per variant per scenario; the quality review used pre-fix outputs and an AI reviewer; the 91.7% critical-defect margin is one design. Re-review a sample of post-fix designs and run a human spot check before public beta.

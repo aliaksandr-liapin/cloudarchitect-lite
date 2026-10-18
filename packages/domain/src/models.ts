@@ -11,14 +11,17 @@ export type ModelChoice = z.infer<typeof ModelChoice>;
 export interface ModelBenchmark {
   measuredAt: string;
   runId: string;
-  /** Generations scored by the eval harness (live eval runs of the Gate A scenarios). */
+  /** Live-eval generations scored by the eval harness (scenarios × repeats), not the number of blind-reviewed designs. */
   runs: number;
   schemaValidRate: number;
   /** Share of runs passing all automated checks (eval harness). */
   passRate: number;
   /** Median blind rubric score, 0–3 (PRD §14). */
   blindMedianScore: number;
-  /** Share of reviewed scenarios without a critical defect. */
+  /**
+   * Share of blind-reviewed scenarios without a critical defect. Not the same population per model:
+   * Haiku's covers 12 scenarios including 3 toggle scenarios, Sonnet's the 9 base scenarios.
+   */
   noCriticalDefectRate: number;
   majorDefects: number;
   /** Mean cost of one generation in USD, at the provider price list of the measurement date. */
