@@ -85,6 +85,16 @@ export function ModelComparison({
 
 const STORAGE_KEY = 'cloudarchitect.model';
 
+/** The model the user picked in the editor panel, if any and readable; the server default applies otherwise. */
+export function readModelChoice(): ModelChoice | undefined {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return MODEL_OPTIONS.some((o) => o.id === saved) ? (saved as ModelChoice) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Editor panel: pick the model for AI operations; models the server key does not serve need BYOK. */
 export function AiModelPanel() {
   const [enabled, setEnabled] = useState<readonly ModelChoice[]>();

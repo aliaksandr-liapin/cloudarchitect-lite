@@ -1,7 +1,17 @@
-import type { ModelChoice, ModelOption } from '@cloudarchitect/domain';
+import type {
+  ContinueRequest,
+  GenerateRequest,
+  GenerateResponse,
+  ModelChoice,
+  ModelOption,
+} from '@cloudarchitect/domain';
 
 /** Same origin by default (nginx and the Vite dev server proxy /api); set VITE_API_BASE for split hosting. */
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
+
+/** Request bodies before schema defaults apply (zod input types, so the web package needs no direct zod dependency). */
+export type GenerateRequestInput = (typeof GenerateRequest)['_zod']['input'];
+export type ContinueRequestInput = (typeof ContinueRequest)['_zod']['input'];
 
 export class ApiError extends Error {
   constructor(
@@ -42,6 +52,18 @@ export const api = {
     request<{ defaultModel: ModelChoice; enabled: ModelChoice[]; options: ModelOption[] }>(
       '/api/models',
     ),
+  generate: (body: GenerateRequestInput, signal?: AbortSignal) =>
+    request<GenerateResponse>('/api/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      signal,
+    }),
+  continueGenerate: (body: ContinueRequestInput, signal?: AbortSignal) =>
+    request<GenerateResponse>('/api/ai/generate/continue', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      signal,
+    }),
 };
 
 export interface SetupRequest {

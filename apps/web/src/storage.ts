@@ -4,10 +4,18 @@ import { migrateProject, type Project } from '@cloudarchitect/domain';
 const DB_NAME = 'cloudarchitect';
 const STORE = 'projects';
 
-function open(): Promise<IDBDatabase> {
+export function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'projectId' });
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE))
+        db.createObjectStore(STORE, { keyPath: 'projectId' });
+      if (!db.objectStoreNames.contains('versions')) {
+        const versions = db.createObjectStore('versions', { keyPath: ['projectId', 'createdAt'] });
+        versions.createIndex('byProject', 'projectId');
+      }
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
