@@ -1,5 +1,5 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import { Project, validateProject } from '@cloudarchitect/domain';
+import { DesignToggles, GapTopic, Project, validateProject } from '@cloudarchitect/domain';
 import { z } from 'zod';
 
 /** Benchmark classes from PRD §13; the Phase 0 set covers each at least once. */
@@ -31,6 +31,12 @@ export const Scenario = z.object({
     .array(z.object({ id: z.string(), keywords: z.array(z.string()).min(1) }))
     .default([]),
   maxErrorFindings: z.number().int().min(0).default(0),
+  /** Design toggles enabled for the live generator run. */
+  toggles: DesignToggles.default({}),
+  /** Answers to clarification questions by topic; unanswered topics get "You decide". */
+  answers: z.partialRecord(GapTopic, z.string()).default({}),
+  /** Validation rule ids that must not fire on the candidate (e.g. a toggle the design ignores). */
+  forbiddenRules: z.array(z.string()).default([]),
 });
 export type Scenario = z.infer<typeof Scenario>;
 
@@ -42,6 +48,7 @@ export interface ScenarioResult {
   forbiddenServices: string[];
   missingUnresolved: string[];
   errorFindings: number;
+  forbiddenRuleHits: string[];
   passed: boolean;
 }
 
@@ -63,6 +70,7 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
       forbiddenServices: [],
       missingUnresolved: [],
       errorFindings: 0,
+      forbiddenRuleHits: [],
       passed: false,
     };
   }
@@ -89,7 +97,10 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
         !unresolvedNames.some((name) => u.keywords.some((k) => name.includes(k.toLowerCase()))),
     )
     .map((u) => u.id);
-  const errorFindings = validateProject(p, awsCatalog).filter((f) => f.severity === 'error').length;
+  const findings = validateProject(p, awsCatalog);
+  const errorFindings = findings.filter((f) => f.severity === 'error').length;
+  const firedRules = new Set(findings.flatMap((f) => (f.ruleId ? [f.ruleId] : [])));
+  const forbiddenRuleHits = scenario.forbiddenRules.filter((r) => firedRules.has(r));
   const requirementRecall = scenario.expectedRequirements.length
     ? recalled.length / scenario.expectedRequirements.length
     : 1;
@@ -102,11 +113,13 @@ export function scoreCandidate(scenario: Scenario, candidate: unknown): Scenario
     forbiddenServices,
     missingUnresolved,
     errorFindings,
+    forbiddenRuleHits,
     passed:
       requirementRecall >= THRESHOLDS.requirementRecall &&
       missingServices.length === 0 &&
       forbiddenServices.length === 0 &&
       missingUnresolved.length === 0 &&
-      errorFindings <= scenario.maxErrorFindings,
+      errorFindings <= scenario.maxErrorFindings &&
+      forbiddenRuleHits.length === 0,
   };
 }

@@ -127,6 +127,9 @@ importers:
       '@cloudarchitect/domain':
         specifier: workspace:*
         version: link:../packages/domain
+      '@cloudarchitect/generator':
+        specifier: workspace:*
+        version: link:../packages/generator
       zod:
         specifier: ^4.6.7
         version: 4.6.7

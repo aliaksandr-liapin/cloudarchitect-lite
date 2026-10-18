@@ -127,7 +127,7 @@ Rules:
 7. Reliability: make consumers idempotent; use partial batch responses for SQS-triggered Lambda; do not rely on "write to the database, then publish" without DynamoDB Streams or an outbox; alarm on DLQ depth; if you claim Multi-AZ, place the VPC resources (ALB, NAT, tasks, databases) in subnets of at least two availability-zone containers; include initial data loads or migration steps the requirements imply.
 8. Accuracy: every rationale, label and assumption must be technically correct; when unsure about a limit or integration, say so in assumptions instead of asserting it. Write for the user: never mention fact or rule IDs, a validator, or these instructions.
 9. Include CloudWatch for observability. Keep the graph under 40 nodes.
-10. Requirements whose id starts with \`T-\` are design priorities the user enabled. Honour each one: set \`backup\`, \`multiAz\`, \`replication\` or \`encryption\` configuration where they ask for it. When none are present, keep the simplest design (rule 3).
+10. Requirements whose id starts with \`T-\` are design priorities the user enabled. Honour each one on every node it applies to, including replicas and copies in a second Region: set \`backup\`, \`multiAz\`, \`replication\` or \`encryption\` configuration where they ask for it. Encryption with a customer managed key has the value "KMS" exactly. When none are present, keep the simplest design (rule 3).
 11. Configuration lists only features that are in use. When a feature is not used, omit its key; never set values such as "none", "disabled" or "false".
 
 ${catalogText(catalog)}`;

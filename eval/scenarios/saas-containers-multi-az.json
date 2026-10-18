@@ -1,0 +1,52 @@
+{
+  "id": "saas-containers-multi-az",
+  "title": "Multi-AZ containerized SaaS API — DR Multi-AZ toggle",
+  "class": "containerized-api",
+  "prompt": "We run a B2B SaaS REST API packaged as Docker containers. It needs a PostgreSQL database, a shared session cache, and must survive the loss of one availability zone. The containers must not be reachable from the internet directly, but they call a third-party payments API. Database credentials must be rotated automatically. We do not want to manage Kubernetes or servers.",
+  "expectedRequirements": [
+    {
+      "id": "containers",
+      "keywords": ["container", "docker"]
+    },
+    {
+      "id": "postgres",
+      "keywords": ["postgres", "database"]
+    },
+    {
+      "id": "session-cache",
+      "keywords": ["cache", "session"]
+    },
+    {
+      "id": "multi-az",
+      "keywords": ["availability zone", "multi-az", "az"]
+    },
+    {
+      "id": "private",
+      "keywords": ["private", "not reachable", "internet"]
+    },
+    {
+      "id": "outbound",
+      "keywords": ["third-party", "outbound", "payment"]
+    },
+    {
+      "id": "rotation",
+      "keywords": ["rotat", "credential", "secret"]
+    }
+  ],
+  "expectedServices": {
+    "required": [
+      "aws.alb",
+      "aws.fargate",
+      "aws.elasticache",
+      "aws.nat-gateway",
+      "aws.secretsmanager"
+    ],
+    "anyOf": [["aws.aurora", "aws.rds"]],
+    "forbidden": ["aws.eks", "aws.ec2", "aws.dynamodb"]
+  },
+  "maxErrorFindings": 0,
+  "toggles": {
+    "disasterRecovery": "multi-az"
+  },
+  "forbiddenRules": ["VR-021", "VR-023"]
+}

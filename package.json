@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "eval": "pnpm --filter @cloudarchitect/eval run eval",
+    "eval:live": "pnpm --filter @cloudarchitect/eval run live",
     "ci": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
     "screenshots": "pnpm --filter @cloudarchitect/web build && node tools/screenshots.ts"
   },

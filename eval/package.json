@@ -8,6 +8,7 @@
     "eval": "tsx src/run.ts",
     "spike": "tsx src/spike.ts",
     "rescore": "tsx src/rescore.ts",
+    "live": "tsx src/live.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc --noEmit"
@@ -15,6 +16,7 @@
   "dependencies": {
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
+    "@cloudarchitect/generator": "workspace:*",
     "zod": "^4.6.7"
   },
   "devDependencies": {
