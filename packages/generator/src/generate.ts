@@ -117,7 +117,17 @@ export async function generateArchitecture(
     const issues = validateProject(out.project, catalog).filter((f) => f.severity !== 'info');
     if (!issues.length) break;
     const list = issues
-      .map((f) => `- [${f.ruleId ?? 'structural'} ${f.severity}] ${f.explanation}`)
+      // Ids, not only labels, so the model can find the element to change.
+      .map((f) =>
+        [
+          `- [${f.ruleId ?? 'structural'} ${f.severity}] ${f.explanation}`,
+          f.remediation && `Fix: ${f.remediation}`,
+          f.nodeIds?.length && `(nodes: ${f.nodeIds.join(', ')})`,
+          f.edgeIds?.length && `(edges: ${f.edgeIds.join(', ')})`,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
       .join('\n');
     messages.push(
       { role: 'assistant', content: out.text },

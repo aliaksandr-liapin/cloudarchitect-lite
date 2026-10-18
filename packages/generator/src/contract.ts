@@ -3,7 +3,6 @@
  * mapping to a `Project`. Ported from the Phase 0 spike (eval/src/spike.ts), which stays frozen.
  * Layout (positions) is computed later by ELK.
  */
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
   PROJECT_SCHEMA_VERSION,
   type CatalogSnapshot,
@@ -11,6 +10,7 @@ import {
   type Requirement,
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
+import { jsonOutputFormat } from './llm.js';
 
 /** The enums come from the catalog, so the schema is built per catalog snapshot. */
 export function generationSchema(catalog: CatalogSnapshot) {
@@ -70,7 +70,11 @@ export function generationSchema(catalog: CatalogSnapshot) {
         label: z.string(),
         purpose: z.string(),
         rationale: z.string(),
-        containerId: z.string().optional(),
+        // Required (null allowed): as an optional field it was dropped from every node of a design.
+        containerId: z
+          .string()
+          .nullable()
+          .describe('Container id (a subnet for scope=vpc services); null for EXTERNAL nodes'),
         requirementIds: z.array(z.string()),
         configuration: Config,
       }),
@@ -147,7 +151,7 @@ export function contractFor(catalog: CatalogSnapshot): Contract {
   let c = contracts.get(catalog);
   if (!c) {
     const schema = generationSchema(catalog);
-    c = { schema, format: zodOutputFormat(schema), system: systemPrompt(catalog) };
+    c = { schema, format: jsonOutputFormat(schema), system: systemPrompt(catalog) };
     contracts.set(catalog, c);
   }
   return c;
@@ -225,8 +229,9 @@ export function toProject(raw: Generation, o: ToProjectOptions): Project {
       ...c,
       ...(subnetType ? { properties: { subnetType } } : {}),
     })),
-    nodes: g.nodes.map(({ configuration, serviceId, unresolved, external, ...n }) => ({
+    nodes: g.nodes.map(({ configuration, serviceId, unresolved, external, containerId, ...n }) => ({
       ...n,
+      ...(containerId ? { containerId } : {}),
       // A sentinel without its detail object is completed from the node itself, never dropped.
       ...(serviceId === 'UNRESOLVED'
         ? { unresolved: unresolved ?? { name: n.label, rationale: n.rationale } }

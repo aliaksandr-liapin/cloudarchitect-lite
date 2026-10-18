@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 export interface TokenUsage {
   input: number;
@@ -76,6 +76,18 @@ export function anthropicClient(apiKey: string): LlmClient {
       stopReason: res.stop_reason,
     };
   };
+}
+
+/**
+ * Value of `output_config.format` for a Zod schema. Unlike the SDK's `zodOutputFormat`, it keeps
+ * `enum` in the JSON schema (that helper moves it into the description, so the decoder never
+ * enforced it) and has no `parse` hook (with one, the SDK stream throws its own error on a
+ * mismatch, before `parseOutput` and without the usage).
+ */
+export function jsonOutputFormat(schema: z.ZodType) {
+  const json: Record<string, unknown> = z.toJSONSchema(schema, { reused: 'ref' });
+  delete json.$schema;
+  return { type: 'json_schema' as const, schema: json };
 }
 
 /** Parses a model answer against `schema`; throws `GenerationError` carrying `usage` otherwise. */

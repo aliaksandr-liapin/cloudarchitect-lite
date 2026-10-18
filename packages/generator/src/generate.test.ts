@@ -149,6 +149,32 @@ describe('generateArchitecture', () => {
     expect(validateProject(r.project, awsCatalog).map((f) => f.ruleId)).not.toContain('VR-004');
   });
 
+  it('names the offending node ids and the remediation in the repair turn', async () => {
+    // Trimmed from Haiku product-search-cost #1: the database came back without containerId,
+    // and a repair turn that named only the label ("... must run inside a VPC") did not fix it.
+    const placed = (containerId: string | null) => {
+      const g = graph(true);
+      g.containers.push(
+        { id: 'c-vpc', kind: 'vpc', parentId: 'region', label: 'VPC' },
+        { id: 'c-priv-a', kind: 'subnet', parentId: 'c-vpc', label: 'Private A' },
+      );
+      return {
+        ...g,
+        nodes: [
+          ...g.nodes,
+          { ...node('n-rds', 'aws.rds', ['R1']), label: 'Product database', containerId },
+        ],
+      };
+    };
+    const { llm, requests } = fake(placed(null), placed('c-priv-a'));
+    const r = await generateArchitecture(llm, awsCatalog, input());
+    const repair = requests[1]?.messages[2]?.content ?? '';
+    expect(repair).toContain('- [VR-009 error] Product database must run inside a VPC.');
+    expect(repair).toContain('Fix: Move the node into a subnet of a VPC container.');
+    expect(repair).toContain('(nodes: n-rds)');
+    expect(r.project.nodes.find((n) => n.id === 'n-rds')?.containerId).toBe('c-priv-a');
+  });
+
   it('does not repair for Sonnet', async () => {
     const { llm, requests } = fake(graph(false), graph(true));
     const r = await generateArchitecture(llm, awsCatalog, input({ model: 'sonnet' }));

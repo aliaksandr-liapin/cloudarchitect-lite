@@ -1,4 +1,3 @@
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
   GapTopic,
   Requirement,
@@ -7,7 +6,7 @@ import {
   type Question,
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
-import { parseOutput, type CallUsage, type LlmClient } from './llm.js';
+import { jsonOutputFormat, parseOutput, type CallUsage, type LlmClient } from './llm.js';
 import { callUsage, EXTRACTION_MODEL } from './prices.js';
 
 /** The topic enum depends on the enabled toggles, so the schema is built per call. */
@@ -79,7 +78,7 @@ export async function extract(llm: LlmClient, input: ExtractInput): Promise<Extr
     system: systemPrompt(topics, input.toggles),
     maxTokens: 4000,
     effort: 'low',
-    format: zodOutputFormat(schema),
+    format: jsonOutputFormat(schema),
     messages: [{ role: 'user', content: input.prompt }],
     signal: input.signal,
   });
