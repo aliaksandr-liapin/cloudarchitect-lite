@@ -23,10 +23,11 @@ What makes it worth using: the first diagram is a **sensible general solution** 
    - **Security hardening:** WAF on public entry points, KMS encryption, private subnets, least-privilege auth on edges.
 
    Toggles change the generated result. Each enabled toggle enters the pipeline as an explicit requirement (`status: confirmed`, `provenance: 'toggle'`), so nodes it causes trace back to it ("added because: Backups"), and the validator checks that the result honours it (§6).
+
 4. **Automatic versions instead of a dialog [PO chose this over "ask to save" and "confirm override"].**
-   - When a diagram exists, a line under Generate reads: *"Generating replaces the current diagram. The current one is kept in Versions."*
-   - On click, generation starts immediately. The current diagram is first stored as a version in IndexedDB, labelled with time and enabled toggles (e.g. *"14:32 · Serverless-first, Backups"*).
-   - After success, a toast shows *"New diagram generated · Restore previous"*. A Versions list restores any earlier one.
+   - When a diagram exists, a line under Generate reads: _"Generating replaces the current diagram. The current one is kept in Versions."_
+   - On click, generation starts immediately. The current diagram is first stored as a version in IndexedDB, labelled with time and enabled toggles (e.g. _"14:32 · Serverless-first, Backups"_).
+   - After success, a toast shows _"New diagram generated · Restore previous"_. A Versions list restores any earlier one.
    - The one real confirmation: if the user **edited the diagram by hand** since it was generated, confirm before replacing. The edited diagram is still kept as a version.
    - Keep the last 10 versions per project; drop older ones automatically. [builder call, proposed to PO]
 5. **Gateway generation is real.** `/api/ai/generate` and `/api/ai/generate/continue` stop returning 501. Credits, budget caps and kill switch apply as already built.
@@ -73,15 +74,15 @@ What makes it worth using: the first diagram is a **sensible general solution** 
 
 Each toggle adds rules that run only when it is enabled (project stores enabled toggles, §8). New rule IDs continue the sequence [builder call on exact conditions; the intent is PO's]:
 
-| Toggle | Rule (enabled only) | Severity |
-|---|---|---|
-| Serverless-first | EC2 or RDS/Aurora (non-serverless) node without a requirement justifying it | warning |
-| Backups | Data store (DynamoDB, RDS, Aurora, S3, EFS, ElastiCache) without backup/PITR/versioning configuration | warning |
-| Disaster recovery: Multi-AZ | VPC resources not spread over ≥ 2 availability-zone containers; RDS/Aurora without Multi-AZ config | warning |
-| Disaster recovery: cross-region | No second region container, or data stores without replication config (S3 CRR, DynamoDB global tables, Aurora global) | warning |
-| High availability | Single-AZ placement of VPC resources (generalises VR-018) | warning |
-| Cost-optimized | DAX/NAT Gateway/provisioned capacity without a justifying requirement | info |
-| Security hardening | Public API Gateway / ALB / CloudFront without WAF; data store without KMS encryption config | warning |
+| Toggle                          | Rule (enabled only)                                                                                                   | Severity |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------- |
+| Serverless-first                | EC2 or RDS/Aurora (non-serverless) node without a requirement justifying it                                           | warning  |
+| Backups                         | Data store (DynamoDB, RDS, Aurora, S3, EFS, ElastiCache) without backup/PITR/versioning configuration                 | warning  |
+| Disaster recovery: Multi-AZ     | VPC resources not spread over ≥ 2 availability-zone containers; RDS/Aurora without Multi-AZ config                    | warning  |
+| Disaster recovery: cross-region | No second region container, or data stores without replication config (S3 CRR, DynamoDB global tables, Aurora global) | warning  |
+| High availability               | Single-AZ placement of VPC resources (generalises VR-018)                                                             | warning  |
+| Cost-optimized                  | DAX/NAT Gateway/provisioned capacity without a justifying requirement                                                 | info     |
+| Security hardening              | Public API Gateway / ALB / CloudFront without WAF; data store without KMS encryption config                           | warning  |
 
 New feature keys these rules read (backup, PITR, versioning, Multi-AZ, replication, KMS) are added to the catalog `features` list so the generator can set them through the existing `configuration` contract. The rules get positive and negative fixture tests like VR-001…018.
 
