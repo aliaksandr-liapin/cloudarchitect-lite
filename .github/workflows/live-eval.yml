@@ -1,0 +1,58 @@
+name: Live eval
+
+on:
+  pull_request:
+    paths:
+      - packages/generator/**
+      - packages/catalog/data/**
+      - packages/domain/src/models.ts
+      - packages/domain/src/validation.ts
+      - eval/scenarios/**
+      - eval/src/live.ts
+      - eval/src/gate.ts
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Comma-separated model choices (haiku, sonnet, opus)
+        default: haiku
+      repeats:
+        description: Runs per scenario
+        default: '1'
+      max_usd:
+        description: Spend cap in USD for the whole run
+        default: '0.50'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-eval:
+    name: Live generator evaluation (spends API budget)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Without the secret (forks, Dependabot) the script skips and exits 0.
+      - name: Run live eval with gate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODELS: ${{ inputs.models || 'haiku' }}
+          REPEATS: ${{ inputs.repeats || '1' }}
+          MAX_USD: ${{ inputs.max_usd || '0.50' }}
+        run: pnpm eval:live --gate --models "$MODELS" --repeats "$REPEATS" --max-usd "$MAX_USD"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: live-eval-results
+          path: eval/results/live/
+          if-no-files-found: ignore
