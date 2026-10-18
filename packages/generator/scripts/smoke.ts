@@ -13,10 +13,9 @@ import { parseArgs } from 'node:util';
 import {
   anthropicClient,
   extract,
-  GenerationError,
+  costMicroUsd,
   generateArchitecture,
   PRICES,
-  type CallUsage,
   type LlmClient,
 } from '../src/index.js';
 
@@ -33,6 +32,7 @@ const { values: args } = parseArgs({
 });
 const model = ModelChoice.parse(args.model);
 const maxUsd = Number(args['max-usd']);
+if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be a positive number');
 const toggles: DesignToggles = { backups: true };
 const { prompt } = JSON.parse(readFileSync(join(repo, 'eval/scenarios/myblog.json'), 'utf8')) as {
   prompt: string;
@@ -47,12 +47,12 @@ const llm: LlmClient = async (req) => {
   const worst = inputTokens * p.cacheWrite + req.maxTokens * p.output;
   if (spentMicro + worst > maxUsd * 1e6)
     throw new Error(`Stopped: the next call could pass --max-usd ${maxUsd}`);
-  return real(req);
+  const res = await real(req);
+  spentMicro += costMicroUsd(req.model, res.usage);
+  return res;
 };
-const total = (usage: CallUsage[]) => usage.reduce((a, u) => a + u.costMicroUsd, 0);
 
 const ex = await extract(llm, { prompt, toggles });
-spentMicro += total(ex.usage);
 console.log(`questions: ${ex.questions.map((q) => q.topic).join(', ') || '(none)'}`);
 try {
   const r = await generateArchitecture(llm, awsCatalog, {
@@ -65,7 +65,6 @@ try {
     questions: ex.questions,
     answers: {},
   });
-  spentMicro += total(r.usage);
   const byRule: Record<string, number> = {};
   for (const f of validateProject(r.project, awsCatalog)) {
     const key = `${f.ruleId ?? 'structural'}:${f.severity}`;
@@ -74,7 +73,6 @@ try {
   console.log(`generation calls: ${r.usage.length}; nodes: ${r.project.nodes.length}`);
   console.log('findings by rule:', byRule);
 } catch (err) {
-  if (err instanceof GenerationError) spentMicro += total(err.usage);
   console.log(`generation failed: ${err instanceof Error ? err.message : String(err)}`);
   process.exitCode = 1;
 } finally {
