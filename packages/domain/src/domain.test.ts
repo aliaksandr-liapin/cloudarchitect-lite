@@ -571,3 +571,169 @@ describe('PRD rules VR-002, VR-003, VR-008, VR-011', () => {
     ).not.toContain('VR-011');
   });
 });
+
+describe('toggle rules VR-019…VR-025', () => {
+  const node = (id: string, serviceId: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      provider: 'aws',
+      serviceId,
+      label: id,
+      requirementIds: [],
+      position: pos,
+      containerId: 'region',
+      ...extra,
+    }) as never;
+  const ext = (id: string) =>
+    ({
+      id,
+      provider: 'aws',
+      label: id,
+      requirementIds: [],
+      position: pos,
+      external: { kind: 'user', name: id },
+    }) as never;
+  const edge = (source: string, target: string) =>
+    ({ id: `${source}-${target}`, source, target, kind: 'invoke', requirementIds: [] }) as never;
+  const gen = (toggles: Record<string, unknown>) => ({
+    toggles,
+    model: 'sonnet',
+    generatedAt: '2026-10-18T00:00:00Z',
+    contentHash: 'h',
+  });
+  const req = (id: string, provenance: string, status = 'confirmed') =>
+    ({ id, text: id, type: 'functional', status, provenance }) as never;
+  const withToggles = (toggles: Record<string, unknown>, over: Partial<Project> = {}) =>
+    base({ generation: gen(toggles) as never, ...over });
+  const found = (p: Project, id: string) =>
+    validateProject(p, catalog).filter((f) => f.ruleId === id);
+
+  it('VR-019 flags unrequested servers and accepts user-requested ones', () => {
+    const bad = withToggles(
+      { serverlessFirst: true },
+      {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['R1'] })],
+        requirements: [req('R1', 'ai')],
+      },
+    );
+    expect(found(bad, 'VR-019')[0]?.requirementIds).toEqual(['T-serverless-first']);
+    const ok = withToggles(
+      { serverlessFirst: true },
+      {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['R1'] })],
+        requirements: [req('R1', 'user')],
+      },
+    );
+    expect(found(ok, 'VR-019')).toHaveLength(0);
+  });
+
+  it('VR-020 flags a data store without backup', () => {
+    const t = { backups: true };
+    expect(found(withToggles(t, { nodes: [node('s3', 'aws.s3')] }), 'VR-020')).toHaveLength(1);
+    const ok = node('s3', 'aws.s3', { configuration: { backup: 'versioning' } });
+    expect(found(withToggles(t, { nodes: [ok] }), 'VR-020')).toHaveLength(0);
+  });
+
+  it('VR-021 flags a database that is not Multi-AZ', () => {
+    const t = { disasterRecovery: 'multi-az' };
+    expect(found(withToggles(t, { nodes: [node('db', 'aws.rds')] }), 'VR-021')).toHaveLength(1);
+    const ok = node('db', 'aws.rds', { configuration: { multiAz: 'true' } });
+    expect(found(withToggles(t, { nodes: [ok] }), 'VR-021')).toHaveLength(0);
+    expect(
+      found(
+        withToggles({ disasterRecovery: 'cross-region' }, { nodes: [node('db', 'aws.rds')] }),
+        'VR-021',
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('VR-022 needs two regions and replicated stores', () => {
+    const t = { disasterRecovery: 'cross-region' };
+    const bad = withToggles(t, { nodes: [node('d', 'aws.dynamodb'), node('e', 'aws.efs')] });
+    expect(found(bad, 'VR-022')).toHaveLength(2); // one region + dynamodb; EFS exempt
+    const ok = withToggles(t, {
+      containers: [
+        { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+        { id: 'region', kind: 'region', parentId: 'cloud', label: 'a' },
+        { id: 'region2', kind: 'region', parentId: 'cloud', label: 'b' },
+      ],
+      nodes: [node('d', 'aws.dynamodb', { configuration: { replication: 'global-table' } })],
+    });
+    expect(found(ok, 'VR-022')).toHaveLength(0);
+  });
+
+  describe('VR-023', () => {
+    const containers = (azs: string[]) => [
+      { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+      { id: 'region', kind: 'region', parentId: 'cloud', label: 'r' },
+      { id: 'vpc', kind: 'vpc', parentId: 'region', label: 'vpc' },
+      ...azs.map((a) => ({ id: a, kind: 'availability-zone', parentId: 'vpc', label: a })),
+    ];
+    const at = (id: string, serviceId: string, containerId: string) =>
+      node(id, serviceId, { containerId });
+    it('flags a single AZ or no AZ and accepts two', () => {
+      const t = { highAvailability: true };
+      const one = withToggles(t, {
+        containers: containers(['a']) as never,
+        nodes: [at('lb', 'aws.alb', 'a'), at('db', 'aws.rds', 'a')],
+      });
+      expect(found(one, 'VR-023')).toHaveLength(1);
+      const none = withToggles(t, {
+        containers: containers([]) as never,
+        nodes: [at('db', 'aws.rds', 'vpc')],
+      });
+      expect(found(none, 'VR-023')).toHaveLength(1);
+      const two = withToggles(t, {
+        containers: containers(['a', 'b']) as never,
+        nodes: [at('lb', 'aws.alb', 'a'), at('db', 'aws.rds', 'b')],
+      });
+      expect(found(two, 'VR-023')).toHaveLength(0);
+    });
+    it('also runs for disaster recovery', () => {
+      const p = withToggles(
+        { disasterRecovery: 'multi-az' },
+        { containers: containers(['a']) as never, nodes: [at('db', 'aws.rds', 'a')] },
+      );
+      expect(found(p, 'VR-023')[0]?.requirementIds).toEqual(['T-dr']);
+    });
+  });
+
+  it('VR-024 flags cost drivers with only toggle requirements', () => {
+    const t = { costOptimized: true };
+    const mk = (r: string) =>
+      withToggles(t, {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['T-cost', 'R1'] })],
+        requirements: [req('T-cost', 'toggle'), req('R1', r)],
+      });
+    expect(found(mk('toggle'), 'VR-024')).toHaveLength(1);
+    expect(found(mk('user'), 'VR-024')).toHaveLength(0);
+  });
+
+  it('VR-025 flags public entry points without WAF and data stores without KMS', () => {
+    const t = { securityHardening: true };
+    const kms = { configuration: { encryption: 'KMS' } };
+    const bad = withToggles(t, {
+      nodes: [ext('u'), node('api', 'aws.apigateway'), node('s3', 'aws.s3')],
+      edges: [edge('u', 'api')],
+    });
+    expect(found(bad, 'VR-025')).toHaveLength(2);
+    const ok = withToggles(t, {
+      nodes: [
+        ext('u'),
+        node('api', 'aws.apigateway'),
+        node('waf', 'aws.waf'),
+        node('s3', 'aws.s3', kms),
+      ],
+      edges: [edge('u', 'api'), edge('waf', 'api')],
+    });
+    expect(found(ok, 'VR-025')).toHaveLength(0);
+  });
+
+  it('never fires without project.generation', () => {
+    const p = base({
+      nodes: [node('vm', 'aws.ec2'), node('s3', 'aws.s3'), node('api', 'aws.apigateway'), ext('u')],
+      edges: [edge('u', 'api')],
+    });
+    expect(ruleIds(p).filter((id) => /^VR-0(19|2[0-5])$/.test(id ?? ''))).toEqual([]);
+  });
+});

@@ -91,5 +91,40 @@
     "severity": "warning",
     "title": "Application Load Balancer placed in a single Availability Zone",
     "documentationUrl": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+  },
+  {
+    "id": "VR-019",
+    "severity": "warning",
+    "title": "Server-based service in a serverless-first design"
+  },
+  {
+    "id": "VR-020",
+    "severity": "warning",
+    "title": "Data store without backups"
+  },
+  {
+    "id": "VR-021",
+    "severity": "warning",
+    "title": "Database not Multi-AZ"
+  },
+  {
+    "id": "VR-022",
+    "severity": "warning",
+    "title": "Cross-region recovery not satisfied"
+  },
+  {
+    "id": "VR-023",
+    "severity": "warning",
+    "title": "VPC resources not spread across two Availability Zones"
+  },
+  {
+    "id": "VR-024",
+    "severity": "info",
+    "title": "Cost driver without a stated requirement"
+  },
+  {
+    "id": "VR-025",
+    "severity": "warning",
+    "title": "Security hardening gap: public entry point without WAF or data store without KMS"
   }
 ]

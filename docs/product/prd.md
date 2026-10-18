@@ -157,8 +157,15 @@ Rule findings are deterministic and versioned; advisory findings (FR-021) are a 
 | VR-016 | AWS WAF attached to an API Gateway HTTP or WebSocket API (WAF supports REST APIs only) | error |
 | VR-017 | Lambda on-failure destination used for an SQS event source (use the queue's redrive DLQ) | warning |
 | VR-018 | Application Load Balancer placed in a single Availability Zone | warning |
+| VR-019 | EC2 / RDS / ECS / EKS node not requested by a confirmed user or clarification requirement; only when the serverless-first toggle is enabled | warning |
+| VR-020 | Data store without a backup configuration; only when the backups toggle is enabled | warning |
+| VR-021 | RDS / Aurora / ElastiCache without Multi-AZ; only when the disaster-recovery toggle is `multi-az` | warning |
+| VR-022 | Fewer than two Regions, or a data store (except EFS / ElastiCache) without replication; only when the disaster-recovery toggle is `cross-region` | warning |
+| VR-023 | VPC resources not placed in at least two Availability Zones; only when the high-availability or any disaster-recovery toggle is enabled | warning |
+| VR-024 | DAX / NAT Gateway / EC2 / EKS linked to no requirement besides toggle ones; only when the cost-optimized toggle is enabled | info |
+| VR-025 | Public API Gateway / ALB / CloudFront without WAF, or a data store without KMS encryption; only when the security-hardening toggle is enabled | warning |
 
-Every rule has positive and negative fixture tests. All rules VR-001…VR-018 are implemented.
+Every rule has positive and negative fixture tests. All rules VR-001…VR-025 are implemented.
 
 ## 12. Icons — sources and usage terms
 
