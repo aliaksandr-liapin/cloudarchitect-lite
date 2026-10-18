@@ -78,6 +78,7 @@ export async function extract(llm: LlmClient, input: ExtractInput): Promise<Extr
     model: EXTRACTION_MODEL,
     system: systemPrompt(topics, input.toggles),
     maxTokens: 4000,
+    effort: 'low',
     format: zodOutputFormat(schema),
     messages: [{ role: 'user', content: input.prompt }],
     signal: input.signal,

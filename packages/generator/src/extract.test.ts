@@ -53,6 +53,7 @@ describe('extract', () => {
     await extract(llm, { prompt: 'a shop', toggles: { backups: true } });
     expect(requests[0]?.model).toBe('claude-haiku-5-5');
     expect(requests[0]?.maxTokens).toBe(4000);
+    expect(requests[0]?.effort).toBe('low');
     expect(requests[0]?.system).toContain('Backups');
   });
 

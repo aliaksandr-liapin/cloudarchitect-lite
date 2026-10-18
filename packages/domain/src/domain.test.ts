@@ -662,6 +662,34 @@ describe('toggle rules VR-019…VR-025', () => {
     expect(found(ok, 'VR-022')).toHaveLength(0);
   });
 
+  it('VR-022 accepts a replica in another region of a replicated store', () => {
+    const t = { disasterRecovery: 'cross-region' };
+    const containers = [
+      { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+      { id: 'region', kind: 'region', parentId: 'cloud', label: 'a' },
+      { id: 'region2', kind: 'region', parentId: 'cloud', label: 'b' },
+    ];
+    const replicated = { containerId: 'region', configuration: { replication: 'global tables' } };
+    const replica = withToggles(t, {
+      containers: containers as never,
+      nodes: [
+        node('d', 'aws.dynamodb', replicated),
+        node('d2', 'aws.dynamodb', { containerId: 'region2' }),
+      ],
+    });
+    expect(found(replica, 'VR-022')).toHaveLength(0);
+    // Same region, or a different service, is not a replica.
+    const sameRegion = withToggles(t, {
+      containers: containers as never,
+      nodes: [
+        node('d', 'aws.dynamodb', replicated),
+        node('d2', 'aws.dynamodb', { containerId: 'region' }),
+        node('s', 'aws.s3', { containerId: 'region2' }),
+      ],
+    });
+    expect(found(sameRegion, 'VR-022').flatMap((f) => f.nodeIds)).toEqual(['d2', 's']);
+  });
+
   describe('VR-023', () => {
     const containers = (azs: string[]) => [
       { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },

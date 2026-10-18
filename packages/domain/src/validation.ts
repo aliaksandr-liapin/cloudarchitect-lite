@@ -540,9 +540,22 @@ const RULES: Rule[] = [
             'Cross-region recovery is enabled but the design has fewer than two Regions.',
           remediation: 'Add a second Region container with the recovery stack.',
         });
+      const region = (x: ArchNode) => enclosing(ctx, x.containerId, 'region')?.id;
+      // A store without `replication` is the replica when the same service in another Region has it.
+      const isReplica = (x: ArchNode) =>
+        nodesOf(ctx, svc(x)!).some(
+          (o) =>
+            o.id !== x.id &&
+            Boolean(o.configuration?.replication) &&
+            region(o) !== undefined &&
+            region(x) !== undefined &&
+            region(o) !== region(x),
+        );
       for (const n of nodesOf(ctx, ...DATA_STORES).filter(
         (x) =>
-          !['aws.efs', 'aws.elasticache'].includes(svc(x) ?? '') && !x.configuration?.replication,
+          !['aws.efs', 'aws.elasticache'].includes(svc(x) ?? '') &&
+          !x.configuration?.replication &&
+          !isReplica(x),
       ))
         out.push({
           ruleId: 'VR-022',

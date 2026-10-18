@@ -14,6 +14,8 @@ export interface LlmRequest {
   maxTokens: number;
   /** Value of `output_config.format`. */
   format: unknown;
+  /** Value of `output_config.effort`; adaptive thinking depth. Omitted means the model default. */
+  effort?: 'low' | 'medium' | 'high';
   messages: { role: 'user' | 'assistant'; content: string }[];
   signal?: AbortSignal;
 }
@@ -46,16 +48,22 @@ export class GenerationError extends Error {
 export function anthropicClient(apiKey: string): LlmClient {
   const client = new Anthropic({ apiKey, maxRetries: 2 });
   return async (req) => {
-    const res = await client.messages.create(
-      {
-        model: req.model,
-        max_tokens: req.maxTokens,
-        system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-        output_config: { format: req.format as never },
-        messages: req.messages,
-      },
-      { signal: req.signal },
-    );
+    // Streaming, so a large max_tokens (room for adaptive thinking) stays clear of HTTP timeouts.
+    const res = await client.messages
+      .stream(
+        {
+          model: req.model,
+          max_tokens: req.maxTokens,
+          system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
+          output_config: {
+            format: req.format as never,
+            ...(req.effort ? { effort: req.effort } : {}),
+          },
+          messages: req.messages,
+        },
+        { signal: req.signal },
+      )
+      .finalMessage();
     const u = res.usage;
     return {
       text: res.content.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join(''),

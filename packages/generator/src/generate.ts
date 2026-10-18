@@ -34,7 +34,9 @@ export interface GenerateResult {
   usage: CallUsage[];
 }
 
-const MAX_TOKENS = 16000;
+/** Room for adaptive thinking plus the JSON answer, so thinking cannot truncate the output. */
+const MAX_TOKENS = 32000;
+const EFFORT = 'medium';
 
 /** Given requirements, then one per clarification question, then one per enabled toggle. */
 export function buildRequirements(
@@ -87,6 +89,7 @@ export async function generateArchitecture(
       model: option.model,
       system: contract.system,
       maxTokens: MAX_TOKENS,
+      effort: EFFORT,
       format: contract.format,
       messages: [...messages],
       signal: input.signal,

@@ -194,7 +194,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "S3 encryption at rest",
-    "summary": "Encrypts S3 data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts S3 data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html"
   },
   {
@@ -203,7 +203,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "DynamoDB encryption at rest",
-    "summary": "Encrypts DynamoDB data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts DynamoDB data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
   },
   {
@@ -212,7 +212,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "RDS encryption at rest",
-    "summary": "Encrypts RDS data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts RDS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
   },
   {
@@ -221,7 +221,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "Aurora encryption at rest",
-    "summary": "Encrypts Aurora data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts Aurora data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html"
   },
   {
@@ -230,7 +230,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "EFS encryption at rest",
-    "summary": "Encrypts EFS data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts EFS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html"
   },
   {
@@ -239,7 +239,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "ElastiCache encryption at rest",
-    "summary": "Encrypts ElastiCache data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts ElastiCache data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
   },
   {
@@ -248,7 +248,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "SQS encryption at rest",
-    "summary": "Encrypts SQS data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts SQS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
   },
   {
@@ -257,7 +257,7 @@
     "appliesTo": "node",
     "configKey": "encryption",
     "displayName": "SNS encryption at rest",
-    "summary": "Encrypts SNS data at rest. Value: KMS (customer managed key) or AWS-managed.",
+    "summary": "Encrypts SNS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
     "documentationUrl": "https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html"
   }
 ]

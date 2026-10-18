@@ -137,6 +137,10 @@ describe('generateArchitecture', () => {
     const r = await generateArchitecture(llm, awsCatalog, input());
     expect(requests).toHaveLength(2);
     expect(requests[0]?.model).toBe('claude-haiku-5-5');
+    expect(requests.map((q) => [q.maxTokens, q.effort])).toEqual([
+      [32000, 'medium'],
+      [32000, 'medium'],
+    ]);
     expect(requests[1]?.messages).toHaveLength(3);
     expect(requests[1]?.messages[2]?.content).toContain('VR-004');
     expect(requests[1]?.system).toBe(requests[0]?.system);
