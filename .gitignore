@@ -19,3 +19,5 @@ coverage/
 # Icon packs are fetched, not committed (see docs/product/cloud-provider-catalog.md §2)
 assets/icons/
 eval/results/
+# Local agent workflow scratch (plans and specs live in docs/superpowers)
+.superpowers/
