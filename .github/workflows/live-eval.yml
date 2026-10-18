@@ -2,6 +2,7 @@ name: Live eval
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - packages/generator/**
       - packages/catalog/data/**
@@ -31,6 +32,8 @@ concurrency:
 
 jobs:
   live-eval:
+    # Draft PRs skip the paid run; it runs when the PR is marked ready, and on manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     name: Live generator evaluation (spends API budget)
     runs-on: ubuntu-latest
     timeout-minutes: 20
