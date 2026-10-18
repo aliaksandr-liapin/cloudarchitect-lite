@@ -98,6 +98,14 @@ class Operation {
   }
 }
 
+/** Prefixes of the clarification and toggle requirements the generator adds itself. */
+const RESERVED_ID = /^[CT]-/;
+
+const ContinueBody = ContinueRequest.refine(
+  (r) => !r.requirements?.some((q) => RESERVED_ID.test(q.id)),
+  { message: 'Requirement ids starting with C- or T- are reserved', path: ['requirements'] },
+);
+
 const invalid = (c: Ctx, op: Operation, error: z.ZodError) => {
   op.finish('invalid_request');
   return c.json(
@@ -189,11 +197,12 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
       return c.json({ error: 'catalog_mismatch' }, 409);
     }
 
+    // The client's disconnect signal is deliberately not forwarded: each call finishes so it is priced
+    // and counted, and `deliver` skips the credit when the client has gone away.
     const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
-    const signal = c.req.raw.signal;
     let project: Project;
     try {
-      const extracted = await extract(llm, { prompt: body.prompt, toggles: body.toggles, signal });
+      const extracted = await extract(llm, { prompt: body.prompt, toggles: body.toggles });
       if (extracted.questions.length || body.reviewRequirements) {
         const operationId = crypto.randomUUID();
         const state: OperationState = {
@@ -228,7 +237,6 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
         assumptions: extracted.assumptions,
         questions: [],
         answers: {},
-        signal,
         now: new Date(deps.now()),
       }));
     } catch (err) {
@@ -239,7 +247,7 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
 
   app.post('/api/ai/generate/continue', async (c) => {
     const op = new Operation(c, deps, 'ai_continue');
-    const parsed = ContinueRequest.safeParse(await c.req.json().catch(() => null));
+    const parsed = ContinueBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return invalid(c, op, parsed.error);
     const body = parsed.data;
     const stopped = setupRequired(c, op);
@@ -279,7 +287,6 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
         assumptions,
         questions,
         answers: body.answers,
-        signal: c.req.raw.signal,
         now: new Date(deps.now()),
       }));
     } catch (err) {

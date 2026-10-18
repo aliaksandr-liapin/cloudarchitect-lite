@@ -84,6 +84,8 @@ function fakeLlm(opts: FakeOptions = {}) {
     requests.push(req);
     await new Promise((r) => setTimeout(r, 1));
     opts.onCall?.(req);
+    // Like the SDK: a call whose signal fires while in flight throws and reports no usage.
+    if (req.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
     const text =
       req.maxTokens === 4000
         ? JSON.stringify(extraction(opts.questions ?? []))
@@ -286,6 +288,26 @@ describe('/api/ai/generate', () => {
     expect(await remaining(s.app)).toBe(3);
   });
 
+  it('continue rejects edited requirement ids reserved for clarification and toggle requirements', async () => {
+    const s = setup({ questions: [question] });
+    const q = await startWithQuestions(s);
+    const calls = s.requests.length;
+    for (const id of ['C-auth-methods', 'T-backups']) {
+      const res = await s.app.request(
+        '/api/ai/generate/continue',
+        post({
+          operationId: q.operationId,
+          operationToken: q.operationToken,
+          requirements: [{ id, text: 'Collides with a generated id', status: 'confirmed' }],
+        }),
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'invalid_request', issues: ['requirements'] });
+    }
+    expect(s.requests.length).toBe(calls);
+    expect(await remaining(s.app)).toBe(3);
+  });
+
   it('continue rejects duplicate, empty or oversized edited requirements', async () => {
     const s = setup({ questions: [question] });
     const q = await startWithQuestions(s);
@@ -338,6 +360,25 @@ describe('/api/ai/generate', () => {
     expect(await remaining(s.app)).toBe(3);
     expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(0);
     expect(s.logs.find((l) => l.event === 'ai_generate')?.outcome).toBe('aborted');
+  });
+
+  it('a disconnect while a model call is in flight still records its spend and charges nothing', async () => {
+    const controller = new AbortController();
+    const s = setup({ onCall: (req) => req.maxTokens === 4000 && controller.abort() });
+    const res = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion }, undefined, controller.signal),
+    );
+    expect(res.status).toBe(499);
+    expect(await res.json()).toEqual({ error: 'client_closed' });
+    expect(await remaining(s.app)).toBe(3);
+    const event = s.logs.find((l) => l.event === 'ai_generate')!;
+    expect(event.outcome).toBe('aborted');
+    // Every call ran to completion and was priced, including the one in flight at the disconnect.
+    expect(event.calls).toBe(s.requests.length);
+    expect(event.costMicroUsd).toBeGreaterThan(0);
+    expect((await s.store.spend()).dayMicroUsd).toBe(event.costMicroUsd);
+    expect(s.requests.every((r) => r.signal === undefined)).toBe(true);
   });
 
   it('schema-invalid output returns 502 generation_failed and no charge', async () => {
