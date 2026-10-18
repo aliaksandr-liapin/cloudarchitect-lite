@@ -36,7 +36,7 @@ export interface GenerateResult {
 
 /** Room for adaptive thinking plus the JSON answer, so thinking cannot truncate the output. */
 const MAX_TOKENS = 32000;
-const EFFORT = 'medium';
+const EFFORT = 'low';
 
 /** Given requirements, then one per clarification question, then one per enabled toggle. */
 export function buildRequirements(

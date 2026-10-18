@@ -138,8 +138,8 @@ describe('generateArchitecture', () => {
     expect(requests).toHaveLength(2);
     expect(requests[0]?.model).toBe('claude-haiku-5-5');
     expect(requests.map((q) => [q.maxTokens, q.effort])).toEqual([
-      [32000, 'medium'],
-      [32000, 'medium'],
+      [32000, 'low'],
+      [32000, 'low'],
     ]);
     expect(requests[1]?.messages).toHaveLength(3);
     expect(requests[1]?.messages[2]?.content).toContain('VR-004');
