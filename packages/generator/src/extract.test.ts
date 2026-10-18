@@ -1,3 +1,4 @@
+import { Question, Requirement } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import { allowedTopics, extract } from './extract.js';
 import { GenerationError, type LlmClient, type LlmRequest } from './llm.js';
@@ -55,6 +56,63 @@ describe('extract', () => {
     expect(requests[0]?.maxTokens).toBe(4000);
     expect(requests[0]?.effort).toBe('low');
     expect(requests[0]?.system).toContain('Backups');
+  });
+
+  it('drops questions with fewer than 2 suggestions and keeps at most 4', async () => {
+    const { llm } = fake({
+      ...base,
+      questions: [
+        { topic: 'auth-methods', text: 'How?', suggestions: ['only one'] },
+        { topic: 'user-scale', text: 'How many?', suggestions: ['1', '2', '3', '4', '5'] },
+        { topic: 'compliance', text: 'Which?', suggestions: ['', '  ', 'GDPR'] },
+      ],
+    });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    expect(r.questions.map((x) => x.topic)).toEqual(['user-scale']);
+    expect(r.questions[0]?.suggestions).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('truncates question and suggestion texts to the schema limits', async () => {
+    const { llm } = fake({
+      ...base,
+      questions: [
+        { topic: 'user-scale', text: 'q'.repeat(600), suggestions: ['s'.repeat(150), 'b'] },
+      ],
+    });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    expect(r.questions[0]?.text).toHaveLength(500);
+    expect(r.questions[0]?.suggestions[0]).toHaveLength(120);
+    expect(() => Question.array().parse(r.questions)).not.toThrow();
+  });
+
+  it('drops empty requirements and truncates long ones', async () => {
+    const req = (id: string, text: string) => ({
+      id,
+      text,
+      type: 'functional',
+      status: 'confirmed',
+    });
+    const { llm } = fake({
+      ...base,
+      requirements: [req('R1', 'Sell things'), req('R2', '   '), req('R3', 'x'.repeat(2500))],
+      questions: [],
+    });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    expect(r.requirements.map((x) => x.id)).toEqual(['R1', 'R3']);
+    expect(r.requirements[1]?.text).toHaveLength(2000);
+  });
+
+  it('re-ids duplicate, reserved and invalid requirement ids to the first free R<n>', async () => {
+    const req = (id: string) => ({ id, text: `Req ${id}`, type: 'functional', status: 'inferred' });
+    const { llm } = fake({
+      ...base,
+      requirements: [req('R1'), req('R1'), req('C-auth'), req('T-backups'), req('R2'), req('')],
+      questions: [],
+    });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    expect(r.requirements.map((x) => x.id)).toEqual(['R1', 'R3', 'R4', 'R5', 'R2', 'R6']);
+    expect(r.requirements[1]?.text).toBe('Req R1');
+    expect(() => Requirement.array().parse(r.requirements)).not.toThrow();
   });
 
   it('throws GenerationError on invalid JSON and carries usage', async () => {

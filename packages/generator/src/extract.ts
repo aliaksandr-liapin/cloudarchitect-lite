@@ -1,9 +1,9 @@
 import {
   GapTopic,
+  Question,
   Requirement,
   toggleLabels,
   type DesignToggles,
-  type Question,
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
 import { jsonOutputFormat, parseOutput, type CallUsage, type LlmClient } from './llm.js';
@@ -50,6 +50,56 @@ export interface ExtractResult {
 }
 
 const MAX_QUESTIONS = 3;
+/** Limits of the domain `Question` / `Requirement` schemas and of `ContinueRequest`, which `/continue` re-validates. */
+const MAX_SUGGESTIONS = 4;
+const MAX_QUESTION_CHARS = 500;
+const MAX_SUGGESTION_CHARS = 120;
+const MAX_REQUIREMENT_CHARS = 2000;
+const MAX_REQUIREMENTS = 100;
+const MAX_ID_CHARS = 128;
+/** Prefixes of the clarification and toggle requirements the generator adds itself. */
+const RESERVED_ID = /^[CT]-/;
+
+type RawExtraction = z.infer<typeof Extraction>;
+
+/** Trims, truncates and drops suggestions so every kept question parses as a domain `Question`. */
+function normaliseQuestion(q: RawExtraction['questions'][number]): Question | null {
+  const suggestions = q.suggestions
+    .map((x) => x.trim().slice(0, MAX_SUGGESTION_CHARS))
+    .filter(Boolean)
+    .slice(0, MAX_SUGGESTIONS);
+  const parsed = Question.safeParse({
+    topic: q.topic,
+    text: q.text.trim().slice(0, MAX_QUESTION_CHARS),
+    suggestions,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Drops empty requirements, truncates long ones and gives duplicate, reserved (`C-`/`T-`) or
+ * invalid ids the first free `R<n>`, so the list passes `ContinueRequest` when sent back.
+ */
+function normaliseRequirements(raw: RawExtraction['requirements']): Requirement[] {
+  const kept = raw
+    .map((r) => ({ ...r, id: r.id.trim(), text: r.text.trim().slice(0, MAX_REQUIREMENT_CHARS) }))
+    .filter((r) => r.text)
+    .slice(0, MAX_REQUIREMENTS);
+  const valid = (id: string) => id.length > 0 && id.length <= MAX_ID_CHARS && !RESERVED_ID.test(id);
+  const used = new Set(kept.map((r) => r.id).filter(valid));
+  const claimed = new Set<string>();
+  let n = 1;
+  const freeId = () => {
+    while (used.has(`R${n}`)) n++;
+    used.add(`R${n}`);
+    return `R${n}`;
+  };
+  return kept.map((r) => {
+    const id = valid(r.id) && !claimed.has(r.id) ? r.id : freeId();
+    claimed.add(id);
+    return Requirement.parse({ ...r, id, provenance: 'ai' });
+  });
+}
 
 export function allowedTopics(t: DesignToggles): GapTopic[] {
   const skipAvailability = Boolean(t.highAvailability || t.disasterRecovery);
@@ -91,12 +141,14 @@ export async function extract(llm: LlmClient, input: ExtractInput): Promise<Extr
   for (const q of data.questions) {
     if (!topics.includes(q.topic) || seen.has(q.topic) || questions.length >= MAX_QUESTIONS)
       continue;
+    const question = normaliseQuestion(q);
+    if (!question) continue;
     seen.add(q.topic);
-    questions.push(q);
+    questions.push(question);
   }
   return {
     name: data.name,
-    requirements: data.requirements.map((r) => ({ ...r, provenance: 'ai' as const })),
+    requirements: normaliseRequirements(data.requirements),
     assumptions: data.assumptions,
     questions,
     usage,

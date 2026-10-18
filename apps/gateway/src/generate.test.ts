@@ -73,6 +73,7 @@ const graph = {
 
 interface FakeOptions {
   questions?: unknown[];
+  extraction?: unknown;
   graphText?: string;
   onCall?: (req: LlmRequest) => void;
 }
@@ -88,7 +89,7 @@ function fakeLlm(opts: FakeOptions = {}) {
     if (req.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
     const text =
       req.maxTokens === 4000
-        ? JSON.stringify(extraction(opts.questions ?? []))
+        ? JSON.stringify(opts.extraction ?? extraction(opts.questions ?? []))
         : (opts.graphText ?? JSON.stringify(graph));
     return { text, usage, stopReason: 'end_turn' };
   };
@@ -197,6 +198,44 @@ describe('/api/ai/generate', () => {
     expect(body.status).toBe('questions');
     expect(body.questions).toEqual([]);
     expect(await remaining(s.app)).toBe(3);
+  });
+
+  it('an untidy extraction is normalised so continue with the returned requirements succeeds', async () => {
+    const req = (id: string, text: string) => ({
+      id,
+      text,
+      type: 'functional',
+      status: 'confirmed',
+    });
+    const s = setup({
+      extraction: {
+        name: 'Orders',
+        requirements: [req('R1', R1_TEXT), req('R2', ''), req('R1', 'Keep an audit trail')],
+        assumptions: [],
+        questions: [
+          {
+            topic: 'auth-methods',
+            text: 'How do users sign in?',
+            suggestions: ['Email', 'Google', 'GitHub', 'Passkeys', 'SAML', 'x'.repeat(150)],
+          },
+          { topic: 'user-scale', text: 'How many?', suggestions: ['1', 'y'.repeat(150)] },
+        ],
+      },
+    });
+    const q = await startWithQuestions(s);
+    expect(q.requirements.map((r) => r.id)).toEqual(['R1', 'R2']);
+    const res = await s.app.request(
+      '/api/ai/generate/continue',
+      post({
+        operationId: q.operationId,
+        operationToken: q.operationToken,
+        answers: { 'auth-methods': 'Email' },
+        requirements: q.requirements,
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Done).status).toBe('done');
+    expect(await remaining(s.app)).toBe(2);
   });
 
   it('continue with edited requirements uses them and marks changed ones as user provenance', async () => {
