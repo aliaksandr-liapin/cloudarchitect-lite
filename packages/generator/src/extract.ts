@@ -7,8 +7,8 @@ import {
   type Question,
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
-import { GenerationError, type CallUsage, type LlmClient } from './llm.js';
-import { costMicroUsd, EXTRACTION_MODEL } from './prices.js';
+import { parseOutput, type CallUsage, type LlmClient } from './llm.js';
+import { callUsage, EXTRACTION_MODEL } from './prices.js';
 
 /** The topic enum depends on the enabled toggles, so the schema is built per call. */
 export function extractionSchema(topics: GapTopic[]) {
@@ -82,36 +82,22 @@ export async function extract(llm: LlmClient, input: ExtractInput): Promise<Extr
     messages: [{ role: 'user', content: input.prompt }],
     signal: input.signal,
   });
-  const usage: CallUsage[] = [
-    {
-      model: EXTRACTION_MODEL,
-      usage: res.usage,
-      costMicroUsd: costMicroUsd(EXTRACTION_MODEL, res.usage),
-    },
-  ];
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(res.text);
-  } catch {
-    throw new GenerationError('schema_invalid', usage);
-  }
+  const usage: CallUsage[] = [callUsage(EXTRACTION_MODEL, res.usage)];
   // Validate against the full topic list so one disallowed question is dropped, not fatal.
-  const parsed = Extraction.safeParse(raw);
-  if (!parsed.success) throw new GenerationError('schema_invalid', usage);
+  const data = parseOutput(res.text, Extraction, usage);
 
   const seen = new Set<GapTopic>();
   const questions: Question[] = [];
-  for (const q of parsed.data.questions) {
+  for (const q of data.questions) {
     if (!topics.includes(q.topic) || seen.has(q.topic) || questions.length >= MAX_QUESTIONS)
       continue;
     seen.add(q.topic);
     questions.push(q);
   }
   return {
-    name: parsed.data.name,
-    requirements: parsed.data.requirements.map((r) => ({ ...r, provenance: 'ai' as const })),
-    assumptions: parsed.data.assumptions,
+    name: data.name,
+    requirements: data.requirements.map((r) => ({ ...r, provenance: 'ai' as const })),
+    assumptions: data.assumptions,
     questions,
     usage,
   };

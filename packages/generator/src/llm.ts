@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { z } from 'zod';
 
 export interface TokenUsage {
   input: number;
@@ -67,4 +68,17 @@ export function anthropicClient(apiKey: string): LlmClient {
       stopReason: res.stop_reason,
     };
   };
+}
+
+/** Parses a model answer against `schema`; throws `GenerationError` carrying `usage` otherwise. */
+export function parseOutput<T>(text: string, schema: z.ZodType<T>, usage: CallUsage[]): T {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new GenerationError('schema_invalid', usage);
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new GenerationError('schema_invalid', usage);
+  return parsed.data;
 }

@@ -1,4 +1,4 @@
-import type { TokenUsage } from './llm.js';
+import type { CallUsage, TokenUsage } from './llm.js';
 
 /** USD per million tokens, from https://platform.claude.com/docs/en/about-claude/pricing (2026-10-13). */
 export const PRICES = {
@@ -19,4 +19,9 @@ export function costMicroUsd(model: string, u: TokenUsage): number {
       u.cacheWrite * p.cacheWrite +
       u.cacheRead * p.cacheRead,
   );
+}
+
+/** Usage record of one call, priced for the spend counters. */
+export function callUsage(model: string, usage: TokenUsage): CallUsage {
+  return { model, usage, costMicroUsd: costMicroUsd(model, usage) };
 }
