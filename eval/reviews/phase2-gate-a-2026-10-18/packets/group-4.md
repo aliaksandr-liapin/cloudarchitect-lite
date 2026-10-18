@@ -474,7 +474,7 @@ The tool asked the user up to three clarifying questions (listed among the requi
   - satisfies: R6, R5, R2
 - **Order Event Publisher** [n-stream-fn] - service: AWS Lambda
   - purpose: Reads order stream and publishes order-placed events to SNS
-  - rationale: Publishes from committed writes so events are not lost (FACT-006)
+  - rationale: Publishes from committed writes so events are not lost
   - configuration failureDestination: SQS
   - satisfies: R2, R5, R7
 - **Order Events Topic** [n-topic] - service: Amazon SNS
