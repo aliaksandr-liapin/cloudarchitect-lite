@@ -418,6 +418,56 @@ describe('/api/ai/generate', () => {
     expect(event.costMicroUsd).toBeGreaterThan(0);
     expect((await s.store.spend()).dayMicroUsd).toBe(event.costMicroUsd);
     expect(s.requests.every((r) => r.signal === undefined)).toBe(true);
+    // The disconnect came during extraction: no generation call starts after it.
+    expect(s.requests).toHaveLength(1);
+    expect(event.calls).toBe(1);
+  });
+
+  it('continue after a disconnect during the first generation call starts no repair call', async () => {
+    const controller = new AbortController();
+    const s = setup({
+      questions: [question],
+      // Without the DLQ the graph has a warning, so the generator would start a repair call.
+      graphText: JSON.stringify({
+        ...graph,
+        edges: graph.edges.map((e) => ({ ...e, configuration: [] })),
+      }),
+      onCall: (req) => req.maxTokens !== 4000 && controller.abort(),
+    });
+    const q = await startWithQuestions(s);
+    const before = s.requests.length;
+    const res = await s.app.request(
+      '/api/ai/generate/continue',
+      post(
+        { operationId: q.operationId, operationToken: q.operationToken },
+        undefined,
+        controller.signal,
+      ),
+    );
+    expect(res.status).toBe(499);
+    expect(s.requests.length).toBe(before + 1);
+    expect(s.logs.find((l) => l.event === 'ai_continue')?.outcome).toBe('aborted');
+    expect(await remaining(s.app)).toBe(3);
+  });
+
+  it('runs model calls, spend writes and the credit step under waitUntil when the runtime has one', async () => {
+    const s = setup();
+    const pending: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: (p: Promise<unknown>) => void pending.push(p),
+      passThroughOnException: () => undefined,
+      props: {},
+    };
+    const res = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion }),
+      undefined,
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    // One per model call (call + spend write) plus one for the credit and log step.
+    expect(pending).toHaveLength(s.requests.length + 1);
+    await Promise.all(pending);
   });
 
   it('schema-invalid output returns 502 generation_failed and no charge', async () => {

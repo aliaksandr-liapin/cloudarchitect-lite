@@ -55,25 +55,62 @@ const TokenState = z.object({
   questions: z.array(Question),
 });
 
+/** The client went away before the next model call; no further calls start. */
+class ClientClosed extends Error {}
+
+/**
+ * Workers may cancel the handler when the client disconnects (and `request.signal` only fires with
+ * the `enable_request_signal` flag); `waitUntil` keeps registered work running for up to 30 s
+ * after that. Node has no execution context: the work simply runs to completion there.
+ */
+function waitUntilOf(c: Ctx): ((p: Promise<unknown>) => void) | undefined {
+  try {
+    const ctx = c.executionCtx;
+    return (p) => ctx.waitUntil(p);
+  } catch {
+    return undefined; // Hono throws when the runtime has no ExecutionContext.
+  }
+}
+
 /** One log event per AI request: counts and cost only, never content (NFR-006). */
 class Operation {
   readonly calls: CallUsage[] = [];
   model: ModelChoice | null = null;
+  private readonly waitUntil: ((p: Promise<unknown>) => void) | undefined;
 
   constructor(
     private readonly c: Ctx,
     private readonly deps: GenerateDeps,
     private readonly event: 'ai_generate' | 'ai_continue',
-  ) {}
+  ) {
+    this.waitUntil = waitUntilOf(c);
+  }
 
-  /** Wraps the provider client so every completed call is priced and added to the spend counters. */
+  get aborted() {
+    return this.c.req.raw.signal.aborted;
+  }
+
+  /** Runs `work` so it completes even if the runtime cancels the handler after a disconnect. */
+  keep<T>(work: () => Promise<T>): Promise<T> {
+    const p = work();
+    this.waitUntil?.(p.catch(() => undefined));
+    return p;
+  }
+
+  /**
+   * Wraps the provider client so every completed call is priced and added to the spend counters.
+   * A call that started finishes and is counted; none starts once the client has gone away.
+   */
   tracked(llm: LlmClient): LlmClient {
-    return async (req) => {
-      const res = await llm(req);
-      const usage = callUsage(req.model, res.usage);
-      this.calls.push(usage);
-      await this.deps.store.addSpend(usage.costMicroUsd);
-      return res;
+    return (req) => {
+      if (this.aborted) return Promise.reject(new ClientClosed());
+      return this.keep(async () => {
+        const res = await llm(req);
+        const usage = callUsage(req.model, res.usage);
+        this.calls.push(usage);
+        await this.deps.store.addSpend(usage.costMicroUsd);
+        return res;
+      });
     };
   }
 
@@ -155,30 +192,35 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     return c.json({ error: 'setup_required' }, 503);
   };
 
+  const clientClosed = (c: Ctx, op: Operation) => {
+    op.finish('aborted');
+    return c.json({ error: 'client_closed' }, 499 as UnofficialStatusCode);
+  };
+
   /** Model failures are never charged; their spend is already counted by the tracked client. */
   const failure = (c: Ctx, op: Operation, err: unknown) => {
+    if (err instanceof ClientClosed) return clientClosed(c, op);
     const error = err instanceof GenerationError ? 'generation_failed' : 'provider_error';
     op.finish(error);
     return c.json({ error }, 502);
   };
 
   /** Charges one credit for a schema-valid project, unless the client has gone away. */
-  async function deliver(c: Ctx, op: Operation, project: Project) {
-    if (c.req.raw.signal.aborted) {
-      op.finish('aborted');
-      return c.json({ error: 'client_closed' }, 499 as UnofficialStatusCode);
-    }
-    if (!(await store.consume(c.get('clientKey')))) {
-      op.finish('no_credits');
-      return c.json({ error: 'no_credits', byok: true }, 402);
-    }
-    op.finish('done');
-    const body: GenerateResponse = {
-      status: 'done',
-      project,
-      usage: { costUsd: op.costMicroUsd / 1_000_000 },
-    };
-    return c.json(body);
+  function deliver(c: Ctx, op: Operation, project: Project) {
+    return op.keep(async () => {
+      if (op.aborted) return clientClosed(c, op);
+      if (!(await store.consume(c.get('clientKey')))) {
+        op.finish('no_credits');
+        return c.json({ error: 'no_credits', byok: true }, 402);
+      }
+      op.finish('done');
+      const body: GenerateResponse = {
+        status: 'done',
+        project,
+        usage: { costUsd: op.costMicroUsd / 1_000_000 },
+      };
+      return c.json(body);
+    });
   }
 
   app.post('/api/ai/generate', async (c) => {
@@ -197,8 +239,8 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
       return c.json({ error: 'catalog_mismatch' }, 409);
     }
 
-    // The client's disconnect signal is deliberately not forwarded: each call finishes so it is priced
-    // and counted, and `deliver` skips the credit when the client has gone away.
+    // The client's disconnect signal is deliberately not forwarded: a started call finishes so it is
+    // priced and counted, no new call starts after a disconnect, and `deliver` skips the credit.
     const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
     let project: Project;
     try {
