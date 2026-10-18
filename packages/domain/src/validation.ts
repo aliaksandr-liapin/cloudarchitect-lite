@@ -46,6 +46,15 @@ function enclosing(ctx: Ctx, containerId: string | undefined, kind: Container['k
 const VPC_BOUND = ['aws.ec2', 'aws.rds', 'aws.aurora', 'aws.elasticache', 'aws.efs'];
 const DATABASES = ['aws.rds', 'aws.aurora', 'aws.elasticache'];
 const ASYNC_SOURCES = ['aws.sqs', 'aws.sns', 'aws.eventbridge', 'aws.s3'];
+export const DATA_STORES = [
+  'aws.s3',
+  'aws.dynamodb',
+  'aws.rds',
+  'aws.aurora',
+  'aws.efs',
+  'aws.elasticache',
+];
+const CLIENT_KINDS = ['user', 'client-app'];
 const BASELINE = [
   'aws.cloudwatch',
   'aws.xray',
@@ -59,7 +68,6 @@ const BASELINE = [
 /**
  * Deterministic rules from PRD §11. Each rule's metadata lives in the catalog
  * (`validation-rules.json`); logic lives here, keyed by rule ID.
- * Rules not yet implemented: VR-002, VR-003, VR-008, VR-011 (tracked in ROADMAP E4).
  * VR-016…VR-018 come from the Phase 0 blind review (docs/product/phase0-spike.md).
  */
 const RULES: Rule[] = [
@@ -85,6 +93,88 @@ const RULES: Rule[] = [
           explanation:
             'S3 origin is served through CloudFront without Origin Access Control (OAC).',
           remediation: 'Set originAccess = OAC and keep the bucket private.',
+        })),
+  },
+  {
+    id: 'VR-002',
+    severity: 'warning',
+    check: (ctx) => {
+      const served = new Set(
+        ctx.project.edges
+          .filter(
+            (e) =>
+              e.kind === 'origin' &&
+              svc(ctx.nodes.get(e.source) ?? ({} as ArchNode)) === 'aws.cloudfront',
+          )
+          .map((e) => e.target),
+      );
+      return ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          return (
+            s &&
+            t &&
+            s.external &&
+            CLIENT_KINDS.includes(s.external.kind) &&
+            svc(t) === 'aws.s3' &&
+            served.has(t.id)
+          );
+        })
+        .map((e) => ({
+          ruleId: 'VR-002',
+          severity: 'warning',
+          edgeIds: [e.id],
+          explanation:
+            'Clients reach the S3 bucket directly while CloudFront also serves its content.',
+          remediation:
+            'Route client reads through CloudFront and keep the bucket private behind OAC.',
+        }));
+    },
+  },
+  {
+    id: 'VR-003',
+    severity: 'warning',
+    check: (ctx) =>
+      nodesOf(ctx, 'aws.apigateway', 'aws.alb')
+        .filter((n) => {
+          const incoming = ctx.project.edges.filter((e) => e.target === n.id);
+          const exposed = incoming.some((e) => {
+            const s = ctx.nodes.get(e.source);
+            return s && (s.external || svc(s) === 'aws.cloudfront');
+          });
+          if (!exposed) return false;
+          const hasCognito = ctx.project.edges.some((e) => {
+            const other = e.source === n.id ? e.target : e.target === n.id ? e.source : undefined;
+            const o = other ? ctx.nodes.get(other) : undefined;
+            return o && svc(o) === 'aws.cognito';
+          });
+          return (
+            !n.configuration?.authorizer &&
+            !incoming.some((e) => e.configuration?.authorizer) &&
+            !hasCognito
+          );
+        })
+        .map((n) => ({
+          ruleId: 'VR-003',
+          severity: 'warning',
+          nodeIds: [n.id],
+          explanation: `${n.label} is reachable from the internet without a stated authentication mechanism.`,
+          remediation:
+            'Add a Cognito, IAM or Lambda authorizer (or Cognito/OIDC authentication on the ALB).',
+        })),
+  },
+  {
+    id: 'VR-008',
+    severity: 'info',
+    check: (ctx) =>
+      nodesOf(ctx, ...DATA_STORES)
+        .filter((n) => !n.configuration?.encryption)
+        .map((n) => ({
+          ruleId: 'VR-008',
+          severity: 'info',
+          nodeIds: [n.id],
+          explanation: `${n.label} has no stated encryption at rest.`,
+          remediation: 'Set encryption to KMS or AWS-managed.',
         })),
   },
   {
@@ -194,6 +284,29 @@ const RULES: Rule[] = [
           nodeIds: [n.id],
           explanation: `${n.label} is placed in a public subnet.`,
           remediation: 'Move the database to a private subnet.',
+        })),
+  },
+  {
+    id: 'VR-011',
+    severity: 'warning',
+    check: (ctx) =>
+      ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          if (!s || !t || e.kind !== 'write' || !s.external || svc(t) !== 'aws.s3') return false;
+          if (e.configuration?.presignedUrl) return false;
+          return !ctx.project.edges.some((o) => {
+            const other = o.source === s.id ? o.target : o.target === s.id ? o.source : undefined;
+            const n = other ? ctx.nodes.get(other) : undefined;
+            return n && svc(n) === 'aws.cognito';
+          });
+        })
+        .map((e) => ({
+          ruleId: 'VR-011',
+          severity: 'warning',
+          edgeIds: [e.id],
+          explanation: 'A client writes to S3 without a stated authorization mechanism.',
+          remediation: 'Issue presigned URLs from a backend, or authorize the client with Cognito.',
         })),
   },
   {

@@ -50,6 +50,8 @@ const catalog: CatalogSnapshot = {
     service('aws.apigateway', 'regional'),
     service('aws.sqs', 'regional'),
     service('aws.alb', 'vpc'),
+    service('aws.cognito', 'regional'),
+    service('aws.dynamodb', 'regional'),
   ],
   features: [],
   facts: [],
@@ -458,5 +460,114 @@ describe('migrateProject', () => {
 
   it('rejects unknown versions', () => {
     expect(() => migrateProject({ schemaVersion: '9.9.9' })).toThrow(UnsupportedSchemaError);
+  });
+});
+
+describe('PRD rules VR-002, VR-003, VR-008, VR-011', () => {
+  const node = (id: string, serviceId: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      provider: 'aws',
+      serviceId,
+      label: id,
+      requirementIds: [],
+      position: pos,
+      containerId: 'region',
+      ...extra,
+    }) as never;
+  const ext = (id: string, kind: string) =>
+    ({
+      id,
+      provider: 'aws',
+      label: id,
+      requirementIds: [],
+      position: pos,
+      external: { kind, name: id },
+    }) as never;
+  const edge = (
+    source: string,
+    target: string,
+    kind: string,
+    configuration?: Record<string, string>,
+  ) =>
+    ({
+      id: `${source}-${target}`,
+      source,
+      target,
+      kind,
+      requirementIds: [],
+      configuration,
+    }) as never;
+  const cw = node('cw', 'aws.cloudwatch');
+
+  it('VR-002 flags clients reading S3 that CloudFront also serves', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('cf', 'aws.cloudfront'), node('s3', 'aws.s3'), cw],
+      edges: [edge('cf', 's3', 'origin', { originAccess: 'OAC' }), edge('u', 's3', 'read')],
+    });
+    expect(ruleIds(p)).toContain('VR-002');
+  });
+  it('VR-002 accepts S3 reached only through CloudFront', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('cf', 'aws.cloudfront'), node('s3', 'aws.s3'), cw],
+      edges: [edge('cf', 's3', 'origin', { originAccess: 'OAC' }), edge('u', 'cf', 'read')],
+    });
+    expect(ruleIds(p)).not.toContain('VR-002');
+  });
+
+  it('VR-003 flags a public API without an authorizer', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('api', 'aws.apigateway'), cw],
+      edges: [edge('u', 'api', 'invoke')],
+    });
+    expect(ruleIds(p)).toContain('VR-003');
+  });
+  it('VR-003 accepts an API with authorizer config', () => {
+    const p = base({
+      nodes: [
+        ext('u', 'user'),
+        node('api', 'aws.apigateway', { configuration: { authorizer: 'JWT' } }),
+        cw,
+      ],
+      edges: [edge('u', 'api', 'invoke')],
+    });
+    expect(ruleIds(p)).not.toContain('VR-003');
+  });
+  it('VR-003 accepts an authorizer on the incoming edge or a Cognito link', () => {
+    const nodes = [ext('u', 'user'), node('alb', 'aws.alb'), node('c', 'aws.cognito'), cw];
+    expect(
+      ruleIds(base({ nodes, edges: [edge('u', 'alb', 'invoke', { authorizer: 'OIDC' })] })),
+    ).not.toContain('VR-003');
+    expect(
+      ruleIds(base({ nodes, edges: [edge('u', 'alb', 'invoke'), edge('alb', 'c', 'other')] })),
+    ).not.toContain('VR-003');
+  });
+
+  it('VR-008 flags a data store without encryption', () => {
+    const p = base({ nodes: [node('t', 'aws.dynamodb'), cw] });
+    expect(ruleIds(p)).toContain('VR-008');
+  });
+  it('VR-008 accepts a data store with encryption', () => {
+    const p = base({
+      nodes: [node('t', 'aws.dynamodb', { configuration: { encryption: 'KMS' } }), cw],
+    });
+    expect(ruleIds(p)).not.toContain('VR-008');
+  });
+
+  it('VR-011 flags a client upload to S3 without authorization', () => {
+    const p = base({
+      nodes: [ext('c', 'client-app'), node('s3', 'aws.s3'), cw],
+      edges: [edge('c', 's3', 'write')],
+    });
+    expect(ruleIds(p)).toContain('VR-011');
+  });
+  it('VR-011 accepts a presigned URL or a Cognito link', () => {
+    const nodes = [ext('c', 'client-app'), node('s3', 'aws.s3'), node('cog', 'aws.cognito'), cw];
+    expect(
+      ruleIds(base({ nodes, edges: [edge('c', 's3', 'write', { presignedUrl: 'PUT' })] })),
+    ).not.toContain('VR-011');
+    expect(
+      ruleIds(base({ nodes, edges: [edge('c', 's3', 'write'), edge('c', 'cog', 'invoke')] })),
+    ).not.toContain('VR-011');
   });
 });

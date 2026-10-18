@@ -1,4 +1,9 @@
-import { IMPLEMENTED_RULE_IDS, migrateProject, validateProject } from '@cloudarchitect/domain';
+import {
+  DATA_STORES,
+  IMPLEMENTED_RULE_IDS,
+  migrateProject,
+  validateProject,
+} from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import { awsCatalog, samples } from './index.js';
 
@@ -17,6 +22,20 @@ describe('AWS catalog', () => {
   it('only references existing services from features', () => {
     const ids = new Set(awsCatalog.services.map((s) => s.id));
     for (const f of awsCatalog.features) expect(ids.has(f.serviceId), f.id).toBe(true);
+  });
+
+  it('has unique feature ids', () => {
+    const ids = awsCatalog.features.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('offers an encryption feature on every data store', () => {
+    for (const id of DATA_STORES) {
+      expect(
+        awsCatalog.features.some((f) => f.serviceId === id && f.configKey === 'encryption'),
+        id,
+      ).toBe(true);
+    }
   });
 
   it('has metadata for every implemented rule', () => {

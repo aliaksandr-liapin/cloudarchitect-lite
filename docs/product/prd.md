@@ -158,7 +158,7 @@ Rule findings are deterministic and versioned; advisory findings (FR-021) are a 
 | VR-017 | Lambda on-failure destination used for an SQS event source (use the queue's redrive DLQ) | warning |
 | VR-018 | Application Load Balancer placed in a single Availability Zone | warning |
 
-Every rule has positive and negative fixture tests.
+Every rule has positive and negative fixture tests. All rules VR-001…VR-018 are implemented.
 
 ## 12. Icons — sources and usage terms
 
