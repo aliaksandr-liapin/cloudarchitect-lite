@@ -1,0 +1,50 @@
+{
+  "regulated-portal-security": {
+    "A": "haiku_r2",
+    "B": "haiku_r1"
+  },
+  "myblog": {
+    "A": "sonnet",
+    "B": "haiku"
+  },
+  "saas-containers-multi-az": {
+    "A": "haiku_r1",
+    "B": "haiku_r2"
+  },
+  "fraud-model-serving": {
+    "A": "sonnet",
+    "B": "haiku"
+  },
+  "brochure-site": {
+    "A": "haiku",
+    "B": "sonnet"
+  },
+  "saas-containers": {
+    "A": "sonnet",
+    "B": "haiku"
+  },
+  "product-search": {
+    "A": "haiku",
+    "B": "sonnet"
+  },
+  "nightly-reports-serverless": {
+    "A": "haiku_r2",
+    "B": "haiku_r1"
+  },
+  "regulated-portal": {
+    "A": "haiku",
+    "B": "sonnet"
+  },
+  "claims-approval-workflow": {
+    "A": "sonnet",
+    "B": "haiku"
+  },
+  "order-events": {
+    "A": "haiku",
+    "B": "sonnet"
+  },
+  "k8s-microservices": {
+    "A": "sonnet",
+    "B": "haiku"
+  }
+}
