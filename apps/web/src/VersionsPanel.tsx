@@ -4,9 +4,12 @@ import type { ProjectVersion } from './versions';
 export function VersionsPanel({
   versions,
   onRestore,
+  disabled = false,
 }: {
   versions: ProjectVersion[];
   onRestore(v: ProjectVersion): void;
+  /** True while a generation or another replace is in progress. */
+  disabled?: boolean;
 }) {
   return (
     <section>
@@ -19,7 +22,9 @@ export function VersionsPanel({
             <li key={v.createdAt}>
               <span>{v.label}</span>
               <span className="spacer" />
-              <button onClick={() => onRestore(v)}>Restore</button>
+              <button disabled={disabled} onClick={() => onRestore(v)}>
+                Restore
+              </button>
             </li>
           ))}
         </ul>

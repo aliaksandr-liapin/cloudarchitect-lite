@@ -27,12 +27,15 @@ export function GeneratePanel({
   onGenerate,
   onCancel,
   stage,
+  cancellable = true,
 }: {
   hasDiagram: boolean;
   busy: boolean;
   onGenerate(input: GenerateInput): void;
   onCancel(): void;
   stage?: string;
+  /** False once the request can no longer be aborted (its response is being applied). */
+  cancellable?: boolean;
 }) {
   const [prompt, setPrompt] = useState('');
   const [toggles, setToggles] = useState<DesignToggles>({});
@@ -116,7 +119,7 @@ export function GeneratePanel({
             {stage}
           </span>
           <span className="spacer" />
-          <button onClick={onCancel}>Cancel</button>
+          {cancellable && <button onClick={onCancel}>Cancel</button>}
         </div>
       ) : (
         <button

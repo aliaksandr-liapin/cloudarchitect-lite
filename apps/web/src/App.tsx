@@ -16,6 +16,7 @@ import {
   applyNodeChanges,
   type Node,
   type NodeChange,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -91,6 +92,15 @@ export function App() {
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
+  /** The request can still be aborted (false once its response has arrived). */
+  const [cancellable, setCancellable] = useState(false);
+  /** A replace flow (generated result, Restore) is running; see `exclusive`. */
+  const [replacing, setReplacing] = useState(false);
+  const replacingRef = useRef(false);
+  const dialogOpenRef = useRef(false);
+  const flowRef = useRef<ReactFlowInstance>(undefined);
+  /** Fit the viewport once the next committed nodes render (new diagram from generation or Restore). */
+  const fitPendingRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const abortRef = useRef<AbortController>(undefined);
@@ -136,18 +146,41 @@ export function App() {
     if (dialog) dialogRef.current?.showModal();
   }, [dialog]);
 
-  /** In-app confirmation; resolves with the chosen action's value ('cancel' on Escape). */
+  useEffect(() => {
+    if (!fitPendingRef.current) return;
+    fitPendingRef.current = false;
+    // React Flow queues this until the new nodes are measured.
+    void flowRef.current?.fitView();
+  }, [nodes]);
+
+  /** In-app confirmation; resolves with the chosen action's value ('cancel' on Escape). Rejects if one is open. */
   const ask = (spec: DialogSpec) =>
-    new Promise<string>((resolve) =>
+    new Promise<string>((resolve, reject) => {
+      if (dialogOpenRef.current) return reject(new Error('A dialog is already open'));
+      dialogOpenRef.current = true;
       setDialog({
         ...spec,
         resolve: (value) => {
+          dialogOpenRef.current = false;
           dialogRef.current?.close();
           setDialog(undefined);
           resolve(value);
         },
-      }),
-    );
+      });
+    });
+
+  /** Runs one replace flow at a time, so two flows never version the same diagram or race their commits. */
+  const exclusive = async (flow: () => Promise<void>) => {
+    if (replacingRef.current) return;
+    replacingRef.current = true;
+    setReplacing(true);
+    try {
+      await flow();
+    } finally {
+      replacingRef.current = false;
+      setReplacing(false);
+    }
+  };
 
   /**
    * Stores the current diagram as a version before something replaces it. Returns the version, `null`
@@ -174,6 +207,7 @@ export function App() {
     const saved = current ? await keepCurrent(current) : null;
     if (saved === undefined) return;
     setStage(STAGE.checking);
+    fitPendingRef.current = true;
     await commit(
       {
         ...migrateProject(generated),
@@ -186,16 +220,18 @@ export function App() {
   };
 
   /** Restores a kept version; the diagram it replaces is kept as a version too. */
-  const restore = async (v: ProjectVersion) => {
-    const current = projectRef.current;
-    setToast(undefined);
-    if (current && (await keepCurrent(current)) === undefined) return;
-    await commit({
-      ...migrateProject(v.project),
-      projectId: current?.projectId ?? v.project.projectId,
-      revision: (current?.revision ?? 0) + 1,
-    });
-  };
+  const restore = (v: ProjectVersion) =>
+    exclusive(async () => {
+      const current = projectRef.current;
+      setToast(undefined);
+      if (current && (await keepCurrent(current)) === undefined) return;
+      fitPendingRef.current = true;
+      await commit({
+        ...migrateProject(v.project),
+        projectId: current?.projectId ?? v.project.projectId,
+        revision: (current?.revision ?? 0) + 1,
+      });
+    }).catch(showError);
 
   const showError = (err: unknown) => {
     const code = err instanceof ApiError ? err.code : undefined;
@@ -212,6 +248,7 @@ export function App() {
     setToast(undefined);
     setClarify(undefined);
     setStage(first);
+    setCancellable(true);
     const timer =
       first === STAGE.reading
         ? setTimeout(() => !ac.signal.aborted && setStage(STAGE.designing), DESIGNING_AFTER_MS)
@@ -222,8 +259,9 @@ export function App() {
       if (ac.signal.aborted) return;
       // The response is here: nothing left to cancel, the rest happens in the browser.
       abortRef.current = undefined;
+      setCancellable(false);
       if (res.status === 'questions') setClarify(res);
-      else await replaceWith(res.project);
+      else await exclusive(() => replaceWith(res.project));
     } catch (err) {
       if (ac.signal.aborted) return; // cancel() already reported it
       if (err instanceof ApiError && err.code === 'client_closed') setToast({ text: CANCELLED });
@@ -233,6 +271,7 @@ export function App() {
       // A newer run owns the stage text; otherwise this run is over.
       if (abortRef.current === ac || abortRef.current === undefined) {
         abortRef.current = undefined;
+        setCancellable(false);
         setStage(undefined);
       }
     }
@@ -277,6 +316,7 @@ export function App() {
     if (!abortRef.current && !clarify) return;
     abortRef.current?.abort();
     abortRef.current = undefined;
+    setCancellable(false);
     setStage(undefined);
     setClarify(undefined);
     setToast({ text: CANCELLED });
@@ -292,6 +332,9 @@ export function App() {
       nodes: project.nodes.map((n) => (n.id === id ? { ...n, label: label.trim() } : n)),
     });
   };
+
+  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
+  const busy = stage !== undefined || replacing || dialog !== undefined;
 
   const edges = useMemo(() => (project ? toFlow(project, displayName).edges : []), [project]);
   const findings: Finding[] = useMemo(
@@ -335,9 +378,13 @@ export function App() {
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
-        <button onClick={() => project && commit(project, true)}>Auto layout</button>
+        <button disabled={busy} onClick={() => project && commit(project, true)}>
+          Auto layout
+        </button>
         <button onClick={() => project && downloadJson(project)}>Export JSON</button>
-        <button onClick={() => fileInput.current?.click()}>Import JSON</button>
+        <button disabled={busy} onClick={() => fileInput.current?.click()}>
+          Import JSON
+        </button>
         <input
           ref={fileInput}
           type="file"
@@ -384,6 +431,8 @@ export function App() {
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={onNodeDragStop}
+            onInit={(flow) => (flowRef.current = flow)}
+            nodesDraggable={!busy}
             onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}
             fitView
             minZoom={0.2}
@@ -397,12 +446,15 @@ export function App() {
         <aside className="side">
           <GeneratePanel
             hasDiagram={Boolean(project?.nodes.length)}
-            busy={stage !== undefined}
+            busy={busy}
+            cancellable={cancellable}
             stage={stage}
             onGenerate={generate}
             onCancel={cancel}
           />
-          {project && selected && <Details project={project} id={selected} onRename={rename} />}
+          {project && selected && (
+            <Details project={project} id={selected} onRename={rename} disabled={busy} />
+          )}
           <section>
             <h2>Findings ({findings.length})</h2>
             {findings.length === 0 && <p className="muted">No rule findings.</p>}
@@ -418,7 +470,7 @@ export function App() {
               ))}
             </ul>
           </section>
-          <VersionsPanel versions={versions} onRestore={restore} />
+          <VersionsPanel versions={versions} onRestore={restore} disabled={busy} />
           <AiModelPanel />
           <p className="muted small">
             Generated designs require professional review before production use. Icons shown are
@@ -432,7 +484,11 @@ export function App() {
           {toast.restore && (
             <>
               {' · '}
-              <button className="link" onClick={() => toast.restore && restore(toast.restore)}>
+              <button
+                className="link"
+                disabled={busy}
+                onClick={() => toast.restore && restore(toast.restore)}
+              >
                 Restore previous
               </button>
             </>
@@ -476,6 +532,7 @@ function Details(props: {
   project: Project;
   id: string;
   onRename: (id: string, label: string) => void;
+  disabled: boolean;
 }) {
   const body = describe(props);
   return body ? (
@@ -490,10 +547,12 @@ function describe({
   project,
   id,
   onRename,
+  disabled,
 }: {
   project: Project;
   id: string;
   onRename: (id: string, label: string) => void;
+  disabled: boolean;
 }) {
   const node = project.nodes.find((n) => n.id === id);
   if (!node) {
@@ -512,6 +571,7 @@ function describe({
           aria-label="Component name"
           defaultValue={node.label}
           maxLength={200}
+          disabled={disabled}
           onBlur={(e) => onRename(node.id, e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
