@@ -26,11 +26,12 @@ import { GeneratePanel, type GenerateInput } from './GeneratePanel';
 import { applyLayout, needsLayout, toFlow } from './layout';
 import { AiModelPanel, readModelChoice } from './models';
 import { nodeTypes } from './nodes';
-import { downloadJson, loadProject, readJsonFile, saveProject } from './storage';
+import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
   idbVersionStore,
   keepCurrent,
   prepareReplace,
+  unavailableVersionStore,
   type Kept,
   type ProjectVersion,
   type ReplaceUi,
@@ -96,6 +97,9 @@ export function App() {
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
   const [stage, setStage] = useState<string>();
+  /** Startup could not read browser storage: edit in memory only, never save over the stored project. */
+  const [storageDown, setStorageDown] = useState(false);
+  const storageDownRef = useRef(false);
   const [clarify, setClarify] = useState<Questions>();
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
@@ -117,12 +121,15 @@ export function App() {
   /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
   const preparedRef = useRef<Kept & { project: Project | undefined }>(undefined);
 
+  const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
+
   /** Single entry point for project changes: lay out if needed, persist, re-render. */
   const commit = useCallback(async (next: Project, forceLayout = false) => {
     const laid = forceLayout || needsLayout(next) ? await applyLayout(next) : next;
     projectRef.current = laid;
     setProject(laid);
     setNodes(toFlow(laid, displayName).nodes);
+    if (storageDownRef.current) return;
     await saveProject(laid).catch(() =>
       setError('Could not save to browser storage — export JSON as a backup.'),
     );
@@ -130,9 +137,11 @@ export function App() {
 
   useEffect(() => {
     const sample = migrateProject(samples.myblog);
-    loadProject(sample.projectId)
-      .catch(() => undefined)
-      .then((stored) => commit(stored ?? sample));
+    void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
+      storageDownRef.current = storage === 'unavailable';
+      setStorageDown(storageDownRef.current);
+      return commit(project);
+    });
   }, [commit]);
 
   useEffect(() => {
@@ -145,11 +154,17 @@ export function App() {
 
   const projectId = project?.projectId;
   const refreshVersions = useCallback(async (id: string) => {
-    setVersions(await idbVersionStore.list(id).catch(() => []));
+    setVersions(
+      await versionStore()
+        .list(id)
+        .catch(() => []),
+    );
   }, []);
   useEffect(() => {
     if (!projectId) return;
-    idbVersionStore.list(projectId).then(setVersions, () => setVersions([]));
+    versionStore()
+      .list(projectId)
+      .then(setVersions, () => setVersions([]));
   }, [projectId]);
 
   useEffect(() => {
@@ -205,7 +220,7 @@ export function App() {
   const prepare = async (): Promise<boolean> => {
     const current = projectRef.current;
     if (preparedRef.current && preparedRef.current.project === current) return true;
-    const kept = await prepareReplace(idbVersionStore, current, replaceUi);
+    const kept = await prepareReplace(versionStore(), current, replaceUi);
     if (!kept) return false;
     if (kept.saved && current) await refreshVersions(current.projectId);
     preparedRef.current = { ...kept, project: current };
@@ -235,7 +250,7 @@ export function App() {
     exclusive(async () => {
       const current = projectRef.current;
       setToast(undefined);
-      const kept = await keepCurrent(idbVersionStore, current, replaceUi);
+      const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
       if (kept.saved && current) await refreshVersions(current.projectId);
       fitPendingRef.current = true;
@@ -427,6 +442,12 @@ export function App() {
         <div className="notice">
           AI features are not set up yet. Open the setup link printed in the server log (
           <code>docker compose logs gateway</code>) to finish setup; manual editing works meanwhile.
+        </div>
+      )}
+      {storageDown && (
+        <div role="alert" className="notice">
+          Browser storage is unavailable — close other CloudArchitect tabs and reload. Changes are
+          not being saved.
         </div>
       )}
       {error && (

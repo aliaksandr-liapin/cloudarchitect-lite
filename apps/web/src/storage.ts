@@ -59,6 +59,24 @@ export async function loadProject(id: string): Promise<Project | undefined> {
   return raw ? migrateProject(raw) : undefined;
 }
 
+export type StorageState = 'ok' | 'unavailable';
+
+/**
+ * Startup load. "Not found" opens the sample; a failed load (database blocked by an old tab, a
+ * migration error) also shows the sample but marks storage unavailable, so nothing is saved over
+ * the project that could not be read.
+ */
+export async function bootProject(
+  load: () => Promise<Project | undefined>,
+  sample: Project,
+): Promise<{ project: Project; storage: StorageState }> {
+  try {
+    return { project: (await load()) ?? sample, storage: 'ok' };
+  } catch {
+    return { project: sample, storage: 'unavailable' };
+  }
+}
+
 export function downloadJson(p: Project) {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }),
