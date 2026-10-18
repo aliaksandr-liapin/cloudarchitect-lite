@@ -32,7 +32,7 @@ describe('live regression gate', () => {
   });
 
   it('fails above 1.5x the benchmark cost', () => {
-    const r = evaluateGate({ ...ok, meanCostUsd: 0.0061 * 1.5 + 0.0001 }, benchmark);
+    const r = evaluateGate({ ...ok, meanCostUsd: benchmark * 1.5 + 0.0001 }, benchmark);
     expect(r.passed).toBe(false);
     expect(r.failures).toHaveLength(1);
   });

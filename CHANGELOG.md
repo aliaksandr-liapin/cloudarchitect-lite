@@ -10,6 +10,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - One clarification round: up to three questions with quick answers, "You decide" and free text, plus editable requirements before drawing (optional review pause when there are no questions).
 - Versions: the current diagram is kept in browser storage (last 10 per project) before a generated one replaces it; a toast offers "Restore previous" and a Versions list restores any earlier diagram. Hand-edited diagrams ask before they are replaced.
 - Component names can be edited in the Details panel.
+- Phase 2 Gate A passed: Haiku blind median 2.29, no critical defect in 11 of 12 reviewed scenarios, live gate green (schema-valid 100%, pass 93.2%). Model benchmarks in the setup wizard and editor now show these measurements ([report](docs/product/phase2-gate-a.md)).
+
+### Fixed
+
+- Generator: `containerId` is required (null for external nodes), so designs no longer come back without VPC and subnet placement.
+- Generator: output enums (service ids, feature keys, kinds) are enforced by constrained decoding; the SDK helper had moved them into field descriptions.
+- Generator: repair turns now name the offending node and edge ids and the remediation for each finding.
 
 ## [0.1.0] - 2026-10-14
 
