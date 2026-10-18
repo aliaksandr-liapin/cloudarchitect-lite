@@ -1,0 +1,258 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Edge 'SageMaker training -> Training data and artifacts' is typed read but its label also says it writes artifacts; the write direction is not modelled.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The retrain workflow deploys a new model to the live endpoint with no evaluation or approval gate (for example a model registry approval status) before the blue/green update.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No IAM roles or least-privilege execution roles are shown for Lambda, Step Functions and SageMaker access to S3 and DynamoDB.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito user authorizer is assumed for the checkout API without saying whether the caller is the end user's browser or a backend checkout service; machine-to-machine auth may fit better.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "To spread the real-time endpoint across two AZs it needs at least two instances; the cost of this always-on minimum is not discussed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, correctly wired design with API Gateway plus WAF and Cognito, Lambda calling a SageMaker real-time endpoint with timeout and fallback, DynamoDB for scores, and an EventBridge plus Step Functions monthly retrain with blue/green deployment and CloudWatch alarms."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The CloudWatch node has no edges, so the design does not show which components send scoring latency, errors or endpoint metrics, and there is no alarm on failed retraining runs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No caller node and no edge protection for a payment-path API; HTTP API with IAM auth works for a signed backend caller, but the decision to skip WAF and the caller identity are not stated as assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The pipeline deploys the new model version straight to the endpoint with no stated evaluation or approval step and no blue/green or canary deployment guardrails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Multi-AZ placement of the endpoint (minimum two instances) is not stated, so availability on the inline checkout path is unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A lean, technically correct design (HTTP API, Lambda with fallback, SageMaker real-time endpoint, DynamoDB, EventBridge-triggered SageMaker pipeline), but monitoring is not wired up and deployment safety and AZ placement are thin."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "I2 (clean URLs such as /menu returning that directory's index page) is claimed to be met by CloudFront alone. With a private S3 REST origin behind OAC, the CloudFront default root object applies only to the root URL, not to subdirectories, so /menu/ would return an error unless a CloudFront Function or similar rewrites to index.html. The design does not include one.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DefaultRootObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no CloudWatch alarm notification target (for example SNS email), so the bakery would not actually be told when error rates rise.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cache invalidation after content uploads is not mentioned, so updated menu or hours may be served stale until the TTL expires.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, low-cost serverless static site (Route 53, CloudFront with ACM in us-east-1, private S3 with OAC, IAM-scoped uploads, CloudWatch), let down by a clean-URL claim that CloudFront does not deliver without a rewrite function."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ACM certificate is placed in a generic 'Primary Region' with no statement that it must be requested in us-east-1; a certificate in any other Region cannot be attached to CloudFront, so HTTPS on the custom domain would fail.",
+          "evidence": "https://docs.aws.amazon.com/acm/latest/userguide/acm-services.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No content update path (who uploads pages and with what IAM permissions) is modelled.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The rationale calls CloudFront 'the only practical way' to serve a custom domain over HTTPS from S3; S3 website endpoints do lack HTTPS, but managed alternatives such as Amplify Hosting exist, so the claim is overstated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Default root object and subdirectory or index handling are not mentioned, and alarms have no notification target.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct minimal static-hosting design (Route 53, CloudFront, ACM, private S3 with OAC, CloudWatch), but it leaves the required us-east-1 certificate Region unspecified and omits the content upload path."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "I1 says tokens are validated 'at the edge of the API', but validation actually happens inside the tasks (JWKS fetch), and only AZ A tasks have the JWKS edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No container image registry (ECR) or image pull path is shown, though I4 refers to pulling images privately.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Tasks read the DB secret, but the design does not say that tasks must re-fetch credentials after rotation (or use a proxy) to avoid connection failures when the password changes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No container autoscaling policy or alarm notification is described; CloudWatch receives logs only from tasks, not from Aurora or ElastiCache.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Customer managed KMS keys plus two NAT gateways add fixed cost; the CMK choice is justified only by an inferred requirement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound two-AZ ECS Fargate design with an internet-facing ALB plus WAF, private tasks, one NAT gateway per AZ for payments egress, Multi-AZ Aurora PostgreSQL and ElastiCache, and Secrets Manager rotation; the gaps are minor (ECR, token validation wording, rotation handling in the app)."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only a single NAT gateway in Public subnet A serves payments egress. If AZ A fails, tasks in AZ B lose outbound access to the payments API, which violates the requirement to survive the loss of one AZ.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudFront with WAF is the intended single public entry point, but the internet-facing ALB origin is not restricted to CloudFront (no secret origin header rule, CloudFront managed prefix list or VPC origin). Clients can bypass WAF by calling the ALB directly.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "ALB, Fargate tasks, Aurora and RDS Proxy are each placed only in AZ A subnets in the diagram, which contradicts the stated two-AZ rationale.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "I3 (centralized audit trail) is attributed to CloudWatch; no CloudTrail is included.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The rotation relationship between Secrets Manager and Aurora is not shown (only Secrets Manager -> RDS Proxy), and there are no edges from tasks to Secrets Manager for the payments API key or to Cognito for JWKS.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Putting CloudFront in front of a non-cacheable B2B API adds cost and complexity with little benefit unless caching is disabled and a reason is given.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A broadly correct ECS Fargate, Aurora, ElastiCache and RDS Proxy design with good additions (ECR, RDS Proxy, PITR), but a single NAT gateway breaks AZ-loss survival for payments calls and the ALB can be reached directly, bypassing CloudFront and WAF."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "A",
+      "why": "Both host the model on SageMaker correctly, but A wires observability end to end, alarms on failed retraining, uses blue/green model updates and protects the payment API with WAF and an authorizer."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "A",
+      "why": "Both are correct low-cost CloudFront plus private S3 designs; A pins the certificate to us-east-1 and models the IAM-controlled upload path, though its clean-URL claim needs a CloudFront Function."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "A meets the AZ-loss requirement with a NAT gateway per AZ and has a single protected entry point, whereas B's single NAT gateway and bypassable ALB undermine resilience and the WAF protection."
+    }
+  ]
+}

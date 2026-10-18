@@ -1,0 +1,268 @@
+{
+  "reviews": [
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "ALB to Fargate edge uses plain HTTP, which contradicts the explicit 'TLS everywhere' requirement (R4); ALB target groups support HTTPS to targets and the design should use it.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html"
+        },
+        {
+          "severity": "major",
+          "description": "Single NAT Gateway serves private tasks in both AZs; if its AZ fails, tasks in the other AZ lose egress (e.g. to Secrets Manager), undermining the two-AZ deployment. Use one NAT gateway per AZ or VPC endpoints.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 rationale says it resolves the hostname 'over HTTPS'; DNS resolution is not HTTPS.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Audit log tamper-evidence (I1) relies on versioning and log file validation only; S3 Object Lock or a separate log archive account would be stronger for a bank.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No alarms on WAF blocks or failed sign-ins, no WAF logging, and CloudWatch Logs encryption with the CMK is not stated although 'all data' must use bank-controlled keys.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Shield Standard only covers L3/L4; L7 DDoS relies on WAF rate-based rules, which are not mentioned explicitly.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound, well-scoped regulated portal design (WAF+ALB+Cognito MFA, private Fargate, CMK-encrypted Aurora, validated CloudTrail), but it breaks TLS-everywhere on the ALB-to-task hop and has a single-AZ NAT."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Single NAT Gateway serves private tasks in both AZs despite the stated Multi-AZ goal (R11); loss of its AZ removes egress for the other AZ.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Shield rationale says the DDoS requirement is met 'at the edge', but there is no CloudFront; the ALB is a regional resource and Shield Standard covers only L3/L4.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 -> ALB edge labelled HTTPS invoke; DNS only resolves the name, clients connect to the ALB. The customer actor is also missing from the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "KMS key is said to encrypt secrets but no Secrets Manager-KMS link is drawn; CloudWatch Logs CMK encryption not stated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Audit tamper-evidence (log file validation, Object Lock) is not mentioned for the CloudTrail trail.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Complete, security-hardened design with HTTPS end to end, Cognito MFA on the ALB, CMK encryption, CloudTrail with lifecycle archive and operational alarms; main weakness is a single NAT gateway."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "WAF is attached to the API Gateway stage only; the main public entry point is CloudFront, and the API stage remains directly reachable, bypassing edge caching unless restricted.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB Streams -> Lambda -> SQS -> Lambda for a welcome email is more moving parts than needed for an infrequent event; a stream-triggered sender with on-failure destination would suffice.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Customer managed KMS key on S3 behind CloudFront and on SQS queues targeted by S3 notifications requires key policies granting CloudFront and S3 kms permissions; not called out, and a CMK adds cost without a stated need.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No Route 53/custom domain and no explicit mention of CloudFront cache policies for the API.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Correct, robust serverless blog with CloudFront caching, OAC, presigned uploads, prefix-filtered S3->SQS->Lambda thumbnails and DLQs with alarms; slightly over-engineered on the email path."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Photo Bucket ObjectCreated events trigger the Thumbnail Function, which writes thumbnails back into the same bucket with no prefix filter or separate bucket, creating a recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Photo Bucket is not a CloudFront origin, so photos and thumbnails are not delivered or cached at the edge for a global audience.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Signup function writes DynamoDB then enqueues SQS as two separate calls (dual write); a failure between them loses the welcome email. The rationale dismissing streams is weak.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "KMS node is not used by any resource (all encryption AWS-managed); Cognito sign-in for subscribers is unnecessary friction; no presigned-URL issuance edge; no DLQ-to-CloudWatch alarm edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Readers node carries an author presigned-upload configuration; actor modelling is inconsistent.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Reasonable serverless layout with Route 53, CloudFront and async email, but the thumbnail trigger writes into its own source bucket without a prefix filter and photos bypass the CDN."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Fargate service, RDS Proxy and Aurora are each placed in a single AZ subnet in the diagram although the rationale says they span two AZs; RDS Proxy needs subnets in at least two AZs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption in transit for ElastiCache and TLS from ALB to tasks not stated; cache encryption is AWS-managed only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Two NAT gateways plus WAF add fixed cost; justified by the AZ-loss requirement but not discussed. VPC endpoints for ECR/Secrets Manager could cut NAT data charges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cache edge typed 'read' though sessions are also written.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Solid Multi-AZ Fargate design with ALB, per-AZ NAT for payments egress, Aurora PostgreSQL behind RDS Proxy using Secrets Manager rotation, and Multi-AZ ElastiCache."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "RDS Proxy has no Secrets Manager edge although it authenticates to the database with Secrets Manager credentials (or IAM auth); with rotation this link is essential.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only AZ A tasks are shown reading Secrets Manager; AZ B tasks also need credentials.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "I3 promises an audit trail of secret access but no CloudTrail is included; CloudWatch alone does not record Secrets Manager API access.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clients -> WAF edge models WAF as a network hop; WAF is attached to the ALB. App and data tiers share the same private subnets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "RDS Proxy and Aurora drawn in a single AZ subnet; ElastiCache encryption in transit not stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Correct Multi-AZ Fargate/Aurora/ElastiCache design with a CMK and per-AZ NAT, but with a few missing links (RDS Proxy secrets, CloudTrail for the stated audit requirement)."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "B keeps TLS on every hop including ALB to tasks, adds alarms and audit log lifecycle, while A uses HTTP to tasks against the TLS-everywhere requirement; both share the single-NAT weakness."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A's thumbnail pipeline is prefix-filtered and buffered with SQS and DLQs and serves media via CloudFront, whereas B's thumbnail function writes into its own triggering bucket (recursion risk) and photos bypass the CDN."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "A",
+      "why": "Both meet the core needs; A wires RDS Proxy to Secrets Manager and separates data subnets, while B leaves gaps in secret access edges and its stated audit requirement."
+    }
+  ]
+}
