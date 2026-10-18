@@ -30,7 +30,8 @@ What makes it worth using: the first diagram is a **sensible general solution** 
    - The one real confirmation: if the user **edited the diagram by hand** since it was generated, confirm before replacing. The edited diagram is still kept as a version.
    - Keep the last 10 versions per project; drop older ones automatically. [builder call, proposed to PO]
 5. **Gateway generation is real.** `/api/ai/generate` and `/api/ai/generate/continue` stop returning 501. Credits, budget caps and kill switch apply as already built.
-6. **Eval harness runs the real generator** (NFR-013), and **Gate A** is passed: blind review of ≥ 10 distinct scenarios via isolated Claude reviewer sessions, eval harness green.
+6. **The remaining PRD rules VR-002, VR-003, VR-008 and VR-011 are implemented** (roadmap Phase 2: rule set VR-001…018).
+7. **Eval harness runs the real generator** (NFR-013), and **Gate A** is passed: blind review of ≥ 10 distinct scenarios via isolated Claude reviewer sessions, eval harness green.
 
 ## 3. Non-goals (this phase)
 
@@ -105,7 +106,8 @@ Port the spike's generation contract (`Generation` schema, system prompt, `toPro
 ## 8. Data model changes
 
 - `Requirement.provenance` adds `'toggle'`.
-- `Project` adds `generation?: { toggles, model, generatedAt, generatedRevision }`. `generatedRevision` lets the client detect manual edits since generation (`revision > generatedRevision` → confirm before replacing).
+- Backups, Multi-AZ, cross-region replication and encryption are modelled as catalog **features** (`backup`, `multiAz`, `replication`, `encryption` config keys) on existing data-store services; no new AWS Backup service node is added in this phase [builder call].
+- `Project` adds `generation?: { toggles, model, generatedAt, contentHash }`. `contentHash` is a hash of the graph content without positions and sizes, so the client can detect manual edits since generation (hash differs → confirm before replacing). Moving nodes or re-running layout does not count as an edit [builder call].
 - Schema bump `1.2.0 → 1.3.0` with a no-op migration in `migrate.ts`.
 - **Versions** live in a new IndexedDB object store `versions` keyed by `[projectId, createdAt]`, value `{ label, toggles, project }`, max 10 per project (oldest pruned on insert). Versions are not part of the project JSON export. [builder call]
 
@@ -115,7 +117,7 @@ Port the spike's generation contract (`Generation` schema, system prompt, `toPro
 - A new **live eval** generates fresh candidates for all 15 scenarios with the shared generator, scores them, and compares with the previous run's metrics. It fails on regression below the `MODEL_OPTIONS` benchmark bars (schema valid 100%, pass rate, VR expectations).
 - Scenarios gain optional `toggles` and `answers` fields; add at least one scenario per toggle that checks the toggle's effect (e.g. Backups → every data store has backup config).
 - Clarification: in the live eval, questions are answered from a scenario's `answers` or with "you-decide", so runs are reproducible in structure.
-- **Regression gate [builder call]:** Haiku only (the free-tier default), 15 scenarios × 2 repeats. Fails when schema-valid rate < 100%, pass rate < 0.90, any `forbiddenServices` hit, or mean cost per operation > 1.5× the Haiku benchmark. Latency is reported, not gated. Sonnet is measured at Gate A and on manual dispatch, not on every PR.
+- **Regression gate [builder call]:** Haiku only (the free-tier default), every scenario × 1 repeat in CI (≈ $0.20 per run with the toggle scenarios); Gate A uses 2 repeats. Fails when schema-valid rate < 100%, pass rate < 0.90, any `forbiddenServices` hit, or mean cost per operation > 1.5× the Haiku benchmark. Latency is reported, not gated. Sonnet is measured at Gate A and on manual dispatch, not on every PR.
 - **When live eval runs and who pays: open for the PO (see §11).**
 
 ## 10. Gate A
