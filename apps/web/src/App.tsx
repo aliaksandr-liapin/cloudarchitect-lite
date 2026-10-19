@@ -1,5 +1,6 @@
 import { awsCatalog, samples } from '@cloudarchitect/catalog';
 import {
+  MODEL_OPTIONS,
   migrateProject,
   validateProject,
   type Finding,
@@ -26,6 +27,7 @@ import { api, ApiError } from './api';
 import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
 import { GeneratePanel, type GenerateInput } from './GeneratePanel';
+import type { StepId } from './GenerationStatus';
 import { edgeTypes } from './edges';
 import {
   applyLayout,
@@ -66,11 +68,6 @@ const displayName = (id: string) => services.get(id)?.displayName ?? id;
 
 type Questions = Extract<GenerateResponse, { status: 'questions' }>;
 
-const STAGE = {
-  reading: 'Reading your requirements…',
-  designing: 'Designing…',
-  checking: 'Checking…',
-} as const;
 /** Extraction is quick; after this the request is almost always in the generation step. */
 const DESIGNING_AFTER_MS = 8000;
 const CANCELLED = 'Generation cancelled — no credit used.';
@@ -110,7 +107,8 @@ export function App() {
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
-  const [stage, setStage] = useState<string>();
+  const [step, setStep] = useState<StepId>();
+  const [startedAt, setStartedAt] = useState<number>();
   /** Startup could not read browser storage: edit in memory only, never save over the stored project. */
   const [storageDown, setStorageDown] = useState(false);
   const storageDownRef = useRef(false);
@@ -309,7 +307,7 @@ export function App() {
     const current = projectRef.current;
     const saved = preparedRef.current?.saved ?? undefined;
     preparedRef.current = undefined;
-    setStage(STAGE.checking);
+    setStep('checking');
     await commit(
       {
         ...migrateProject(generated),
@@ -350,13 +348,13 @@ export function App() {
   };
 
   /**
-   * Runs one gateway call with stage text and Cancel; handles questions, results and errors.
+   * Runs one gateway call with step status and Cancel; handles questions, results and errors.
    * `fromClarify` (Continue): the clarification card, with the user's answers and edits, stays
    * until the call succeeds, and also after an error a retry can fix.
    */
   const run = async (
     call: (signal: AbortSignal) => Promise<GenerateResponse>,
-    first: string,
+    first: StepId,
     fromClarify = false,
   ) => {
     abortRef.current?.abort();
@@ -365,11 +363,12 @@ export function App() {
     setError(undefined);
     setToast(undefined);
     if (!fromClarify) setClarify(undefined);
-    setStage(first);
+    setStep(first);
+    setStartedAt(Date.now());
     setCancellable(true);
     const timer =
-      first === STAGE.reading
-        ? setTimeout(() => !ac.signal.aborted && setStage(STAGE.designing), DESIGNING_AFTER_MS)
+      first === 'reading'
+        ? setTimeout(() => !ac.signal.aborted && setStep('designing'), DESIGNING_AFTER_MS)
         : undefined;
     try {
       const res = await call(ac.signal);
@@ -378,6 +377,7 @@ export function App() {
       // The response is here: nothing left to cancel, the rest happens in the browser.
       abortRef.current = undefined;
       setCancellable(false);
+      setStep((s) => (s === 'reading' ? 'designing' : s));
       setClarify(res.status === 'questions' ? res : undefined);
       if (res.status === 'done') await showGenerated(res.project);
     } catch (err) {
@@ -387,11 +387,11 @@ export function App() {
       else showError(err);
     } finally {
       clearTimeout(timer);
-      // A newer run owns the stage text; otherwise this run is over.
+      // A newer run owns the step; otherwise this run is over.
       if (abortRef.current === ac || abortRef.current === undefined) {
         abortRef.current = undefined;
         setCancellable(false);
-        setStage(undefined);
+        setStep(undefined);
       }
     }
   };
@@ -416,7 +416,7 @@ export function App() {
             },
             signal,
           ),
-        STAGE.reading,
+        'reading',
       ),
     );
 
@@ -437,7 +437,7 @@ export function App() {
             },
             signal,
           ),
-        STAGE.designing,
+        'designing',
         true,
       ),
     );
@@ -447,7 +447,7 @@ export function App() {
     abortRef.current?.abort();
     abortRef.current = undefined;
     setCancellable(false);
-    setStage(undefined);
+    setStep(undefined);
     setClarify(undefined);
     setToast({ text: CANCELLED });
   };
@@ -464,7 +464,13 @@ export function App() {
   };
 
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
-  const busy = stage !== undefined || replacing || dialog !== undefined;
+  // Typical wait for the chosen model (benchmark median), shown next to the timer.
+  const typicalSeconds = Math.round(
+    MODEL_OPTIONS.find((m) => m.id === (readModelChoice() ?? 'haiku'))?.benchmark
+      .medianLatencySeconds ?? 0,
+  );
+
+  const busy = step !== undefined || replacing || dialog !== undefined;
 
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
@@ -621,7 +627,7 @@ export function App() {
         className="main"
         style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
       >
-        <section className="canvas" aria-label="Architecture canvas">
+        <section className={step ? 'canvas is-busy' : 'canvas'} aria-label="Architecture canvas">
           {clarify && (
             <div className="overlay">
               <ClarifyCard
@@ -682,7 +688,9 @@ export function App() {
               hasDiagram={Boolean(project?.nodes.length)}
               busy={busy}
               cancellable={cancellable}
-              stage={stage}
+              step={step}
+              startedAt={startedAt}
+              typicalSeconds={typicalSeconds}
               onGenerate={generate}
               onCancel={cancel}
             />

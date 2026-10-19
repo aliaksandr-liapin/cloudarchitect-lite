@@ -511,8 +511,53 @@ table.models caption {
   align-items: center;
   margin: 8px 0;
 }
-.stage {
+.gen-status .row {
+  align-items: center;
+  gap: 8px;
+}
+.gen-current {
+  font-weight: 600;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--line);
+    background: var(--accent);
+  }
+}
+.gen-steps {
+  margin: 8px 0 4px;
+  padding-left: 20px;
+  font-size: 0.85rem;
   color: var(--muted);
+}
+.gen-steps li.current {
+  color: var(--text);
+  font-weight: 600;
+}
+.gen-steps li.done::marker {
+  content: '✓ ';
+}
+.gen-time {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.canvas.is-busy .react-flow {
+  opacity: 0.55;
+  pointer-events: none;
 }
 .canvas {
   position: relative;

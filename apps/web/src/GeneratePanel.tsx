@@ -1,5 +1,6 @@
 import { LIMITS, type DesignToggles } from '@cloudarchitect/domain';
 import { useState } from 'react';
+import { GenerationStatus, type StepId } from './GenerationStatus';
 
 type Flag = Exclude<keyof DesignToggles, 'disasterRecovery'>;
 
@@ -26,14 +27,19 @@ export function GeneratePanel({
   busy,
   onGenerate,
   onCancel,
-  stage,
+  step,
+  startedAt,
+  typicalSeconds,
   cancellable = true,
 }: {
   hasDiagram: boolean;
   busy: boolean;
   onGenerate(input: GenerateInput): void;
   onCancel(): void;
-  stage?: string;
+  step?: StepId;
+  startedAt?: number;
+  /** Typical total wait for the chosen model, shown while reading and designing. */
+  typicalSeconds?: number;
   /** False once the request can no longer be aborted (its response is being applied). */
   cancellable?: boolean;
 }) {
@@ -113,14 +119,16 @@ export function GeneratePanel({
           Generating replaces the current diagram. The current one is kept in Versions.
         </p>
       )}
-      {busy ? (
-        <div className="row">
-          <span className="stage" role="status">
-            {stage}
-          </span>
-          <span className="spacer" />
-          {cancellable && <button onClick={onCancel}>Cancel</button>}
-        </div>
+      {step && startedAt !== undefined ? (
+        <GenerationStatus
+          step={step}
+          startedAt={startedAt}
+          typicalSeconds={typicalSeconds}
+          cancellable={cancellable}
+          onCancel={onCancel}
+        />
+      ) : busy ? (
+        <p className="muted small">Working…</p>
       ) : (
         <button
           className="primary"
