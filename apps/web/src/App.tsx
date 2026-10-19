@@ -21,6 +21,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from './api';
+import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
 import { GeneratePanel, type GenerateInput } from './GeneratePanel';
 import { applyLayout, needsLayout, toFlow } from './layout';
@@ -51,20 +52,6 @@ const STAGE = {
 /** Extraction is quick; after this the request is almost always in the generation step. */
 const DESIGNING_AFTER_MS = 8000;
 const CANCELLED = 'Generation cancelled — no credit used.';
-const SETUP_REQUIRED = 'AI features are not set up yet — see the setup notice above.';
-
-/** Plain messages for gateway error codes (spec §5); manual editing stays available for all of them. */
-const ERROR_MESSAGES: Record<string, string> = {
-  no_credits: 'Free generations used up. Bring your own key arrives in a later version.',
-  model_not_enabled: 'This model needs your own API key.',
-  free_ai_unavailable: 'AI generation is paused right now. Manual editing still works.',
-  setup_required: SETUP_REQUIRED,
-  generation_failed: 'Generation failed — no credit used. Try again.',
-  provider_error: 'Generation failed — no credit used. Try again.',
-  operation_expired: 'The questions expired. Generate again.',
-  catalog_mismatch: 'Reload the page to get the latest service catalog.',
-};
-const GENERIC_ERROR = 'Something went wrong — try again';
 
 interface DialogSpec {
   message: string;
@@ -262,19 +249,26 @@ export function App() {
     }).catch(showError);
 
   const showError = (err: unknown) => {
-    const code = err instanceof ApiError ? err.code : undefined;
-    if (code === 'setup_required') setSetupPending(true);
-    setError((code && ERROR_MESSAGES[code]) ?? GENERIC_ERROR);
+    if (errorCode(err) === 'setup_required') setSetupPending(true);
+    setError(errorMessage(err));
   };
 
-  /** Runs one gateway call with stage text and Cancel; handles questions, results and errors. */
-  const run = async (call: (signal: AbortSignal) => Promise<GenerateResponse>, first: string) => {
+  /**
+   * Runs one gateway call with stage text and Cancel; handles questions, results and errors.
+   * `fromClarify` (Continue): the clarification card, with the user's answers and edits, stays
+   * until the call succeeds, and also after an error a retry can fix.
+   */
+  const run = async (
+    call: (signal: AbortSignal) => Promise<GenerateResponse>,
+    first: string,
+    fromClarify = false,
+  ) => {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
     setError(undefined);
     setToast(undefined);
-    setClarify(undefined);
+    if (!fromClarify) setClarify(undefined);
     setStage(first);
     setCancellable(true);
     const timer =
@@ -288,10 +282,11 @@ export function App() {
       // The response is here: nothing left to cancel, the rest happens in the browser.
       abortRef.current = undefined;
       setCancellable(false);
-      if (res.status === 'questions') setClarify(res);
-      else await showGenerated(res.project);
+      setClarify(res.status === 'questions' ? res : undefined);
+      if (res.status === 'done') await showGenerated(res.project);
     } catch (err) {
       if (ac.signal.aborted) return; // cancel() already reported it
+      if (fromClarify && !isTransient(err)) setClarify(undefined);
       if (err instanceof ApiError && err.code === 'client_closed') setToast({ text: CANCELLED });
       else showError(err);
     } finally {
@@ -347,6 +342,7 @@ export function App() {
             signal,
           ),
         STAGE.designing,
+        true,
       ),
     );
 
@@ -466,6 +462,7 @@ export function App() {
                 assumptions={clarify.assumptions}
                 onContinue={(answers, reqs) => continueWith(clarify, answers, reqs)}
                 onCancel={cancel}
+                disabled={busy}
               />
             </div>
           )}

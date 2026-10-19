@@ -18,12 +18,15 @@ export function ClarifyCard({
   assumptions,
   onContinue,
   onCancel,
+  disabled = false,
 }: {
   questions: Question[];
   requirements: Requirement[];
   assumptions: string[];
   onContinue(answers: Answers, requirements: Requirement[]): void;
   onCancel(): void;
+  /** A request is running: hold Continue so it is not sent twice (Cancel stays available). */
+  disabled?: boolean;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [freeText, setFreeText] = useState<Answers>({});
@@ -125,7 +128,7 @@ export function ClarifyCard({
         <span className="spacer" />
         {questions.length > 0 && (
           <button
-            disabled={kept.length === 0}
+            disabled={disabled || kept.length === 0}
             onClick={() => onContinue(allAnswers(YOU_DECIDE), kept)}
           >
             Skip questions
@@ -133,7 +136,7 @@ export function ClarifyCard({
         )}
         <button
           className="primary"
-          disabled={kept.length === 0}
+          disabled={disabled || kept.length === 0}
           onClick={() => onContinue(allAnswers(), kept)}
         >
           Continue
