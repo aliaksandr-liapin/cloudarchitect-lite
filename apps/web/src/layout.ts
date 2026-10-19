@@ -114,8 +114,9 @@ export async function applyLayout(project: Project): Promise<{ project: Project;
     const l = e.labels?.[0];
     routes.set(e.id, {
       points: [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map(({ x, y }) => ({ x, y })),
-      ...(l
-        ? { label: { x: l.x ?? 0, y: l.y ?? 0, width: l.width ?? 0, height: l.height ?? 0 } }
+      // No label box without ELK coordinates: the edge then falls back to the smoothstep label position.
+      ...(l && l.x !== undefined && l.y !== undefined
+        ? { label: { x: l.x, y: l.y, width: l.width ?? 0, height: l.height ?? 0 } }
         : {}),
     });
   }

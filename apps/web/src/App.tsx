@@ -14,6 +14,8 @@ import {
   MiniMap,
   ReactFlow,
   applyNodeChanges,
+  type Edge,
+  type FitViewOptions,
   type Node,
   type NodeChange,
   type ReactFlowInstance,
@@ -24,9 +26,17 @@ import { api, ApiError } from './api';
 import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
 import { GeneratePanel, type GenerateInput } from './GeneratePanel';
-import { applyLayout, needsLayout, toFlow } from './layout';
+import { edgeTypes } from './edges';
+import {
+  applyLayout,
+  containerMinSize,
+  dropRoutes,
+  needsLayout,
+  toFlow,
+  type Routes,
+} from './layout';
 import { AiModelPanel, readModelChoice } from './models';
-import { nodeTypes } from './nodes';
+import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
   idbVersionStore,
@@ -77,9 +87,14 @@ const STORAGE_DIALOG: DialogSpec = {
 
 type Toast = { text: string; restore?: ProjectVersion };
 
+/** Fit the whole diagram with padding, never zooming past 100 %. */
+const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
+const NO_ROUTES: Routes = new Map();
+
 export function App() {
   const [project, setProject] = useState<Project>();
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
@@ -98,8 +113,10 @@ export function App() {
   const replacingRef = useRef(false);
   const dialogOpenRef = useRef(false);
   const flowRef = useRef<ReactFlowInstance>(undefined);
-  /** Fit the viewport once the next committed nodes render (new diagram from generation or Restore). */
+  /** Fit the viewport once the next committed nodes render (generation, Restore, Import, Auto layout). */
   const fitPendingRef = useRef(false);
+  /** ELK edge routes of the last layout pass, minus those a hand move or resize made stale. */
+  const routesRef = useRef<Routes>(NO_ROUTES);
   const fileInput = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const abortRef = useRef<AbortController>(undefined);
@@ -110,17 +127,30 @@ export function App() {
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
 
-  /** Single entry point for project changes: lay out if needed, persist, re-render. */
-  const commit = useCallback(async (next: Project, forceLayout = false) => {
-    const laid = forceLayout || needsLayout(next) ? (await applyLayout(next)).project : next;
-    projectRef.current = laid;
-    setProject(laid);
-    setNodes(toFlow(laid, displayName).nodes);
-    if (storageDownRef.current) return;
-    await saveProject(laid).catch(() =>
-      setError('Could not save to browser storage — export JSON as a backup.'),
-    );
-  }, []);
+  /**
+   * Single entry point for project changes: lay out if needed, persist, re-render. A layout pass
+   * replaces the routes; otherwise `opts.routes` (default: the current ones) is drawn. `opts.fit`
+   * fits the viewport once the result renders.
+   */
+  const commit = useCallback(
+    async (next: Project, forceLayout = false, opts: { routes?: Routes; fit?: boolean } = {}) => {
+      let laid = next;
+      let routes = opts.routes ?? routesRef.current;
+      if (forceLayout || needsLayout(next)) ({ project: laid, routes } = await applyLayout(next));
+      routesRef.current = routes;
+      projectRef.current = laid;
+      if (opts.fit) fitPendingRef.current = true;
+      const flow = toFlow(laid, displayName, routes);
+      setProject(laid);
+      setNodes(flow.nodes);
+      setEdges(flow.edges);
+      if (storageDownRef.current) return;
+      await saveProject(laid).catch(() =>
+        setError('Could not save to browser storage — export JSON as a backup.'),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const sample = migrateProject(samples.myblog);
@@ -162,7 +192,7 @@ export function App() {
     if (!fitPendingRef.current) return;
     fitPendingRef.current = false;
     // React Flow queues this until the new nodes are measured.
-    void flowRef.current?.fitView();
+    void flowRef.current?.fitView({ ...FIT, duration: 300 });
   }, [nodes]);
 
   /** In-app confirmation; resolves with the chosen action's value ('cancel' on Escape). Rejects if one is open. */
@@ -220,7 +250,6 @@ export function App() {
     const saved = preparedRef.current?.saved ?? undefined;
     preparedRef.current = undefined;
     setStage(STAGE.checking);
-    fitPendingRef.current = true;
     await commit(
       {
         ...migrateProject(generated),
@@ -228,6 +257,7 @@ export function App() {
         revision: (current?.revision ?? 0) + 1,
       },
       true,
+      { fit: true },
     );
     setToast({ text: 'New diagram generated', restore: saved });
   };
@@ -240,12 +270,15 @@ export function App() {
       const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
       if (kept.saved && current) await refreshVersions(current.projectId);
-      fitPendingRef.current = true;
-      await commit({
-        ...migrateProject(v.project),
-        projectId: current?.projectId ?? v.project.projectId,
-        revision: (current?.revision ?? 0) + 1,
-      });
+      await commit(
+        {
+          ...migrateProject(v.project),
+          projectId: current?.projectId ?? v.project.projectId,
+          revision: (current?.revision ?? 0) + 1,
+        },
+        false,
+        { routes: NO_ROUTES, fit: true },
+      );
     }).catch(showError);
 
   const showError = (err: unknown) => {
@@ -370,7 +403,6 @@ export function App() {
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
   const busy = stage !== undefined || replacing || dialog !== undefined;
 
-  const edges = useMemo(() => (project ? toFlow(project, displayName).edges : []), [project]);
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
     [project],
@@ -385,14 +417,79 @@ export function App() {
     (_: unknown, dragged: Node) => {
       if (!project) return;
       const position = dragged.position;
-      void commit({
-        ...project,
-        revision: project.revision + 1,
-        nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-        containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
-      });
+      void commit(
+        {
+          ...project,
+          revision: project.revision + 1,
+          nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
+          containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+        },
+        false,
+        { routes: dropRoutes(routesRef.current, project, [dragged.id]) },
+      );
     },
     [project, commit],
+  );
+
+  /**
+   * A resize is a hand edit like a drag. Left and top handles move the box too; React Flow then shifts
+   * a container's children back by the same amount so they stay put on screen, and so does this.
+   */
+  const onResized = useCallback(
+    (id: string, { x, y, width, height }: ResizeRect) => {
+      const p = projectRef.current;
+      if (!p) return;
+      const box = p.nodes.find((n) => n.id === id) ?? p.containers.find((c) => c.id === id);
+      if (!box) return;
+      const old = box.position ?? { x: 0, y: 0 };
+      if (old.x === x && old.y === y && box.size?.width === width && box.size?.height === height)
+        return;
+      const position = { x, y };
+      const size = { width, height };
+      const shift = (pos: { x: number; y: number }) => ({
+        x: pos.x - (x - old.x),
+        y: pos.y - (y - old.y),
+      });
+      void commit(
+        {
+          ...p,
+          revision: p.revision + 1,
+          nodes: p.nodes.map((n) =>
+            n.id === id
+              ? { ...n, position, size }
+              : n.containerId === id
+                ? { ...n, position: shift(n.position) }
+                : n,
+          ),
+          containers: p.containers.map((c) =>
+            c.id === id
+              ? { ...c, position, size }
+              : c.parentId === id && c.position
+                ? { ...c, position: shift(c.position) }
+                : c,
+          ),
+        },
+        false,
+        { routes: dropRoutes(routesRef.current, p, [id]) },
+      );
+    },
+    [commit],
+  );
+
+  /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
+  const shownNodes = useMemo(
+    () =>
+      nodes.map((n): Node => {
+        const editable: EditableData = {
+          resizable: !busy,
+          onResized,
+          ...(n.type === 'container' && project
+            ? { minSize: containerMinSize(project, n.id) }
+            : {}),
+        };
+        return { ...n, data: { ...n.data, ...editable } };
+      }),
+    [nodes, busy, onResized, project],
   );
 
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
@@ -412,7 +509,7 @@ export function App() {
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
-        <button disabled={busy} onClick={() => project && commit(project, true)}>
+        <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
         </button>
         <button onClick={() => project && downloadJson(project)}>Export JSON</button>
@@ -428,7 +525,7 @@ export function App() {
             const file = e.target.files?.[0];
             if (file)
               readJsonFile(file).then(
-                (p) => commit(p),
+                (p) => commit(p, false, { routes: NO_ROUTES, fit: true }),
                 (err: Error) => setError(err.message),
               );
           }}
@@ -467,15 +564,17 @@ export function App() {
             </div>
           )}
           <ReactFlow
-            nodes={nodes}
+            nodes={shownNodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={onNodeDragStop}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
             onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}
             fitView
+            fitViewOptions={FIT}
             minZoom={0.2}
             colorMode="system"
           >
