@@ -14,7 +14,7 @@ Local-first AI cloud architecture designer — AWS first, Azure/GCP ready. The a
   <img alt="The editor showing a serverless blog architecture inside AWS and region containers. A validation finding (VR-004, missing failure destination) is selected and its Lambda function is highlighted; the side panel shows the Generate panel with its design-priority toggles, then the component's details and the findings." src="docs/images/editor-light.png">
 </picture>
 
-**Status:** pre-alpha (ROADMAP Phase 2). AI generation from a description works: describe your app, pick design priorities, answer up to three clarifying questions, and get a validated diagram; earlier diagrams are kept in Versions. The editor, project format, catalog, validation rules, model benchmarks, gateway controls, self-hosted install and CI/CD work too.
+**Status:** pre-alpha (ROADMAP Phase 2). AI generation from a description works: describe your app, pick design priorities, answer up to three clarifying questions, and get a validated diagram; earlier diagrams are kept in Versions. Generated diagrams are laid out to be readable on first sight, every box can be resized, and the editor has a light/dark switch. The editor, project format, catalog, validation rules, model benchmarks, gateway controls, self-hosted install and CI/CD work too.
 
 ## How it works
 
