@@ -121,7 +121,7 @@ in memory (as long as they are dropped when an endpoint moves).
    exists and the smoothstep path otherwise. The label is rendered through `EdgeLabelRenderer` and
    wraps at 160 px, 2 lines max, with the full text in `title`. This needs no new dependency.
 5. **Nothing can be edited while busy.** That covers Auto layout, Import, Restore, drag, resize (handles
-   hidden), rename and theme-independent canvas edits. This is the existing `busy` rule extended to
+   hidden) and rename. This is the existing `busy` rule extended to
    resize.
 6. **Cancel or failure leaves the current diagram, its viewport and its routes untouched**: no layout
    and no fit.
