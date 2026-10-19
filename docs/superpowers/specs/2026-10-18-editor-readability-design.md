@@ -1,6 +1,6 @@
 # Editor readability and panel UX — design
 
-Date: 2026-10-18 · Status: approved in chat by the product owner · Scope: `apps/web` (+ one optional field in `packages/domain`)
+Date: 2026-10-18 · Status: implemented (PR #8, merged 2026-10-19) · Scope: `apps/web` (+ one optional field in `packages/domain`)
 
 ## Why
 

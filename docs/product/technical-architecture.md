@@ -64,7 +64,7 @@ Stable project schema example (illustrative subset):
 
 ```json
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.4.0",
   "projectId": "project-demo",
   "name": "MyBlog.com",
   "revision": 12,
@@ -93,12 +93,12 @@ Stable project schema example (illustrative subset):
 ```
 
 **Container** (new): id, kind (`aws-cloud` / `region` / `vpc` / `availability-zone` / `subnet` / `group`), parentId, label, properties (subnet: `public` | `private`, optional cidr), position, size. Allowed nesting: aws-cloud → region → vpc → availability-zone → subnet; `group` may appear at any level. Global services (CloudFront, Route 53, IAM) attach to `aws-cloud`, not a region.  
-**Node**: id, provider, either `serviceId` (from catalog) **or** `unresolved {name, rationale}` (PRD FR-020), label, purpose, rationale, requirementIds, configuration (catalog-defined feature keys such as `transferAcceleration`), containerId, position, metadata provenance.  
+**Node**: id, provider, either `serviceId` (from catalog) **or** `unresolved {name, rationale}` (PRD FR-020), label, purpose, rationale, requirementIds, configuration (catalog-defined feature keys such as `transferAcceleration`), containerId, position, optional size (1.4.0), metadata provenance.  
 **Edge**: id, source, target, kind (invoke/read/write/event/origin/other), protocol, configuration (e.g. `originAccess: OAC`, `authorizer: cognito`), auth notes, label, requirementIds. Direction is source → target; bidirectional semantics use two edges.  
 **Requirement**: id, text, type, status (`confirmed` / `inferred` / `open`), provenance.  
 **Finding**: id, class (`rule` | `advisory`), ruleId (rule only), severity (`error` / `warning` / `info`), nodeIds/edgeIds/containerIds, explanation, evidence (doc URLs), remediation, validator or model version.
 
-Graph uses stable resource IDs, never icon file names as the primary key. Service catalog version and project schema version are independent. Schema 1.0.0 → 1.1.0 migration: wrap existing nodes in a default `aws-cloud` container; rename `warnings` → `findings`.
+Graph uses stable resource IDs, never icon file names as the primary key. Service catalog version and project schema version are independent. Schema 1.0.0 → 1.1.0 migration: wrap existing nodes in a default `aws-cloud` container; rename `warnings` → `findings`. Later steps only add optional data: 1.2.0 external nodes, 1.3.0 `generation` metadata and the `toggle` provenance, 1.4.0 node `size`.
 
 ## 5. AI pipeline
 

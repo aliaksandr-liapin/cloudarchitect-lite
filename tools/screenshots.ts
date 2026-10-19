@@ -207,6 +207,10 @@ try {
     const projectFile = await sampleWithFinding();
     for (const colorScheme of ['light', 'dark'] as const) {
       const context = await browser.newContext({ viewport, deviceScaleFactor: 2, colorScheme });
+      // The editor follows its own theme switch (light by default), not the OS preference.
+      await context.addInitScript((theme) => {
+        localStorage.setItem('cloudarchitect.theme', theme);
+      }, colorScheme);
       await editor(context, `editor-${colorScheme}`, projectFile);
       await context.close();
     }

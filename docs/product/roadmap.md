@@ -23,7 +23,7 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 ## 3. Implementation epics
 
-**E1 — Project/Canvas:** editor, graph schema 1.1, **containers (FR-019)**, manual operations, undo/redo, ELK layout in a Web Worker, local save/load, schema migration.
+**E1 — Project/Canvas:** editor, graph schema 1.1, **containers (FR-019)**, manual operations, undo/redo, ELK layout in a Web Worker, local save/load, schema migration. Readability pass done 2026-10-19 after Gate A manual testing: orthogonal routing with label space, fit to view, resizable components and groups (schema 1.4.0), light/dark switch, resizable side panel, generation status. Still open: undo/redo, ELK in a Web Worker.
 
 **E2 — Cloud Catalog:** ~40 AWS services + containers + features, CloudFormation-checked IDs, lifecycle, evidence, icon pack import with hashes and terms, manual update checklist, provider-neutral interfaces, sample Azure/GCP schemas.
 

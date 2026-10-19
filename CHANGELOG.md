@@ -10,10 +10,21 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - One clarification round: up to three questions with quick answers, "You decide" and free text, plus editable requirements before drawing (optional review pause when there are no questions).
 - Versions: the current diagram is kept in browser storage (last 10 per project) before a generated one replaces it; a toast offers "Restore previous" and a Versions list restores any earlier diagram. Hand-edited diagrams ask before they are replaced.
 - Component names can be edited in the Details panel.
+- Readable diagrams on first sight: wider component boxes with names wrapping to two lines, orthogonal connection routing with space reserved for labels (no label overlaps a component), and the view fits the whole diagram after generation, Restore, Import and Auto layout. Routes are recomputed when a diagram loads, wherever nothing was moved by hand.
+- Every component and group can be resized; a group cannot be shrunk smaller than its contents. Sizes are saved in the project.
+- Light/dark theme switch (light by default, remembered per browser).
+- Resizable side panel (drag or arrow keys) with the description, design priorities and Generate pinned at the top; AI model and Versions are collapsible and start collapsed.
+- Clear generation status: spinner, steps ("Reading your requirements" → "Designing the architecture" → "Checking the design"), elapsed timer, typical wait for the selected model, and Cancel; the canvas dims while a request runs.
 - Phase 2 Gate A passed: Haiku blind median 2.29, no critical defect in 11 of 12 reviewed scenarios, live gate green (schema-valid 100%, pass 93.2%). Model benchmarks in the setup wizard and editor now show these measurements ([report](docs/product/phase2-gate-a.md)).
+
+### Changed
+
+- Project format 1.4.0: components may store a `size`. Older files load unchanged (migration from 1.3.0) and keep their positions.
+- The editor follows its own theme switch instead of the operating system's color scheme.
 
 ### Fixed
 
+- The note under the model comparison shows the actual number of measured runs per model.
 - Generator: `containerId` is required (null for external nodes), so designs no longer come back without VPC and subnet placement.
 - Generator: output enums (service ids, feature keys, kinds) are enforced by constrained decoding; the SDK helper had moved them into field descriptions.
 - Generator: repair turns now name the offending node and edge ids and the remediation for each finding.
