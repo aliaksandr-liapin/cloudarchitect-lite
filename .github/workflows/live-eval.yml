@@ -8,19 +8,21 @@ on:
       - packages/catalog/data/**
       - packages/domain/src/models.ts
       - packages/domain/src/validation.ts
+      - packages/domain/src/toggles.ts
       - eval/scenarios/**
+      - eval/src/harness.ts
       - eval/src/live.ts
       - eval/src/gate.ts
   workflow_dispatch:
     inputs:
       models:
-        description: Comma-separated model choices (haiku, sonnet, opus)
+        description: Comma-separated model choices (haiku, sonnet)
         default: haiku
       repeats:
         description: Runs per scenario
         default: '1'
       max_usd:
-        description: Spend cap in USD for the whole run
+        description: Spend cap in USD for the whole run (at most 2.00)
         default: '0.50'
 
 permissions:
@@ -52,7 +54,13 @@ jobs:
           MODELS: ${{ inputs.models || 'haiku' }}
           REPEATS: ${{ inputs.repeats || '1' }}
           MAX_USD: ${{ inputs.max_usd || '0.50' }}
-        run: pnpm eval:live --gate --models "$MODELS" --repeats "$REPEATS" --max-usd "$MAX_USD"
+        # A manual dispatch can never spend more than $2.00 in one run.
+        run: |
+          if ! awk -v v="$MAX_USD" 'BEGIN { exit !(v ~ /^[0-9]+(\.[0-9]+)?$/ && v + 0 <= 2.00) }'; then
+            echo "::error::max_usd must be a number no greater than 2.00 (got '$MAX_USD')"
+            exit 1
+          fi
+          pnpm eval:live --gate --models "$MODELS" --repeats "$REPEATS" --max-usd "$MAX_USD"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
