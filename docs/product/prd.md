@@ -165,6 +165,8 @@ Rule findings are deterministic and versioned; advisory findings (FR-021) are a 
 | VR-024 | DAX / NAT Gateway / EC2 / EKS linked to no requirement besides toggle ones; only when the cost-optimized toggle is enabled | info |
 | VR-025 | Public API Gateway / ALB / CloudFront without WAF, or a data store without KMS encryption; only when the security-hardening toggle is enabled | warning |
 
+VR-019 flags EC2, RDS, ECS and EKS only. Aurora is excluded on purpose because Aurora Serverless v2 exists, so an Aurora node is not necessarily server-based (spec §6 lists "RDS/Aurora (non-serverless)").
+
 Every rule has positive and negative fixture tests. All rules VR-001…VR-025 are implemented.
 
 ## 12. Icons — sources and usage terms
