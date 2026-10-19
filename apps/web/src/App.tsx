@@ -33,6 +33,7 @@ import {
   dropRoutes,
   fitsChildren,
   needsLayout,
+  recoverRoutes,
   toFlow,
   type Routes,
 } from './layout';
@@ -130,14 +131,20 @@ export function App() {
 
   /**
    * Single entry point for project changes: lay out if needed, persist, re-render. A layout pass
-   * replaces the routes; otherwise `opts.routes` (default: the current ones) is drawn. `opts.fit`
-   * fits the viewport once the result renders.
+   * replaces the routes; otherwise `opts.routes` (default: the current ones) is drawn. `opts.recover`
+   * (a loaded, imported or restored diagram) starts without routes and draws the ones
+   * `recoverRoutes` finds still valid. `opts.fit` fits the viewport once the result renders.
    */
   const commit = useCallback(
-    async (next: Project, forceLayout = false, opts: { routes?: Routes; fit?: boolean } = {}) => {
+    async (
+      next: Project,
+      forceLayout = false,
+      opts: { routes?: Routes; recover?: boolean; fit?: boolean } = {},
+    ) => {
       let laid = next;
-      let routes = opts.routes ?? routesRef.current;
-      if (forceLayout || needsLayout(next)) ({ project: laid, routes } = await applyLayout(next));
+      let routes = opts.recover ? NO_ROUTES : (opts.routes ?? routesRef.current);
+      const layout = forceLayout || needsLayout(next);
+      if (layout) ({ project: laid, routes } = await applyLayout(next));
       routesRef.current = routes;
       projectRef.current = laid;
       if (opts.fit) fitPendingRef.current = true;
@@ -149,6 +156,17 @@ export function App() {
         return flow.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
       });
       setEdges(flow.edges);
+      if (opts.recover && !layout) {
+        void recoverRoutes(laid).then(
+          (recovered) => {
+            // A newer commit owns the diagram (and its routes) now.
+            if (projectRef.current !== laid) return;
+            routesRef.current = recovered;
+            setEdges(toFlow(laid, displayName, recovered).edges);
+          },
+          () => undefined,
+        );
+      }
       if (storageDownRef.current) return;
       await saveProject(laid).catch(() =>
         setError('Could not save to browser storage — export JSON as a backup.'),
@@ -162,7 +180,7 @@ export function App() {
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
-      return commit(project);
+      return commit(project, false, { recover: true });
     });
   }, [commit]);
 
@@ -282,7 +300,7 @@ export function App() {
           revision: (current?.revision ?? 0) + 1,
         },
         false,
-        { routes: NO_ROUTES, fit: true },
+        { recover: true, fit: true },
       );
     }).catch(showError);
 
@@ -533,7 +551,7 @@ export function App() {
             const file = e.target.files?.[0];
             if (file)
               readJsonFile(file).then(
-                (p) => commit(p, false, { routes: NO_ROUTES, fit: true }),
+                (p) => commit(p, false, { recover: true, fit: true }),
                 (err: Error) => setError(err.message),
               );
           }}

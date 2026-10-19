@@ -91,12 +91,8 @@ export function toElkGraph(project: Project): ElkNode {
 /** A project needs auto-layout when it has never been laid out (containers without sizes). */
 export const needsLayout = (p: Project) => p.containers.some((c) => !c.size || !c.position);
 
-/**
- * Runs ELK and writes positions (relative to the parent container), node sizes and container sizes back
- * into the project, and returns each edge's route in absolute coordinates (`edgeCoords: ROOT`).
- * Only called on first load or when the user asks for auto-layout, so manual positions are never lost (FR-006).
- */
-export async function applyLayout(project: Project): Promise<{ project: Project; routes: Routes }> {
+/** One ELK pass over the project: every box (relative to its parent) and every edge route. */
+async function runElk(project: Project): Promise<{ boxes: Map<string, ElkNode>; routes: Routes }> {
   const laid = await (await getElk()).layout(toElkGraph(project));
   const boxes = new Map<string, ElkNode>();
   const elkEdges: ElkExtendedEdge[] = [...(laid.edges ?? [])];
@@ -120,7 +116,16 @@ export async function applyLayout(project: Project): Promise<{ project: Project;
         : {}),
     });
   }
+  return { boxes, routes };
+}
 
+/**
+ * Runs ELK and writes positions (relative to the parent container), node sizes and container sizes back
+ * into the project, and returns each edge's route in absolute coordinates (`edgeCoords: ROOT`).
+ * Only called on first load or when the user asks for auto-layout, so manual positions are never lost (FR-006).
+ */
+export async function applyLayout(project: Project): Promise<{ project: Project; routes: Routes }> {
+  const { boxes, routes } = await runElk(project);
   const pos = (id: string) => ({ x: boxes.get(id)?.x ?? 0, y: boxes.get(id)?.y ?? 0 });
   return {
     project: {
@@ -134,6 +139,52 @@ export async function applyLayout(project: Project): Promise<{ project: Project;
     },
     routes,
   };
+}
+
+/**
+ * Routes are not persisted. After a reload, Import or Restore this lays the stored project out again
+ * in memory and keeps a route only where both endpoints and all their ancestor containers sit exactly
+ * where that layout puts them, so the route still fits. Nothing in the project is changed.
+ */
+export async function recoverRoutes(project: Project): Promise<Routes> {
+  const { boxes, routes } = await runElk(project);
+  const same = (a: number | undefined, b: number | undefined) =>
+    a !== undefined && b !== undefined && Math.abs(a - b) <= 0.5;
+  const fits = (
+    id: string,
+    position?: { x: number; y: number },
+    size?: { width: number; height: number },
+  ) => {
+    const box = boxes.get(id);
+    return (
+      !!box &&
+      !!position &&
+      !!size &&
+      same(box.x, position.x) &&
+      same(box.y, position.y) &&
+      same(box.width, size.width) &&
+      same(box.height, size.height)
+    );
+  };
+  const containers = new Map(project.containers.map((c) => [c.id, c]));
+  const nodes = new Map(project.nodes.map((n) => [n.id, n]));
+  const unchanged = (nodeId: string) => {
+    const n = nodes.get(nodeId);
+    if (!n || !fits(n.id, n.position, n.size ?? LEGACY_NODE_SIZE)) return false;
+    const seen = new Set<string>();
+    for (let id = n.containerId; id && !seen.has(id); id = containers.get(id)?.parentId) {
+      seen.add(id);
+      const c = containers.get(id);
+      if (!c || !fits(c.id, c.position, c.size)) return false;
+    }
+    return true;
+  };
+  const kept = new Map<string, EdgeRoute>();
+  for (const e of project.edges) {
+    const route = routes.get(e.id);
+    if (route && unchanged(e.source) && unchanged(e.target)) kept.set(e.id, route);
+  }
+  return kept;
 }
 
 /** Whether `containerId` is `ancestor` or sits (at any depth) inside it. */

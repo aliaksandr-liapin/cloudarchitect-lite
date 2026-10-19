@@ -8,6 +8,7 @@ import {
   fitsChildren,
   labelSize,
   needsLayout,
+  recoverRoutes,
   NODE_SIZE,
   toElkGraph,
   toFlow,
@@ -191,5 +192,73 @@ describe('layout', () => {
     p.containers[0] = { ...p.containers[0]!, parentId: undefined };
     expect(fitsChildren(p, id, { x: 0, y: 0, width: 300, height: 200 })).toBe(true);
     expect(fitsChildren(p, id, { x: 2, y: 0, width: 398, height: 300 })).toBe(false);
+  });
+
+  describe('recoverRoutes', () => {
+    const inside = (p: Project, nodeId: string, containerId: string) => {
+      for (
+        let id = p.nodes.find((n) => n.id === nodeId)?.containerId;
+        id;
+        id = p.containers.find((c) => c.id === id)?.parentId
+      )
+        if (id === containerId) return true;
+      return false;
+    };
+
+    it('recovers every route of an untouched layout', async () => {
+      const { project: laid, routes } = await applyLayout(project);
+      const recovered = await recoverRoutes(laid);
+      expect(recovered.size).toBe(laid.edges.length);
+      expect(new Map(recovered)).toEqual(new Map(routes));
+    });
+
+    it('drops routes of edges touching a moved node only', async () => {
+      const laid = (await applyLayout(project)).project;
+      const moved = {
+        ...laid,
+        nodes: laid.nodes.map((n) =>
+          n.id === 'db' ? { ...n, position: { x: n.position.x + 30, y: n.position.y } } : n,
+        ),
+      };
+      const recovered = await recoverRoutes(moved);
+      const touches = (e: { source: string; target: string }) =>
+        e.source === 'db' || e.target === 'db';
+      expect(laid.edges.some(touches)).toBe(true);
+      for (const e of laid.edges.filter(touches)) expect(recovered.has(e.id)).toBe(false);
+      expect(laid.edges.some((e) => !touches(e) && recovered.has(e.id))).toBe(true);
+      expect(moved.nodes.find((n) => n.id === 'db')!.position.x).toBe(
+        laid.nodes.find((n) => n.id === 'db')!.position.x + 30,
+      );
+    });
+
+    it('drops routes of edges with an endpoint inside a resized container', async () => {
+      const laid = (await applyLayout(project)).project;
+      const resized = {
+        ...laid,
+        containers: laid.containers.map((c) =>
+          c.id === 'region' ? { ...c, size: { ...c.size!, width: c.size!.width + 40 } } : c,
+        ),
+      };
+      const recovered = await recoverRoutes(resized);
+      const affected = laid.edges.filter(
+        (e) => inside(laid, e.source, 'region') || inside(laid, e.target, 'region'),
+      );
+      expect(affected.length).toBeGreaterThan(0);
+      for (const e of affected) expect(recovered.has(e.id)).toBe(false);
+    });
+
+    it('drops routes of edges touching legacy-size nodes', async () => {
+      const laid = (await applyLayout(project)).project;
+      const legacy = {
+        ...laid,
+        nodes: laid.nodes.map((n) => (n.id === 'db' ? { ...n, size: undefined } : n)),
+      };
+      const recovered = await recoverRoutes(legacy);
+      const touches = laid.edges.filter((e) => e.source === 'db' || e.target === 'db');
+      expect(touches.length).toBeGreaterThan(0);
+      for (const e of touches) expect(recovered.has(e.id)).toBe(false);
+      const allLegacy = { ...laid, nodes: laid.nodes.map((n) => ({ ...n, size: undefined })) };
+      expect((await recoverRoutes(allLegacy)).size).toBe(0);
+    });
   });
 });
