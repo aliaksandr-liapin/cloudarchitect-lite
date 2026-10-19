@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clampPanelWidth, readPref, readTheme } from './prefs';
+import { clampPanelWidth, maxPanelWidth, readPref, readTheme } from './prefs';
 
 const throwing = {
   getItem() {
@@ -39,4 +39,9 @@ describe('readPref', () => {
     vi.stubGlobal('localStorage', throwing);
     expect(readPref('k', Number, 5)).toBe(5);
   });
+});
+
+describe('maxPanelWidth', () => {
+  it('is half the window', () => expect(maxPanelWidth(1601)).toBe(800));
+  it('never drops below the minimum', () => expect(maxPanelWidth(500)).toBe(320));
 });

@@ -114,6 +114,9 @@ button.link {
   padding: 12px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
+  /* Never taller than the panel, so Generate/Cancel stay reachable. */
+  max-height: 70%;
+  overflow: auto;
 }
 .side .generate h2 {
   margin-top: 0;
@@ -142,7 +145,10 @@ button.link {
 .resize-handle:focus-visible {
   background: var(--accent);
   opacity: 0.5;
-  outline: none;
+}
+.resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  opacity: 1;
 }
 .collapsible {
   margin: 12px 0;
@@ -242,6 +248,9 @@ button.link {
 }
 .svc-text {
   min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
 }
 .svc-label {
   font-size: 13px;
@@ -499,6 +508,7 @@ table.models caption {
   border-radius: 999px;
   font-size: 13px;
 }
+.bar button[aria-pressed='true'],
 .chip[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--ctr);

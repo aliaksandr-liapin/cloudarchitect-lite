@@ -53,6 +53,8 @@ import {
 } from './versions';
 import {
   clampPanelWidth,
+  maxPanelWidth,
+  PANEL_MIN,
   PANEL_STEP,
   PANEL_WIDTH_KEY,
   readPanelWidth,
@@ -223,7 +225,17 @@ export function App() {
   };
 
   const sideWidth = clampPanelWidth(panelWidth, winWidth);
-  const persistWidth = () => writePref(PANEL_WIDTH_KEY, String(Math.round(sideWidth)));
+  // Persist the width the user chose (not one a narrow window merely clamped), and only if a gesture changed it.
+  const widthChangedRef = useRef(false);
+  const chooseWidth = (width: number) => {
+    widthChangedRef.current = true;
+    setPanelWidth(width);
+  };
+  const persistWidth = () => {
+    if (!widthChangedRef.current) return;
+    widthChangedRef.current = false;
+    writePref(PANEL_WIDTH_KEY, String(Math.round(panelWidth)));
+  };
 
   const refreshVersions = useCallback(async (id: string) => {
     setVersions(
@@ -463,13 +475,13 @@ export function App() {
     });
   };
 
-  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
   // Typical wait for the chosen model (benchmark median), shown next to the timer.
   const typicalSeconds = Math.round(
     MODEL_OPTIONS.find((m) => m.id === (readModelChoice() ?? 'haiku'))?.benchmark
       .medianLatencySeconds ?? 0,
   );
 
+  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
   const busy = step !== undefined || replacing || dialog !== undefined;
 
   const findings: Finding[] = useMemo(
@@ -582,7 +594,7 @@ export function App() {
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
         <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
-          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          Dark mode
         </button>
         <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
@@ -668,18 +680,21 @@ export function App() {
             aria-orientation="vertical"
             aria-label="Resize panel"
             aria-valuenow={Math.round(sideWidth)}
+            aria-valuemin={PANEL_MIN}
+            aria-valuemax={maxPanelWidth(winWidth)}
             tabIndex={0}
             onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
             onPointerMove={(e) => {
               if (e.currentTarget.hasPointerCapture(e.pointerId))
-                setPanelWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+                chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
             }}
             onPointerUp={persistWidth}
+            onPointerCancel={persistWidth}
             onKeyDown={(e) => {
               if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
               e.preventDefault();
               const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
-              setPanelWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
+              chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
             }}
             onKeyUp={persistWidth}
           />

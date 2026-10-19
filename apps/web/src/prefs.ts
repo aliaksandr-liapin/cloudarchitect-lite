@@ -6,7 +6,7 @@ export const PANEL_WIDTH_KEY = 'cloudarchitect.panelWidth';
 export const THEME_KEY = 'cloudarchitect.theme';
 export const PANEL_DEFAULT = 380;
 export const PANEL_STEP = 16;
-const PANEL_MIN = 320;
+export const PANEL_MIN = 320;
 
 export function readPref<T>(key: string, parse: (raw: string) => T | undefined, fallback: T): T {
   try {
@@ -32,6 +32,10 @@ export function readTheme(): Theme {
 }
 
 /** Panel width between 320 px and half the window; the minimum wins on a narrow window. */
+export function maxPanelWidth(windowWidth: number): number {
+  return Math.max(PANEL_MIN, Math.floor(windowWidth * 0.5));
+}
+
 export function clampPanelWidth(width: number, windowWidth: number): number {
   return Math.max(PANEL_MIN, Math.min(width, windowWidth * 0.5));
 }
