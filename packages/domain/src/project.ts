@@ -3,7 +3,7 @@ import { DesignToggles } from './toggles.js';
 import { ModelChoice } from './models.js';
 
 /** Current project schema version. Bump with a migration in `migrate.ts`. */
-export const PROJECT_SCHEMA_VERSION = '1.3.0';
+export const PROJECT_SCHEMA_VERSION = '1.4.0';
 
 export const ProviderId = z.enum(['aws', 'azure', 'gcp']);
 export type ProviderId = z.infer<typeof ProviderId>;
@@ -73,6 +73,7 @@ const NodeBase = z.object({
   configuration: Configuration.optional(),
   containerId: Id.optional(),
   position: Position,
+  size: Size.optional(),
 });
 
 /**

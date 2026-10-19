@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyPatch,
+  graphContentHash,
   migrateProject,
   Project,
   PROJECT_SCHEMA_VERSION,
@@ -450,12 +451,37 @@ describe('migrateProject', () => {
     expect(p.nodes).toEqual(base().nodes);
   });
 
-  it('upgrades 1.2.0 projects to 1.3.0 unchanged otherwise', () => {
-    expect(PROJECT_SCHEMA_VERSION).toBe('1.3.0');
+  it('upgrades 1.2.0 projects to the current schema unchanged otherwise', () => {
+    expect(PROJECT_SCHEMA_VERSION).toBe('1.4.0');
     const v12 = { ...base(), schemaVersion: '1.2.0' };
     const p = migrateProject(v12);
-    expect(p.schemaVersion).toBe('1.3.0');
-    expect(p).toEqual(Project.parse({ ...base(), schemaVersion: '1.3.0' }));
+    expect(p.schemaVersion).toBe('1.4.0');
+    expect(p).toEqual(Project.parse({ ...base(), schemaVersion: '1.4.0' }));
+  });
+
+  it('migrates 1.3.0 projects to 1.4.0 without changing nodes', () => {
+    const node = {
+      id: 'api',
+      provider: 'aws',
+      serviceId: 'aws.apigateway',
+      label: 'API',
+      requirementIds: [],
+      containerId: 'region',
+      position: { x: 10, y: 20 },
+    };
+    const v13 = { ...base(), schemaVersion: '1.3.0', nodes: [node] };
+    const p = migrateProject(v13);
+    expect(p.schemaVersion).toBe('1.4.0');
+    expect(p.nodes[0]).toEqual(node);
+  });
+
+  it('keeps a node size and ignores it in the content hash', () => {
+    const withSize = Project.parse({
+      ...base(),
+      nodes: [{ ...base().nodes[0], size: { width: 300, height: 90 } }],
+    });
+    expect(withSize.nodes[0]).toHaveProperty('size', { width: 300, height: 90 });
+    expect(graphContentHash(withSize)).toBe(graphContentHash(base()));
   });
 
   it('rejects unknown versions', () => {
