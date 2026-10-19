@@ -43,12 +43,14 @@
 ### Task 1: Store node sizes (schema 1.4.0)
 
 **Files:**
+
 - Modify: `packages/domain/src/project.ts` (add `size: Size.optional()` to `NodeBase`; `PROJECT_SCHEMA_VERSION = '1.4.0'`)
 - Modify: `packages/domain/src/migrate.ts` (step `1.3.0 → 1.4.0`, nothing to rewrite; add a line to the doc comment)
 - Modify: `packages/catalog/samples/myblog.project.json`, `eval/candidates/myblog.project.json` (`"schemaVersion": "1.4.0"`)
 - Test: `packages/domain/src/domain.test.ts`
 
 **Interfaces:**
+
 - Produces: `ArchNode.size?: { width: number; height: number }` and `PROJECT_SCHEMA_VERSION === '1.4.0'`. `graphContentHash` already ignores `size`, so leave it as it is.
 
 - [ ] **Step 1: Write the failing tests** in `domain.test.ts`:
@@ -63,10 +65,12 @@
 ### Task 2: Readable layout with routed, labelled edges
 
 **Files:**
+
 - Modify: `apps/web/src/layout.ts`
 - Test: `apps/web/src/layout.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ArchNode.size` from Task 1.
 - Produces, all exported from `layout.ts`:
   - `NODE_SIZE = { width: 220, height: 72 }` and `LEGACY_NODE_SIZE = { width: 168, height: 64 }`.
@@ -86,6 +90,7 @@
     - `elk.layered.spacing.edgeNodeBetweenLayers: 24`
 
     Each ELK edge gets `labels: [{ text, ...labelSize(text) }]` when it has a label. Use the same label text that `toFlow` shows.
+
   - `toElkGraph(project)` uses `node.size ?? NODE_SIZE` for node dimensions. Auto layout resets sizes, so pass `NODE_SIZE` always. Keep the signature.
   - `toFlow(project, displayName, routes?: Routes)` does the following:
     - Service nodes get `style: { width, height }` from `node.size ?? LEGACY_NODE_SIZE`.
@@ -116,10 +121,12 @@
 ### Task 3: Routed edges, wrapping nodes, resizing, and fit to view
 
 **Files:**
+
 - Create: `apps/web/src/edges.tsx`
 - Modify: `apps/web/src/nodes.tsx`, `apps/web/src/App.tsx`, `apps/web/src/styles.css`
 
 **Interfaces:**
+
 - Consumes: `Routes`, `EdgeRoute`, `dropRoutes`, `containerMinSize`, `MIN_NODE_SIZE`, `toFlow(…, routes)` and `applyLayout(...) → { project, routes }` from Task 2.
 - Produces:
   - `RoutedEdge`, which `edgeTypes = { routed: RoutedEdge }` exports from `edges.tsx`.
@@ -154,10 +161,12 @@
 ### Task 4: Theme switch, resizable sticky panel, collapsible sections
 
 **Files:**
+
 - Create: `apps/web/src/prefs.ts` and `apps/web/src/prefs.test.ts`
 - Modify: `apps/web/src/App.tsx`, `apps/web/src/models.tsx` (`AiModelPanel` wraps in a section), `apps/web/src/VersionsPanel.tsx`, `apps/web/src/styles.css`, `apps/web/index.html` (`<html data-theme="light">`)
 
 **Interfaces:**
+
 - Produces, from `prefs.ts`:
   - `readPref<T>(key: string, parse: (raw: string) => T | undefined, fallback: T): T`;
   - `writePref(key: string, value: string): void`, which swallows errors;
@@ -193,10 +202,12 @@
 ### Task 5: Clear generation status
 
 **Files:**
+
 - Create: `apps/web/src/GenerationStatus.tsx` and `apps/web/src/status.test.ts`
 - Modify: `apps/web/src/App.tsx` (`STAGE` becomes step ids), `apps/web/src/GeneratePanel.tsx`, `apps/web/src/styles.css`
 
 **Interfaces:**
+
 - Produces:
   - `type StepId = 'reading' | 'designing' | 'checking'`.
   - `STEPS: { id: StepId; label: string }[]`, with these labels verbatim: "Reading your requirements", "Designing the architecture", "Checking the design".
@@ -217,6 +228,7 @@
     - a Cancel button when cancellable.
 
     The current step label sits in a `role="status" aria-live="polite"` element, and the timer is outside it.
+
   - **`App.tsx`:**
     - Track `step` and `startedAt`.
     - Reading switches to designing after `DESIGNING_AFTER_MS` or when the response arrives, and switches to checking while `showGenerated` runs.
