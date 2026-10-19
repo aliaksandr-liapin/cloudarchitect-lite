@@ -49,6 +49,16 @@ import {
   type ProjectVersion,
   type ReplaceUi,
 } from './versions';
+import {
+  clampPanelWidth,
+  PANEL_STEP,
+  PANEL_WIDTH_KEY,
+  readPanelWidth,
+  readTheme,
+  THEME_KEY,
+  writePref,
+  type Theme,
+} from './prefs';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -107,6 +117,11 @@ export function App() {
   const [clarify, setClarify] = useState<Questions>();
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [winWidth, setWinWidth] = useState(() => window.innerWidth);
+  /** Counts versions saved by the replace step or Restore; opens the Versions section. */
+  const [versionsAdded, setVersionsAdded] = useState(0);
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   /** The request can still be aborted (false once its response has arrived). */
   const [cancellable, setCancellable] = useState(false);
@@ -193,6 +208,25 @@ export function App() {
   }, []);
 
   const projectId = project?.projectId;
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    writePref(THEME_KEY, next);
+  };
+
+  const sideWidth = clampPanelWidth(panelWidth, winWidth);
+  const persistWidth = () => writePref(PANEL_WIDTH_KEY, String(Math.round(sideWidth)));
+
   const refreshVersions = useCallback(async (id: string) => {
     setVersions(
       await versionStore()
@@ -262,7 +296,10 @@ export function App() {
     if (preparedRef.current && preparedRef.current.project === current) return true;
     const kept = await prepareReplace(versionStore(), current, replaceUi);
     if (!kept) return false;
-    if (kept.saved && current) await refreshVersions(current.projectId);
+    if (kept.saved && current) {
+      await refreshVersions(current.projectId);
+      setVersionsAdded((n) => n + 1);
+    }
     preparedRef.current = { ...kept, project: current };
     return true;
   };
@@ -292,7 +329,10 @@ export function App() {
       setToast(undefined);
       const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
-      if (kept.saved && current) await refreshVersions(current.projectId);
+      if (kept.saved && current) {
+        await refreshVersions(current.projectId);
+        setVersionsAdded((n) => n + 1);
+      }
       await commit(
         {
           ...migrateProject(v.project),
@@ -535,6 +575,9 @@ export function App() {
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
+        <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
         <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
         </button>
@@ -574,7 +617,10 @@ export function App() {
           {error}
         </div>
       )}
-      <main className="main">
+      <main
+        className="main"
+        style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
+      >
         <section className="canvas" aria-label="Architecture canvas">
           {clarify && (
             <div className="overlay">
@@ -602,7 +648,7 @@ export function App() {
             fitView
             fitViewOptions={FIT}
             minZoom={0.2}
-            colorMode="system"
+            colorMode={theme}
           >
             <Background />
             <MiniMap pannable zoomable />
@@ -610,38 +656,66 @@ export function App() {
           </ReactFlow>
         </section>
         <aside className="side">
-          <GeneratePanel
-            hasDiagram={Boolean(project?.nodes.length)}
-            busy={busy}
-            cancellable={cancellable}
-            stage={stage}
-            onGenerate={generate}
-            onCancel={cancel}
+          <div
+            className="resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize panel"
+            aria-valuenow={Math.round(sideWidth)}
+            tabIndex={0}
+            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+            onPointerMove={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId))
+                setPanelWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+            }}
+            onPointerUp={persistWidth}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
+              setPanelWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
+            }}
+            onKeyUp={persistWidth}
           />
-          {project && selected && (
-            <Details project={project} id={selected} onRename={rename} disabled={busy} />
-          )}
-          <section>
-            <h2>Findings ({findings.length})</h2>
-            {findings.length === 0 && <p className="muted">No rule findings.</p>}
-            <ul className="findings">
-              {findings.map((f) => (
-                <li key={f.id} className={`sev-${f.severity}`}>
-                  <button className="link" onClick={() => locate(f)}>
-                    <span className="badge">{f.severity}</span> {f.ruleId}
-                  </button>
-                  <div>{f.explanation}</div>
-                  {f.remediation && <div className="muted">{f.remediation}</div>}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <VersionsPanel versions={versions} onRestore={restore} disabled={busy} />
-          <AiModelPanel />
-          <p className="muted small">
-            Generated designs require professional review before production use. Icons shown are
-            generic placeholders until the official packs are imported.
-          </p>
+          <div className="side-scroll">
+            <GeneratePanel
+              hasDiagram={Boolean(project?.nodes.length)}
+              busy={busy}
+              cancellable={cancellable}
+              stage={stage}
+              onGenerate={generate}
+              onCancel={cancel}
+            />
+            {project && selected && (
+              <Details project={project} id={selected} onRename={rename} disabled={busy} />
+            )}
+            <section>
+              <h2>Findings ({findings.length})</h2>
+              {findings.length === 0 && <p className="muted">No rule findings.</p>}
+              <ul className="findings">
+                {findings.map((f) => (
+                  <li key={f.id} className={`sev-${f.severity}`}>
+                    <button className="link" onClick={() => locate(f)}>
+                      <span className="badge">{f.severity}</span> {f.ruleId}
+                    </button>
+                    <div>{f.explanation}</div>
+                    {f.remediation && <div className="muted">{f.remediation}</div>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <VersionsPanel
+              versions={versions}
+              onRestore={restore}
+              disabled={busy}
+              openSignal={versionsAdded}
+            />
+            <AiModelPanel />
+            <p className="muted small">
+              Generated designs require professional review before production use. Icons shown are
+              generic placeholders until the official packs are imported.
+            </p>
+          </div>
         </aside>
       </main>
       {toast && (

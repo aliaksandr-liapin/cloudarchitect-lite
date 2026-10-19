@@ -1,6 +1,7 @@
 import { MODEL_OPTIONS, type ModelChoice, type ModelOption } from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { Collapsible } from './Collapsible';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const usd = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(3)}`);
@@ -130,8 +131,7 @@ export function AiModelPanel() {
   };
 
   return (
-    <section>
-      <h2>AI model</h2>
+    <Collapsible id="model" title="AI model" defaultOpen={false}>
       {offline && (
         <p className="muted small">AI service unavailable — manual editing still works.</p>
       )}
@@ -140,6 +140,6 @@ export function AiModelPanel() {
         enabled={enabled}
         onSelect={offline ? undefined : select}
       />
-    </section>
+    </Collapsible>
   );
 }
