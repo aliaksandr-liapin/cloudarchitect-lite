@@ -1,9 +1,34 @@
-import type { ArchNode, Container, Project } from '@cloudarchitect/domain';
+import type { ArchEdge, ArchNode, Container, Project } from '@cloudarchitect/domain';
 import type { Edge, Node } from '@xyflow/react';
-import type { ElkNode } from 'elkjs/lib/elk-api.js';
+import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api.js';
 
-export const NODE_SIZE = { width: 168, height: 64 };
-const CONTAINER_PADDING = '[top=40,left=16,bottom=16,right=16]';
+/** Size `applyLayout` gives every service node. */
+export const NODE_SIZE = { width: 220, height: 72 };
+/** Size of a node saved before nodes stored a size, so old positions don't overlap. */
+export const LEGACY_NODE_SIZE = { width: 168, height: 64 };
+export const MIN_NODE_SIZE = { width: 160, height: 56 };
+export const MIN_CONTAINER_SIZE = { width: 160, height: 80 };
+export const CONTAINER_PAD = { top: 40, left: 16, right: 16, bottom: 16 };
+const CONTAINER_PADDING = `[top=${CONTAINER_PAD.top},left=${CONTAINER_PAD.left},bottom=${CONTAINER_PAD.bottom},right=${CONTAINER_PAD.right}]`;
+
+/** An ELK edge route in absolute flow coordinates: start, bend points, end, plus the label box. */
+export type EdgeRoute = {
+  points: { x: number; y: number }[];
+  label?: { x: number; y: number; width: number; height: number };
+};
+/** Routes from one layout pass, keyed by edge id. Kept in memory only. */
+export type Routes = ReadonlyMap<string, EdgeRoute>;
+
+const LABEL_MAX_WIDTH = 160;
+/** Estimated label box: 7 px per character, wrapping at 160 px over at most 2 lines of 16 px, plus 4 px. */
+export function labelSize(text: string): { width: number; height: number } {
+  const raw = text.length * 7;
+  const lines = Math.min(2, Math.max(1, Math.ceil(raw / LABEL_MAX_WIDTH)));
+  return { width: Math.min(LABEL_MAX_WIDTH, raw), height: lines * 16 + 4 };
+}
+
+/** The label text shown on an edge, shared by layout and rendering. */
+const edgeLabel = (e: ArchEdge) => e.label ?? (e.kind === 'other' ? undefined : e.kind);
 
 export type ServiceNodeData = {
   node: ArchNode;
@@ -26,6 +51,7 @@ export function toElkGraph(project: Project): ElkNode {
   for (const c of project.containers) {
     push(c.parentId, { id: c.id, layoutOptions: { 'elk.padding': CONTAINER_PADDING } });
   }
+  // Auto layout resets hand-made sizes, so every node is laid out at the default size.
   for (const n of project.nodes) push(n.containerId, { id: n.id, ...NODE_SIZE });
 
   const attach = (n: ElkNode): ElkNode => ({
@@ -39,11 +65,26 @@ export function toElkGraph(project: Project): ElkNode {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-      'elk.spacing.nodeNode': '40',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '64',
+      'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.json.edgeCoords': 'ROOT',
+      'elk.edgeLabels.placement': 'CENTER',
+      'elk.spacing.nodeNode': '48',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '96',
+      'elk.spacing.edgeNode': '24',
+      'elk.spacing.edgeEdge': '16',
+      'elk.spacing.edgeLabel': '8',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '24',
     },
     children: (children.get(undefined) ?? []).map(attach),
-    edges: project.edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: project.edges.map((e) => {
+      const text = edgeLabel(e);
+      return {
+        id: e.id,
+        sources: [e.source],
+        targets: [e.target],
+        ...(text ? { labels: [{ text, ...labelSize(text) }] } : {}),
+      };
+    }),
   };
 }
 
@@ -51,27 +92,99 @@ export function toElkGraph(project: Project): ElkNode {
 export const needsLayout = (p: Project) => p.containers.some((c) => !c.size || !c.position);
 
 /**
- * Runs ELK and writes positions (relative to the parent container) and container sizes back into the project.
+ * Runs ELK and writes positions (relative to the parent container), node sizes and container sizes back
+ * into the project, and returns each edge's route in absolute coordinates (`edgeCoords: ROOT`).
  * Only called on first load or when the user asks for auto-layout, so manual positions are never lost (FR-006).
  */
-export async function applyLayout(project: Project): Promise<Project> {
+export async function applyLayout(project: Project): Promise<{ project: Project; routes: Routes }> {
   const laid = await (await getElk()).layout(toElkGraph(project));
   const boxes = new Map<string, ElkNode>();
+  const elkEdges: ElkExtendedEdge[] = [...(laid.edges ?? [])];
   const visit = (n: ElkNode) => {
     boxes.set(n.id, n);
+    elkEdges.push(...(n.edges ?? []));
     n.children?.forEach(visit);
   };
   laid.children?.forEach(visit);
 
+  const routes = new Map<string, EdgeRoute>();
+  for (const e of elkEdges) {
+    const s = e.sections?.[0];
+    if (!s) continue;
+    const l = e.labels?.[0];
+    routes.set(e.id, {
+      points: [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map(({ x, y }) => ({ x, y })),
+      ...(l
+        ? { label: { x: l.x ?? 0, y: l.y ?? 0, width: l.width ?? 0, height: l.height ?? 0 } }
+        : {}),
+    });
+  }
+
   const pos = (id: string) => ({ x: boxes.get(id)?.x ?? 0, y: boxes.get(id)?.y ?? 0 });
   return {
-    ...project,
-    containers: project.containers.map((c) => ({
-      ...c,
-      position: pos(c.id),
-      size: { width: boxes.get(c.id)?.width ?? 200, height: boxes.get(c.id)?.height ?? 120 },
-    })),
-    nodes: project.nodes.map((n) => ({ ...n, position: pos(n.id) })),
+    project: {
+      ...project,
+      containers: project.containers.map((c) => ({
+        ...c,
+        position: pos(c.id),
+        size: { width: boxes.get(c.id)?.width ?? 200, height: boxes.get(c.id)?.height ?? 120 },
+      })),
+      nodes: project.nodes.map((n) => ({ ...n, position: pos(n.id), size: { ...NODE_SIZE } })),
+    },
+    routes,
+  };
+}
+
+/** Whether `containerId` is `ancestor` or sits (at any depth) inside it. */
+const within = (project: Project, containerId: string | undefined, ancestor: string) => {
+  const seen = new Set<string>();
+  for (
+    let id = containerId;
+    id && !seen.has(id);
+    id = project.containers.find((c) => c.id === id)?.parentId
+  ) {
+    if (id === ancestor) return true;
+    seen.add(id);
+  }
+  return false;
+};
+
+/**
+ * Drops the routes a hand move or resize made stale: edges whose source or target changed, or whose
+ * endpoint sits (at any depth) inside a changed container.
+ */
+export function dropRoutes(
+  routes: Routes,
+  project: Project,
+  changedIds: readonly string[],
+): Routes {
+  const changed = new Set(changedIds);
+  const containerOf = new Map(project.nodes.map((n) => [n.id, n.containerId]));
+  const stale = (nodeId: string) =>
+    changed.has(nodeId) || changedIds.some((c) => within(project, containerOf.get(nodeId), c));
+  const kept = new Map(routes);
+  for (const e of project.edges) if (stale(e.source) || stale(e.target)) kept.delete(e.id);
+  return kept;
+}
+
+/** Smallest size a container can be resized to: its direct children's bounding box plus padding. */
+export function containerMinSize(
+  project: Project,
+  containerId: string,
+): { width: number; height: number } {
+  const boxes = [
+    ...project.nodes
+      .filter((n) => n.containerId === containerId)
+      .map((n) => ({ ...n.position, ...(n.size ?? LEGACY_NODE_SIZE) })),
+    ...project.containers
+      .filter((c) => c.parentId === containerId && c.position && c.size)
+      .map((c) => ({ ...c.position!, ...c.size! })),
+  ];
+  const right = Math.max(0, ...boxes.map((b) => b.x + b.width)) + CONTAINER_PAD.right;
+  const bottom = Math.max(0, ...boxes.map((b) => b.y + b.height)) + CONTAINER_PAD.bottom;
+  return {
+    width: Math.max(MIN_CONTAINER_SIZE.width, right),
+    height: Math.max(MIN_CONTAINER_SIZE.height, bottom),
   };
 }
 
@@ -79,6 +192,7 @@ export async function applyLayout(project: Project): Promise<Project> {
 export function toFlow(
   project: Project,
   displayName: (serviceId: string) => string,
+  routes?: Routes,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const parented = (parentId?: string) => (parentId ? { parentId, extent: 'parent' as const } : {});
@@ -101,6 +215,7 @@ export function toFlow(
       id: n.id,
       type: 'service',
       position: n.position,
+      style: { ...(n.size ?? LEGACY_NODE_SIZE) },
       data: {
         node: n,
         displayName: n.serviceId
@@ -118,7 +233,8 @@ export function toFlow(
     id: e.id,
     source: e.source,
     target: e.target,
-    label: e.label ?? (e.kind === 'other' ? undefined : e.kind),
+    type: 'routed',
+    data: { route: routes?.get(e.id), label: edgeLabel(e) },
     animated: e.kind === 'event',
   }));
   return { nodes, edges };

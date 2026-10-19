@@ -112,7 +112,7 @@ export function App() {
 
   /** Single entry point for project changes: lay out if needed, persist, re-render. */
   const commit = useCallback(async (next: Project, forceLayout = false) => {
-    const laid = forceLayout || needsLayout(next) ? await applyLayout(next) : next;
+    const laid = forceLayout || needsLayout(next) ? (await applyLayout(next)).project : next;
     projectRef.current = laid;
     setProject(laid);
     setNodes(toFlow(laid, displayName).nodes);
