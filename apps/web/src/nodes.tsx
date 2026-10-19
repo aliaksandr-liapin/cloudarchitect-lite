@@ -9,6 +9,8 @@ export type EditableData = {
   onResized?: (id: string, rect: ResizeRect) => void;
   /** Containers only: the smallest box that still holds their children. */
   minSize?: { width: number; height: number };
+  /** Containers only: whether a proposed box still holds the children plus padding. */
+  fits?: (rect: ResizeRect) => boolean;
 };
 
 /**
@@ -46,7 +48,8 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
 }
 
 export function ContainerNode({ id, data, selected }: NodeProps) {
-  const { container, resizable, onResized, minSize } = data as ContainerNodeData & EditableData;
+  const { container, resizable, onResized, minSize, fits } = data as ContainerNodeData &
+    EditableData;
   const subnet = container.properties?.subnetType;
   return (
     <div
@@ -56,6 +59,7 @@ export function ContainerNode({ id, data, selected }: NodeProps) {
         isVisible={Boolean(selected && resizable)}
         minWidth={minSize?.width ?? MIN_CONTAINER_SIZE.width}
         minHeight={minSize?.height ?? MIN_CONTAINER_SIZE.height}
+        shouldResize={(_, p) => fits?.(p) ?? true}
         onResizeEnd={(_, p) => onResized?.(id, p)}
       />
       <div className="ctr-label">

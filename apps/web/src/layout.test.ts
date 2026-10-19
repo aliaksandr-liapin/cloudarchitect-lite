@@ -5,6 +5,7 @@ import {
   applyLayout,
   containerMinSize,
   dropRoutes,
+  fitsChildren,
   labelSize,
   needsLayout,
   NODE_SIZE,
@@ -145,5 +146,50 @@ describe('layout', () => {
       expect(min.width).toBeGreaterThanOrEqual(c.x + c.width + 16);
       expect(min.height).toBeGreaterThanOrEqual(c.y + c.height + 16);
     }
+  });
+
+  it('a container resize must keep its children inside the padding', async () => {
+    const laid = (await applyLayout(project)).project;
+    const region = laid.containers.find((c) => c.id === 'region')!;
+    const box = { ...region.position!, ...region.size! };
+    expect(fitsChildren(laid, 'region', box)).toBe(true);
+    // Grow from the left and top: children shift right and down inside the box.
+    expect(
+      fitsChildren(laid, 'region', {
+        ...box,
+        x: box.x - 50,
+        y: box.y - 50,
+        width: box.width + 50,
+        height: box.height + 50,
+      }),
+    ).toBe(true);
+    // Shrink from the top into the 40 px label band.
+    expect(fitsChildren(laid, 'region', { ...box, y: box.y + 30, height: box.height - 30 })).toBe(
+      false,
+    );
+    // Shrink from the left into the 16 px pad.
+    expect(fitsChildren(laid, 'region', { ...box, x: box.x + 10, width: box.width - 10 })).toBe(
+      false,
+    );
+    // Shrink from the right past the children.
+    expect(fitsChildren(laid, 'region', { ...box, width: box.width / 4 })).toBe(false);
+  });
+
+  it('a container resize does not reject a child that was already in the padding', () => {
+    const p: Project = {
+      ...project,
+      containers: [
+        { ...project.containers[0]!, position: { x: 0, y: 0 }, size: { width: 400, height: 300 } },
+      ],
+    };
+    const id = p.containers[0]!.id;
+    p.nodes = p.nodes.map((n, i) =>
+      i === 0
+        ? { ...n, containerId: id, position: { x: 4, y: 10 }, size: { width: 100, height: 60 } }
+        : { ...n, containerId: undefined },
+    );
+    p.containers[0] = { ...p.containers[0]!, parentId: undefined };
+    expect(fitsChildren(p, id, { x: 0, y: 0, width: 300, height: 200 })).toBe(true);
+    expect(fitsChildren(p, id, { x: 2, y: 0, width: 398, height: 300 })).toBe(false);
   });
 });

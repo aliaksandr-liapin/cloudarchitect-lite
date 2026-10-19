@@ -31,6 +31,7 @@ import {
   applyLayout,
   containerMinSize,
   dropRoutes,
+  fitsChildren,
   needsLayout,
   toFlow,
   type Routes,
@@ -142,7 +143,11 @@ export function App() {
       if (opts.fit) fitPendingRef.current = true;
       const flow = toFlow(laid, displayName, routes);
       setProject(laid);
-      setNodes(flow.nodes);
+      // Keep the selection (and so the resize handles and Details) across a commit.
+      setNodes((current) => {
+        const selected = new Set(current.filter((n) => n.selected).map((n) => n.id));
+        return flow.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+      });
       setEdges(flow.edges);
       if (storageDownRef.current) return;
       await saveProject(laid).catch(() =>
@@ -484,7 +489,10 @@ export function App() {
           resizable: !busy,
           onResized,
           ...(n.type === 'container' && project
-            ? { minSize: containerMinSize(project, n.id) }
+            ? {
+                minSize: containerMinSize(project, n.id),
+                fits: (rect: ResizeRect) => fitsChildren(project, n.id, rect),
+              }
             : {}),
         };
         return { ...n, data: { ...n.data, ...editable } };

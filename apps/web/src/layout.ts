@@ -168,25 +168,57 @@ export function dropRoutes(
   return kept;
 }
 
+/** Boxes of a container's direct children, relative to the container. */
+const childBoxes = (project: Project, containerId: string) => [
+  ...project.nodes
+    .filter((n) => n.containerId === containerId)
+    .map((n) => ({ ...n.position, ...(n.size ?? LEGACY_NODE_SIZE) })),
+  ...project.containers
+    .filter((c) => c.parentId === containerId && c.position && c.size)
+    .map((c) => ({ ...c.position!, ...c.size! })),
+];
+
 /** Smallest size a container can be resized to: its direct children's bounding box plus padding. */
 export function containerMinSize(
   project: Project,
   containerId: string,
 ): { width: number; height: number } {
-  const boxes = [
-    ...project.nodes
-      .filter((n) => n.containerId === containerId)
-      .map((n) => ({ ...n.position, ...(n.size ?? LEGACY_NODE_SIZE) })),
-    ...project.containers
-      .filter((c) => c.parentId === containerId && c.position && c.size)
-      .map((c) => ({ ...c.position!, ...c.size! })),
-  ];
+  const boxes = childBoxes(project, containerId);
   const right = Math.max(0, ...boxes.map((b) => b.x + b.width)) + CONTAINER_PAD.right;
   const bottom = Math.max(0, ...boxes.map((b) => b.y + b.height)) + CONTAINER_PAD.bottom;
   return {
     width: Math.max(MIN_CONTAINER_SIZE.width, right),
     height: Math.max(MIN_CONTAINER_SIZE.height, bottom),
   };
+}
+
+/**
+ * Whether a proposed container box (`rect`, in its parent's coordinates) still holds its direct
+ * children plus the padding. Left and top handles move the origin, so children are measured from the
+ * new origin. A child already closer to an edge than the padding only bounds that edge where it is.
+ */
+export function fitsChildren(
+  project: Project,
+  containerId: string,
+  rect: { x: number; y: number; width: number; height: number },
+): boolean {
+  const container = project.containers.find((c) => c.id === containerId);
+  const old = container?.position ?? { x: 0, y: 0 };
+  const size = container?.size ?? { width: rect.width, height: rect.height };
+  const boxes = childBoxes(project, containerId);
+  if (!boxes.length) return true;
+  const left = Math.min(...boxes.map((b) => b.x));
+  const top = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height));
+  const dx = rect.x - old.x;
+  const dy = rect.y - old.y;
+  return (
+    left - dx >= Math.min(CONTAINER_PAD.left, left) &&
+    top - dy >= Math.min(CONTAINER_PAD.top, top) &&
+    rect.width - (right - dx) >= Math.min(CONTAINER_PAD.right, size.width - right) &&
+    rect.height - (bottom - dy) >= Math.min(CONTAINER_PAD.bottom, size.height - bottom)
+  );
 }
 
 /** Converts stored project geometry to React Flow nodes. Parents must precede children, so containers go depth-first. */
