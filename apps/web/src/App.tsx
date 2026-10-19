@@ -1,5 +1,6 @@
 import { awsCatalog, samples } from '@cloudarchitect/catalog';
 import {
+  MODEL_OPTIONS,
   migrateProject,
   validateProject,
   type Finding,
@@ -14,6 +15,8 @@ import {
   MiniMap,
   ReactFlow,
   applyNodeChanges,
+  type Edge,
+  type FitViewOptions,
   type Node,
   type NodeChange,
   type ReactFlowInstance,
@@ -24,9 +27,20 @@ import { api, ApiError } from './api';
 import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
 import { GeneratePanel, type GenerateInput } from './GeneratePanel';
-import { applyLayout, needsLayout, toFlow } from './layout';
+import type { StepId } from './GenerationStatus';
+import { edgeTypes } from './edges';
+import {
+  applyLayout,
+  containerMinSize,
+  dropRoutes,
+  fitsChildren,
+  needsLayout,
+  recoverRoutes,
+  toFlow,
+  type Routes,
+} from './layout';
 import { AiModelPanel, readModelChoice } from './models';
-import { nodeTypes } from './nodes';
+import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
   idbVersionStore,
@@ -37,6 +51,18 @@ import {
   type ProjectVersion,
   type ReplaceUi,
 } from './versions';
+import {
+  clampPanelWidth,
+  maxPanelWidth,
+  PANEL_MIN,
+  PANEL_STEP,
+  PANEL_WIDTH_KEY,
+  readPanelWidth,
+  readTheme,
+  THEME_KEY,
+  writePref,
+  type Theme,
+} from './prefs';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -44,11 +70,6 @@ const displayName = (id: string) => services.get(id)?.displayName ?? id;
 
 type Questions = Extract<GenerateResponse, { status: 'questions' }>;
 
-const STAGE = {
-  reading: 'Reading your requirements…',
-  designing: 'Designing…',
-  checking: 'Checking…',
-} as const;
 /** Extraction is quick; after this the request is almost always in the generation step. */
 const DESIGNING_AFTER_MS = 8000;
 const CANCELLED = 'Generation cancelled — no credit used.';
@@ -77,19 +98,30 @@ const STORAGE_DIALOG: DialogSpec = {
 
 type Toast = { text: string; restore?: ProjectVersion };
 
+/** Fit the whole diagram with padding, never zooming past 100 %. */
+const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
+const NO_ROUTES: Routes = new Map();
+
 export function App() {
   const [project, setProject] = useState<Project>();
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
-  const [stage, setStage] = useState<string>();
+  const [step, setStep] = useState<StepId>();
+  const [startedAt, setStartedAt] = useState<number>();
   /** Startup could not read browser storage: edit in memory only, never save over the stored project. */
   const [storageDown, setStorageDown] = useState(false);
   const storageDownRef = useRef(false);
   const [clarify, setClarify] = useState<Questions>();
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [winWidth, setWinWidth] = useState(() => window.innerWidth);
+  /** Counts versions saved by the replace step or Restore; opens the Versions section. */
+  const [versionsAdded, setVersionsAdded] = useState(0);
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   /** The request can still be aborted (false once its response has arrived). */
   const [cancellable, setCancellable] = useState(false);
@@ -98,8 +130,10 @@ export function App() {
   const replacingRef = useRef(false);
   const dialogOpenRef = useRef(false);
   const flowRef = useRef<ReactFlowInstance>(undefined);
-  /** Fit the viewport once the next committed nodes render (new diagram from generation or Restore). */
+  /** Fit the viewport once the next committed nodes render (generation, Restore, Import, Auto layout). */
   const fitPendingRef = useRef(false);
+  /** ELK edge routes of the last layout pass, minus those a hand move or resize made stale. */
+  const routesRef = useRef<Routes>(NO_ROUTES);
   const fileInput = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const abortRef = useRef<AbortController>(undefined);
@@ -110,24 +144,58 @@ export function App() {
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
 
-  /** Single entry point for project changes: lay out if needed, persist, re-render. */
-  const commit = useCallback(async (next: Project, forceLayout = false) => {
-    const laid = forceLayout || needsLayout(next) ? await applyLayout(next) : next;
-    projectRef.current = laid;
-    setProject(laid);
-    setNodes(toFlow(laid, displayName).nodes);
-    if (storageDownRef.current) return;
-    await saveProject(laid).catch(() =>
-      setError('Could not save to browser storage — export JSON as a backup.'),
-    );
-  }, []);
+  /**
+   * Single entry point for project changes: lay out if needed, persist, re-render. A layout pass
+   * replaces the routes; otherwise `opts.routes` (default: the current ones) is drawn. `opts.recover`
+   * (a loaded, imported or restored diagram) starts without routes and draws the ones
+   * `recoverRoutes` finds still valid. `opts.fit` fits the viewport once the result renders.
+   */
+  const commit = useCallback(
+    async (
+      next: Project,
+      forceLayout = false,
+      opts: { routes?: Routes; recover?: boolean; fit?: boolean } = {},
+    ) => {
+      let laid = next;
+      let routes = opts.recover ? NO_ROUTES : (opts.routes ?? routesRef.current);
+      const layout = forceLayout || needsLayout(next);
+      if (layout) ({ project: laid, routes } = await applyLayout(next));
+      routesRef.current = routes;
+      projectRef.current = laid;
+      if (opts.fit) fitPendingRef.current = true;
+      const flow = toFlow(laid, displayName, routes);
+      setProject(laid);
+      // Keep the selection (and so the resize handles and Details) across a commit.
+      setNodes((current) => {
+        const selected = new Set(current.filter((n) => n.selected).map((n) => n.id));
+        return flow.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+      });
+      setEdges(flow.edges);
+      if (opts.recover && !layout) {
+        void recoverRoutes(laid).then(
+          (recovered) => {
+            // A newer commit owns the diagram (and its routes) now.
+            if (projectRef.current !== laid) return;
+            routesRef.current = recovered;
+            setEdges(toFlow(laid, displayName, recovered).edges);
+          },
+          () => undefined,
+        );
+      }
+      if (storageDownRef.current) return;
+      await saveProject(laid).catch(() =>
+        setError('Could not save to browser storage — export JSON as a backup.'),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const sample = migrateProject(samples.myblog);
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
-      return commit(project);
+      return commit(project, false, { recover: true });
     });
   }, [commit]);
 
@@ -140,6 +208,35 @@ export function App() {
   }, []);
 
   const projectId = project?.projectId;
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    writePref(THEME_KEY, next);
+  };
+
+  const sideWidth = clampPanelWidth(panelWidth, winWidth);
+  // Persist the width the user chose (not one a narrow window merely clamped), and only if a gesture changed it.
+  const widthChangedRef = useRef(false);
+  const chooseWidth = (width: number) => {
+    widthChangedRef.current = true;
+    setPanelWidth(width);
+  };
+  const persistWidth = () => {
+    if (!widthChangedRef.current) return;
+    widthChangedRef.current = false;
+    writePref(PANEL_WIDTH_KEY, String(Math.round(panelWidth)));
+  };
+
   const refreshVersions = useCallback(async (id: string) => {
     setVersions(
       await versionStore()
@@ -162,7 +259,7 @@ export function App() {
     if (!fitPendingRef.current) return;
     fitPendingRef.current = false;
     // React Flow queues this until the new nodes are measured.
-    void flowRef.current?.fitView();
+    void flowRef.current?.fitView({ ...FIT, duration: 300 });
   }, [nodes]);
 
   /** In-app confirmation; resolves with the chosen action's value ('cancel' on Escape). Rejects if one is open. */
@@ -209,7 +306,10 @@ export function App() {
     if (preparedRef.current && preparedRef.current.project === current) return true;
     const kept = await prepareReplace(versionStore(), current, replaceUi);
     if (!kept) return false;
-    if (kept.saved && current) await refreshVersions(current.projectId);
+    if (kept.saved && current) {
+      await refreshVersions(current.projectId);
+      setVersionsAdded((n) => n + 1);
+    }
     preparedRef.current = { ...kept, project: current };
     return true;
   };
@@ -219,8 +319,7 @@ export function App() {
     const current = projectRef.current;
     const saved = preparedRef.current?.saved ?? undefined;
     preparedRef.current = undefined;
-    setStage(STAGE.checking);
-    fitPendingRef.current = true;
+    setStep('checking');
     await commit(
       {
         ...migrateProject(generated),
@@ -228,6 +327,7 @@ export function App() {
         revision: (current?.revision ?? 0) + 1,
       },
       true,
+      { fit: true },
     );
     setToast({ text: 'New diagram generated', restore: saved });
   };
@@ -239,13 +339,19 @@ export function App() {
       setToast(undefined);
       const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
-      if (kept.saved && current) await refreshVersions(current.projectId);
-      fitPendingRef.current = true;
-      await commit({
-        ...migrateProject(v.project),
-        projectId: current?.projectId ?? v.project.projectId,
-        revision: (current?.revision ?? 0) + 1,
-      });
+      if (kept.saved && current) {
+        await refreshVersions(current.projectId);
+        setVersionsAdded((n) => n + 1);
+      }
+      await commit(
+        {
+          ...migrateProject(v.project),
+          projectId: current?.projectId ?? v.project.projectId,
+          revision: (current?.revision ?? 0) + 1,
+        },
+        false,
+        { recover: true, fit: true },
+      );
     }).catch(showError);
 
   const showError = (err: unknown) => {
@@ -254,13 +360,13 @@ export function App() {
   };
 
   /**
-   * Runs one gateway call with stage text and Cancel; handles questions, results and errors.
+   * Runs one gateway call with step status and Cancel; handles questions, results and errors.
    * `fromClarify` (Continue): the clarification card, with the user's answers and edits, stays
    * until the call succeeds, and also after an error a retry can fix.
    */
   const run = async (
     call: (signal: AbortSignal) => Promise<GenerateResponse>,
-    first: string,
+    first: StepId,
     fromClarify = false,
   ) => {
     abortRef.current?.abort();
@@ -269,11 +375,12 @@ export function App() {
     setError(undefined);
     setToast(undefined);
     if (!fromClarify) setClarify(undefined);
-    setStage(first);
+    setStep(first);
+    setStartedAt(Date.now());
     setCancellable(true);
     const timer =
-      first === STAGE.reading
-        ? setTimeout(() => !ac.signal.aborted && setStage(STAGE.designing), DESIGNING_AFTER_MS)
+      first === 'reading'
+        ? setTimeout(() => !ac.signal.aborted && setStep('designing'), DESIGNING_AFTER_MS)
         : undefined;
     try {
       const res = await call(ac.signal);
@@ -282,6 +389,7 @@ export function App() {
       // The response is here: nothing left to cancel, the rest happens in the browser.
       abortRef.current = undefined;
       setCancellable(false);
+      setStep((s) => (s === 'reading' ? 'designing' : s));
       setClarify(res.status === 'questions' ? res : undefined);
       if (res.status === 'done') await showGenerated(res.project);
     } catch (err) {
@@ -291,11 +399,11 @@ export function App() {
       else showError(err);
     } finally {
       clearTimeout(timer);
-      // A newer run owns the stage text; otherwise this run is over.
+      // A newer run owns the step; otherwise this run is over.
       if (abortRef.current === ac || abortRef.current === undefined) {
         abortRef.current = undefined;
         setCancellable(false);
-        setStage(undefined);
+        setStep(undefined);
       }
     }
   };
@@ -320,7 +428,7 @@ export function App() {
             },
             signal,
           ),
-        STAGE.reading,
+        'reading',
       ),
     );
 
@@ -341,7 +449,7 @@ export function App() {
             },
             signal,
           ),
-        STAGE.designing,
+        'designing',
         true,
       ),
     );
@@ -351,7 +459,7 @@ export function App() {
     abortRef.current?.abort();
     abortRef.current = undefined;
     setCancellable(false);
-    setStage(undefined);
+    setStep(undefined);
     setClarify(undefined);
     setToast({ text: CANCELLED });
   };
@@ -367,10 +475,15 @@ export function App() {
     });
   };
 
-  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
-  const busy = stage !== undefined || replacing || dialog !== undefined;
+  // Typical wait for the chosen model (benchmark median), shown next to the timer.
+  const typicalSeconds = Math.round(
+    MODEL_OPTIONS.find((m) => m.id === (readModelChoice() ?? 'haiku'))?.benchmark
+      .medianLatencySeconds ?? 0,
+  );
 
-  const edges = useMemo(() => (project ? toFlow(project, displayName).edges : []), [project]);
+  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
+  const busy = step !== undefined || replacing || dialog !== undefined;
+
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
     [project],
@@ -385,14 +498,82 @@ export function App() {
     (_: unknown, dragged: Node) => {
       if (!project) return;
       const position = dragged.position;
-      void commit({
-        ...project,
-        revision: project.revision + 1,
-        nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-        containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
-      });
+      void commit(
+        {
+          ...project,
+          revision: project.revision + 1,
+          nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
+          containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+        },
+        false,
+        { routes: dropRoutes(routesRef.current, project, [dragged.id]) },
+      );
     },
     [project, commit],
+  );
+
+  /**
+   * A resize is a hand edit like a drag. Left and top handles move the box too; React Flow then shifts
+   * a container's children back by the same amount so they stay put on screen, and so does this.
+   */
+  const onResized = useCallback(
+    (id: string, { x, y, width, height }: ResizeRect) => {
+      const p = projectRef.current;
+      if (!p) return;
+      const box = p.nodes.find((n) => n.id === id) ?? p.containers.find((c) => c.id === id);
+      if (!box) return;
+      const old = box.position ?? { x: 0, y: 0 };
+      if (old.x === x && old.y === y && box.size?.width === width && box.size?.height === height)
+        return;
+      const position = { x, y };
+      const size = { width, height };
+      const shift = (pos: { x: number; y: number }) => ({
+        x: pos.x - (x - old.x),
+        y: pos.y - (y - old.y),
+      });
+      void commit(
+        {
+          ...p,
+          revision: p.revision + 1,
+          nodes: p.nodes.map((n) =>
+            n.id === id
+              ? { ...n, position, size }
+              : n.containerId === id
+                ? { ...n, position: shift(n.position) }
+                : n,
+          ),
+          containers: p.containers.map((c) =>
+            c.id === id
+              ? { ...c, position, size }
+              : c.parentId === id && c.position
+                ? { ...c, position: shift(c.position) }
+                : c,
+          ),
+        },
+        false,
+        { routes: dropRoutes(routesRef.current, p, [id]) },
+      );
+    },
+    [commit],
+  );
+
+  /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
+  const shownNodes = useMemo(
+    () =>
+      nodes.map((n): Node => {
+        const editable: EditableData = {
+          resizable: !busy,
+          onResized,
+          ...(n.type === 'container' && project
+            ? {
+                minSize: containerMinSize(project, n.id),
+                fits: (rect: ResizeRect) => fitsChildren(project, n.id, rect),
+              }
+            : {}),
+        };
+        return { ...n, data: { ...n.data, ...editable } };
+      }),
+    [nodes, busy, onResized, project],
   );
 
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
@@ -412,7 +593,10 @@ export function App() {
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
-        <button disabled={busy} onClick={() => project && commit(project, true)}>
+        <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
+          Dark mode
+        </button>
+        <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
         </button>
         <button onClick={() => project && downloadJson(project)}>Export JSON</button>
@@ -428,7 +612,7 @@ export function App() {
             const file = e.target.files?.[0];
             if (file)
               readJsonFile(file).then(
-                (p) => commit(p),
+                (p) => commit(p, false, { recover: true, fit: true }),
                 (err: Error) => setError(err.message),
               );
           }}
@@ -451,8 +635,11 @@ export function App() {
           {error}
         </div>
       )}
-      <main className="main">
-        <section className="canvas" aria-label="Architecture canvas">
+      <main
+        className="main"
+        style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
+      >
+        <section className={step ? 'canvas is-busy' : 'canvas'} aria-label="Architecture canvas">
           {clarify && (
             <div className="overlay">
               <ClarifyCard
@@ -467,17 +654,19 @@ export function App() {
             </div>
           )}
           <ReactFlow
-            nodes={nodes}
+            nodes={shownNodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={onNodeDragStop}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
             onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}
             fitView
+            fitViewOptions={FIT}
             minZoom={0.2}
-            colorMode="system"
+            colorMode={theme}
           >
             <Background />
             <MiniMap pannable zoomable />
@@ -485,38 +674,71 @@ export function App() {
           </ReactFlow>
         </section>
         <aside className="side">
-          <GeneratePanel
-            hasDiagram={Boolean(project?.nodes.length)}
-            busy={busy}
-            cancellable={cancellable}
-            stage={stage}
-            onGenerate={generate}
-            onCancel={cancel}
+          <div
+            className="resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize panel"
+            aria-valuenow={Math.round(sideWidth)}
+            aria-valuemin={PANEL_MIN}
+            aria-valuemax={maxPanelWidth(winWidth)}
+            tabIndex={0}
+            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+            onPointerMove={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId))
+                chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+            }}
+            onPointerUp={persistWidth}
+            onPointerCancel={persistWidth}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
+              chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
+            }}
+            onKeyUp={persistWidth}
           />
-          {project && selected && (
-            <Details project={project} id={selected} onRename={rename} disabled={busy} />
-          )}
-          <section>
-            <h2>Findings ({findings.length})</h2>
-            {findings.length === 0 && <p className="muted">No rule findings.</p>}
-            <ul className="findings">
-              {findings.map((f) => (
-                <li key={f.id} className={`sev-${f.severity}`}>
-                  <button className="link" onClick={() => locate(f)}>
-                    <span className="badge">{f.severity}</span> {f.ruleId}
-                  </button>
-                  <div>{f.explanation}</div>
-                  {f.remediation && <div className="muted">{f.remediation}</div>}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <VersionsPanel versions={versions} onRestore={restore} disabled={busy} />
-          <AiModelPanel />
-          <p className="muted small">
-            Generated designs require professional review before production use. Icons shown are
-            generic placeholders until the official packs are imported.
-          </p>
+          <div className="side-scroll">
+            <GeneratePanel
+              hasDiagram={Boolean(project?.nodes.length)}
+              busy={busy}
+              cancellable={cancellable}
+              step={step}
+              startedAt={startedAt}
+              typicalSeconds={typicalSeconds}
+              onGenerate={generate}
+              onCancel={cancel}
+            />
+            {project && selected && (
+              <Details project={project} id={selected} onRename={rename} disabled={busy} />
+            )}
+            <section>
+              <h2>Findings ({findings.length})</h2>
+              {findings.length === 0 && <p className="muted">No rule findings.</p>}
+              <ul className="findings">
+                {findings.map((f) => (
+                  <li key={f.id} className={`sev-${f.severity}`}>
+                    <button className="link" onClick={() => locate(f)}>
+                      <span className="badge">{f.severity}</span> {f.ruleId}
+                    </button>
+                    <div>{f.explanation}</div>
+                    {f.remediation && <div className="muted">{f.remediation}</div>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <VersionsPanel
+              versions={versions}
+              onRestore={restore}
+              disabled={busy}
+              openSignal={versionsAdded}
+            />
+            <AiModelPanel />
+            <p className="muted small">
+              Generated designs require professional review before production use. Icons shown are
+              generic placeholders until the official packs are imported.
+            </p>
+          </div>
         </aside>
       </main>
       {toast && (

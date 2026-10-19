@@ -9,6 +9,8 @@
   --warning: #9a6700;
   --info: #3b5b8c;
   --ctr: rgba(35, 87, 217, 0.04);
+  --ok: #1a7f37;
+  color-scheme: light;
   font-family:
     system-ui,
     -apple-system,
@@ -17,19 +19,20 @@
   color: var(--text);
   background: var(--bg);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12161c;
-    --panel: #1a2029;
-    --text: #e6e9ee;
-    --muted: #9aa5b4;
-    --line: #2e3744;
-    --accent: #7aa2ff;
-    --error: #ff8a80;
-    --warning: #f2c94c;
-    --info: #9ab8e6;
-    --ctr: rgba(122, 162, 255, 0.06);
-  }
+/* Dark values; light is the default and the choice is stored (spec section 4). */
+:root[data-theme='dark'] {
+  --bg: #12161c;
+  --panel: #1a2029;
+  --text: #e6e9ee;
+  --muted: #9aa5b4;
+  --line: #2e3744;
+  --accent: #7aa2ff;
+  --error: #ff8a80;
+  --warning: #f2c94c;
+  --info: #9ab8e6;
+  --ctr: rgba(122, 162, 255, 0.06);
+  --ok: #56d364;
+  color-scheme: dark;
 }
 * {
   box-sizing: border-box;
@@ -80,21 +83,85 @@ button.link {
 .main {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr var(--panel-w, 380px);
   min-height: 0;
 }
 .canvas {
   min-height: 0;
 }
 .side {
-  overflow: auto;
-  padding: 12px 16px;
+  position: relative;
+  min-height: 0;
+  font-size: 16px;
   border-left: 1px solid var(--line);
   background: var(--panel);
 }
+.side-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 0 16px 12px;
+}
 .side h2 {
-  font-size: 14px;
+  font-size: 1.1em;
   margin: 12px 0 8px;
+}
+/* Generate and the design options stay in view while the rest of the panel scrolls. */
+.side .generate {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -16px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  /* Never taller than the panel, so Generate/Cancel stay reachable. */
+  max-height: 70%;
+  overflow: auto;
+}
+.side .generate h2 {
+  margin-top: 0;
+}
+.side .small,
+.side .chip,
+.side .findings,
+.side .detail,
+.side .versions {
+  font-size: 14px;
+}
+.side .small {
+  font-size: 13px;
+}
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible {
+  background: var(--accent);
+  opacity: 0.5;
+}
+.resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  opacity: 1;
+}
+.collapsible {
+  margin: 12px 0;
+}
+.collapsible > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.1em;
+  padding: 4px 0;
+}
+.collapsible > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .muted {
   color: var(--muted);
@@ -149,9 +216,10 @@ button.link {
   display: flex;
   gap: 8px;
   align-items: center;
-  width: 168px;
-  height: 64px;
-  padding: 8px;
+  /* Fill the React Flow box, so the stored node size is what renders. */
+  width: 100%;
+  height: 100%;
+  padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -180,20 +248,42 @@ button.link {
 }
 .svc-text {
   min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
 }
 .svc-label {
   font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 .svc-service {
   font-size: 11px;
   color: var(--muted);
-  white-space: nowrap;
+  line-height: 1.2;
+}
+/* Wrap to at most two lines instead of an ellipsis; the full text is in the title tooltip. */
+.svc-label,
+.svc-service,
+.edge-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+}
+.edge-label {
+  position: absolute;
+  max-width: 160px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: all;
 }
 .ctr {
   width: 100%;
@@ -231,6 +321,13 @@ button.link {
     border-left: none;
     border-top: 1px solid var(--line);
   }
+  .side .generate {
+    position: static;
+  }
+  /* Stacked under the canvas the panel is full width: no handle, stored width ignored. */
+  .resize-handle {
+    display: none;
+  }
 }
 
 .notice {
@@ -255,7 +352,7 @@ a.button {
   text-decoration: none;
 }
 .ok {
-  color: #1a7f37;
+  color: var(--ok);
 }
 table.models {
   width: 100%;
@@ -411,6 +508,7 @@ table.models caption {
   border-radius: 999px;
   font-size: 13px;
 }
+.bar button[aria-pressed='true'],
 .chip[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--ctr);
@@ -423,8 +521,53 @@ table.models caption {
   align-items: center;
   margin: 8px 0;
 }
-.stage {
+.gen-status .row {
+  align-items: center;
+  gap: 8px;
+}
+.gen-current {
+  font-weight: 600;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--line);
+    background: var(--accent);
+  }
+}
+.gen-steps {
+  margin: 8px 0 4px;
+  padding-left: 20px;
+  font-size: 0.85rem;
   color: var(--muted);
+}
+.gen-steps li.current {
+  color: var(--text);
+  font-weight: 600;
+}
+.gen-steps li.done::marker {
+  content: '✓ ';
+}
+.gen-time {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.canvas.is-busy .react-flow {
+  opacity: 0.55;
+  pointer-events: none;
 }
 .canvas {
   position: relative;
