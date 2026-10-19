@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 0. Discovery / Benchmark | Week 1 | 10–15 reference prompts with labels, rubric, project schema 1.1 (incl. containers), icon packs downloaded and terms recorded, **AI quality spike** (one-shot generation on the benchmark), **token/cost measurement** | Benchmark + rubric ready; spike shows schema-valid output and acceptable recall; cost per operation measured; budget cap decided |
 | 1. Visual PoC | Weeks 2–3 | React Flow canvas, **nested containers + ELK layout spike**, official AWS icons, JSON roundtrip, undo/redo | Editable, saveable diagram with containers, no AI dependency |
-| 2. AI PoC | Weeks 3–4 | Requirements extraction, clarification round, catalog retrieval, constrained generation, unresolved nodes, rule set VR-001…018, **eval harness in CI** | Gate A |
+| 2. AI PoC | Weeks 3–4 | Requirements extraction, clarification round, catalog retrieval, constrained generation, unresolved nodes, rule set VR-001…018, **eval harness in CI** | Gate A — **passed 2026-10-18** (Haiku blind median 2.29, no critical defect in 11/12, live gate green; [report](phase2-gate-a.md)) |
 | 3. MVP engineering | Weeks 5–7 | Gateway, credits, **budget cap + kill switch**, BYOK direct browser, Review, exports, Privacy Policy / Terms | End-to-end workflow; Gate B |
 | 4. Private beta | Weeks 8–9 | 15–30 testers, full benchmark blind review, bug fixes | Meaningful user acceptance and reliable core |
 | 5. Public beta | ~Weeks 9–10+ | Release, analytics, user feedback | Usage, cost and reliability monitored |

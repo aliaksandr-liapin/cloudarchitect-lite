@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * AI model options (ADR-0011), shared by the gateway, the setup wizard and the editor.
- * Benchmarks come from the Phase 0 round 3 run and blind review (docs/product/phase0-spike.md);
+ * Benchmarks come from the Phase 2 Gate A live runs and blind review (docs/product/phase2-gate-a.md);
  * update them only from a new eval run.
  */
 export const ModelChoice = z.enum(['haiku', 'sonnet']);
@@ -11,14 +11,17 @@ export type ModelChoice = z.infer<typeof ModelChoice>;
 export interface ModelBenchmark {
   measuredAt: string;
   runId: string;
-  /** Generations scored by the eval harness (15 scenarios × 3 repeats). */
+  /** Live-eval generations scored by the eval harness (scenarios × repeats), not the number of blind-reviewed designs. */
   runs: number;
   schemaValidRate: number;
   /** Share of runs passing all automated checks (eval harness). */
   passRate: number;
   /** Median blind rubric score, 0–3 (PRD §14). */
   blindMedianScore: number;
-  /** Share of reviewed scenarios without a critical defect. */
+  /**
+   * Share of blind-reviewed scenarios without a critical defect. Not the same population per model:
+   * Haiku's covers 12 scenarios including 3 toggle scenarios, Sonnet's the 9 base scenarios.
+   */
   noCriticalDefectRate: number;
   majorDefects: number;
   /** Mean cost of one generation in USD, at the provider price list of the measurement date. */
@@ -37,7 +40,7 @@ export interface ModelOption {
   benchmark: ModelBenchmark;
 }
 
-const ROUND_3 = { measuredAt: '2026-10-14', runId: '2026-10-14T05-14-37-270Z', runs: 45 };
+const GATE_A = { measuredAt: '2026-10-18' };
 
 export const MODEL_OPTIONS: readonly ModelOption[] = [
   {
@@ -48,14 +51,16 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
     summary: 'Fast and economical. Meets the quality bar; designs need more review.',
     repairTurns: 1,
     benchmark: {
-      ...ROUND_3,
+      ...GATE_A,
+      runId: '2026-10-18T22-11-01-773Z',
+      runs: 44,
       schemaValidRate: 1,
-      passRate: 0.956,
+      passRate: 0.932,
       blindMedianScore: 2.29,
-      noCriticalDefectRate: 1,
-      majorDefects: 13,
-      costPerOperationUsd: 0.0061,
-      medianLatencySeconds: 44,
+      noCriticalDefectRate: 0.917,
+      majorDefects: 10,
+      costPerOperationUsd: 0.0067,
+      medianLatencySeconds: 49,
     },
   },
   {
@@ -63,17 +68,19 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
     provider: 'anthropic',
     model: 'claude-sonnet-5-5',
     label: 'Claude Sonnet 5.5',
-    summary: 'Best quality: preferred in every blind comparison, about 13× the cost.',
+    summary: 'Best quality: preferred in 7 of 9 blind comparisons, about 7× the cost.',
     repairTurns: 0,
     benchmark: {
-      ...ROUND_3,
+      ...GATE_A,
+      runId: '2026-10-18T22-24-06-777Z',
+      runs: 15,
       schemaValidRate: 1,
       passRate: 0.933,
-      blindMedianScore: 2.86,
+      blindMedianScore: 2.57,
       noCriticalDefectRate: 1,
-      majorDefects: 4,
-      costPerOperationUsd: 0.08,
-      medianLatencySeconds: 51,
+      majorDefects: 3,
+      costPerOperationUsd: 0.0454,
+      medianLatencySeconds: 27,
     },
   },
 ];

@@ -1,0 +1,273 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Application Load Balancer sits only in Public subnet A, although its purpose says it spans two AZs. An ALB needs subnets in at least two AZs, and the API, cache, RDS Proxy and RDS are all drawn only in Private subnet A, with no Multi-AZ on RDS, so one AZ is a single point of failure.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The index sync Lambda is placed at Region level, outside the VPC, yet it connects to RDS Proxy and ElastiCache, which can only be reached privately inside the VPC. The function needs a VPC configuration in the private subnets, or the sync path will not work.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Polling every minute on a schedule, plus the time each run takes, can go past the one-minute freshness target in the worst case. Change detection (an updated_at column or CDC) is not described, and there is no initial full load or rebuild of 2 million documents.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS WAF is drawn in the Region while protecting CloudFront. A web ACL for CloudFront must be created in the global (us-east-1) scope.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront caches product pages, but the sync only invalidates ElastiCache. Cached pages at the edge can show stale prices unless the TTL is short or CloudFront is also invalidated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The OpenSearch domain is outside the VPC and no access policy or fine-grained access control is stated. Encryption is not set for the cache or the index, and nothing says the ALB accepts traffic only from CloudFront.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Fargate tasks in private subnets have no NAT gateway or VPC endpoints for ECR image pulls and CloudWatch Logs.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A reasonable shape (CloudFront, Fargate, cache, OpenSearch, a scheduled sync with DLQ and alarms), but the single-AZ placement and a sync Lambda outside the VPC that still reaches VPC-only RDS Proxy and ElastiCache are real defects."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Change events are published only by the web API (outbox-backed). Writes made to the source-of-truth database by other systems would skip indexing, and the outbox relay is not shown. CDC from the database would be more robust.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "I2 (initial full load of 2 million products and the ability to rebuild) is assigned to the queue and indexer, but no backfill mechanism is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The indexer Lambda connects to RDS and Valkey but is not shown in the VPC, and there is no RDS Proxy for Lambda connection bursts.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no CDN for read-heavy product pages, so all reads reach the ALB. The ElastiCache layer offsets most of this.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "OpenSearch network placement and access policy are not stated, and Fargate in private subnets has no NAT gateway or VPC endpoints for image pulls.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid event-driven design: queue-triggered idempotent indexer with DLQ and alarms, Multi-AZ data stores, KMS and WAF, with gaps in initial backfill and change capture limited to the application."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The NAT gateway costs about as much as the rest of the stack for a 25-minute nightly job. VPC endpoints (an S3 gateway endpoint plus SES/ECR interface endpoints) or a public-subnet task with no inbound rules would be cheaper, which matters given 'keep it cheap'.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design adds an API Gateway, a Lambda authorizer and a handler Lambda. This is justified, because it lets links outlive the task's temporary credentials, but it adds parts to a 'keep it simple' request.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms have no SNS topic or recipient shown, so failure alerts have nowhere to go. There is no alarm for a run that never starts and no retry mechanism (for example Step Functions or a retry policy).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 Block Public Access setting and SES production access (leaving the sandbox) are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, secure design: Fargate for the 25-minute job, an Aurora reader, a private S3 bucket with a 365-day lifecycle, and token-gated short-lived presigned links. It is somewhat heavier and costlier (NAT, API layer) than 'simple and cheap' implies."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The Fargate task creates the presigned S3 links that are emailed at about 02:25. A presigned URL signed with temporary IAM role credentials (an ECS task role) expires when those credentials expire, typically within 1-6 hours, whatever expiry is requested. Managers opening the email in the morning would often get errors, so the core delivery path does not work as described.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Fargate task runs in a public subnet, which needs a public IP. With no inbound security group rules this is acceptable and avoids NAT cost, but it deserves an explicit note.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Aurora reader instance is only referenced in the rationale, and backups are not stated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SES production access and S3 Block Public Access are not explicitly configured.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Simple and cheap, with good alerting (SNS, missing-run alarm). But emailing presigned URLs signed with Fargate task-role credentials means the links expire within hours, breaking the download flow."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fargate tasks in private subnets have no NAT gateway and no VPC endpoints, yet they must pull images and reach Secrets Manager, CloudWatch Logs and Cognito. Without one of these, tasks cannot start.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "WAF is attached only to the ALB, not to CloudFront, the single public entry point, and nothing restricts the ALB to CloudFront traffic (prefix list or custom header). Attacks are filtered late, and the ALB can be hit directly.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Shield is described as Standard only. For a bank, Shield Advanced is worth considering, and Shield has no edge to the resources it protects.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The KMS customer managed keys have no edges to the resources they encrypt, and the API has no token-validation path to Cognito.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Versioning alone is not immutable. Audit integrity would benefit from CloudTrail log file validation or S3 Object Lock, and CloudTrail is not sent to CloudWatch for alarms. App and data tiers share one subnet.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the security controls well (CloudFront, WAF, Shield, ACM, Cognito MFA, CMKs, CloudTrail), but private Fargate tasks have no outbound path, and WAF sits only on the ALB."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB is given 'encryption: KMS', which is not a load balancer setting. ALB access logs to S3 support only SSE-S3.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Nothing restricts the ALB to CloudFront (prefix list or custom header), so the WAF on CloudFront can be bypassed by hitting the ALB directly.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate for CloudFront must be in us-east-1. This is not noted.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only one NAT gateway is implied for two AZs, and VPC endpoints for AWS APIs would keep traffic private and cut NAT cost. Secrets Manager rotation needs a rotation Lambda, which is not shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no CloudTrail log file validation or S3 Object Lock for audit immutability, and Shield Advanced is not discussed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thorough, well-connected regulated design with WAF and Shield at the edge, CMK encryption wired to every store, Cognito MFA, CloudTrail to S3 and CloudWatch, and NAT for private tasks; remaining issues are minor."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "B's queue-driven idempotent indexer with DLQ, Multi-AZ data stores and encryption is more reliable and correctly wired; A is single-AZ in practice and its sync Lambda sits outside the VPC while using VPC-only resources."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "A",
+      "why": "B is simpler and cheaper, but its emailed presigned URLs signed with task-role credentials expire within hours; A's token-gated link handler issues fresh presigned URLs on demand and works reliably."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B puts WAF and Shield on CloudFront, wires CMKs to every data store, and gives private Fargate tasks an outbound path; A lacks NAT or endpoints, so tasks cannot pull images or reach AWS APIs."
+    }
+  ]
+}

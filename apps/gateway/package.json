@@ -17,6 +17,7 @@
   "dependencies": {
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
+    "@cloudarchitect/generator": "workspace:*",
     "@hono/node-server": "^2.1.5",
     "hono": "^4.13.13",
     "zod": "^4.6.7"

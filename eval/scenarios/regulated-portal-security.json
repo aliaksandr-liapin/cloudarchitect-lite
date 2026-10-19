@@ -1,0 +1,58 @@
+{
+  "id": "regulated-portal-security",
+  "title": "Customer portal with security and audit requirements — security-hardening toggle",
+  "class": "security-compliance",
+  "prompt": "A regional bank needs a customer self-service portal (web app plus API). Requirements: protection against common web exploits and DDoS, TLS everywhere, all data encrypted at rest with keys we control, a full audit trail of administrative API activity in the AWS account, and customer sign-in with MFA. The app tier runs in containers in private subnets.",
+  "expectedRequirements": [
+    {
+      "id": "web-protection",
+      "keywords": ["exploit", "waf", "web attack"]
+    },
+    {
+      "id": "ddos",
+      "keywords": ["ddos"]
+    },
+    {
+      "id": "tls",
+      "keywords": ["tls", "https"]
+    },
+    {
+      "id": "encryption",
+      "keywords": ["encrypt", "key"]
+    },
+    {
+      "id": "audit",
+      "keywords": ["audit"]
+    },
+    {
+      "id": "mfa",
+      "keywords": ["mfa", "multi-factor"]
+    },
+    {
+      "id": "private-subnets",
+      "keywords": ["private"]
+    }
+  ],
+  "expectedServices": {
+    "required": [
+      "aws.cloudfront",
+      "aws.waf",
+      "aws.shield",
+      "aws.acm",
+      "aws.kms",
+      "aws.cloudtrail",
+      "aws.cognito",
+      "aws.alb"
+    ],
+    "anyOf": [
+      ["aws.ecs", "aws.eks", "aws.fargate"],
+      ["aws.aurora", "aws.rds"]
+    ],
+    "forbidden": []
+  },
+  "maxErrorFindings": 0,
+  "toggles": {
+    "securityHardening": true
+  },
+  "forbiddenRules": ["VR-025"]
+}

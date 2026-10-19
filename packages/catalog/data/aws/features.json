@@ -70,5 +70,194 @@
     "displayName": "API Gateway API type",
     "summary": "REST, HTTP or WEBSOCKET. REST APIs support AWS WAF, API keys, usage plans and request validation; HTTP APIs are cheaper and simpler.",
     "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+  },
+  {
+    "id": "aws.dynamodb.pitr",
+    "serviceId": "aws.dynamodb",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "DynamoDB point-in-time recovery (PITR)",
+    "summary": "Continuous backups that restore a table to any second in the last 35 days. Value: PITR.",
+    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Point-in-time-recovery.html"
+  },
+  {
+    "id": "aws.rds.automated-backups",
+    "serviceId": "aws.rds",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "RDS automated backups",
+    "summary": "Daily snapshots plus transaction logs enable point-in-time restore within the retention period.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html"
+  },
+  {
+    "id": "aws.aurora.automated-backups",
+    "serviceId": "aws.aurora",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "Aurora automated backups",
+    "summary": "Continuous, incremental backups to S3 enable point-in-time restore within the retention period.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Managing.Backups.html"
+  },
+  {
+    "id": "aws.efs.backup",
+    "serviceId": "aws.efs",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "EFS backups with AWS Backup",
+    "summary": "Policy-based automatic backups of a file system through AWS Backup.",
+    "documentationUrl": "https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html"
+  },
+  {
+    "id": "aws.elasticache.snapshots",
+    "serviceId": "aws.elasticache",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "ElastiCache snapshots",
+    "summary": "Point-in-time snapshots of a Valkey or Redis OSS cluster, restorable into a new cluster.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/backups.html"
+  },
+  {
+    "id": "aws.s3.versioning",
+    "serviceId": "aws.s3",
+    "appliesTo": "node",
+    "configKey": "backup",
+    "displayName": "S3 versioning",
+    "summary": "Keeps multiple versions of each object so overwrites and deletes can be undone. Value: versioning.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html"
+  },
+  {
+    "id": "aws.rds.multi-az",
+    "serviceId": "aws.rds",
+    "appliesTo": "node",
+    "configKey": "multiAz",
+    "displayName": "RDS Multi-AZ deployment",
+    "summary": "Synchronous standby in another Availability Zone with automatic failover.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html"
+  },
+  {
+    "id": "aws.aurora.multi-az",
+    "serviceId": "aws.aurora",
+    "appliesTo": "node",
+    "configKey": "multiAz",
+    "displayName": "Aurora Multi-AZ (replicas across zones)",
+    "summary": "Aurora replicas in other Availability Zones provide automatic failover.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html"
+  },
+  {
+    "id": "aws.elasticache.multi-az",
+    "serviceId": "aws.elasticache",
+    "appliesTo": "node",
+    "configKey": "multiAz",
+    "displayName": "ElastiCache Multi-AZ",
+    "summary": "Replicas in other Availability Zones with automatic failover for Valkey and Redis OSS.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
+  },
+  {
+    "id": "aws.s3.replication",
+    "serviceId": "aws.s3",
+    "appliesTo": "node",
+    "configKey": "replication",
+    "displayName": "S3 cross-region replication",
+    "summary": "Asynchronously copies new objects to a bucket in another Region.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html"
+  },
+  {
+    "id": "aws.dynamodb.global-tables",
+    "serviceId": "aws.dynamodb",
+    "appliesTo": "node",
+    "configKey": "replication",
+    "displayName": "DynamoDB global tables",
+    "summary": "Multi-Region, multi-active replication of a table.",
+    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GlobalTables.html"
+  },
+  {
+    "id": "aws.aurora.global-database",
+    "serviceId": "aws.aurora",
+    "appliesTo": "node",
+    "configKey": "replication",
+    "displayName": "Aurora global database",
+    "summary": "One primary Region plus read-only secondary Regions with fast cross-Region replication.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database.html"
+  },
+  {
+    "id": "aws.rds.cross-region-replica",
+    "serviceId": "aws.rds",
+    "appliesTo": "node",
+    "configKey": "replication",
+    "displayName": "RDS cross-region read replica",
+    "summary": "A read replica in another Region for disaster recovery and local reads.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.XRgn.html"
+  },
+  {
+    "id": "aws.s3.encryption",
+    "serviceId": "aws.s3",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "S3 encryption at rest",
+    "summary": "Encrypts S3 data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html"
+  },
+  {
+    "id": "aws.dynamodb.encryption",
+    "serviceId": "aws.dynamodb",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "DynamoDB encryption at rest",
+    "summary": "Encrypts DynamoDB data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+  },
+  {
+    "id": "aws.rds.encryption",
+    "serviceId": "aws.rds",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "RDS encryption at rest",
+    "summary": "Encrypts RDS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+  },
+  {
+    "id": "aws.aurora.encryption",
+    "serviceId": "aws.aurora",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "Aurora encryption at rest",
+    "summary": "Encrypts Aurora data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html"
+  },
+  {
+    "id": "aws.efs.encryption",
+    "serviceId": "aws.efs",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "EFS encryption at rest",
+    "summary": "Encrypts EFS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html"
+  },
+  {
+    "id": "aws.elasticache.encryption",
+    "serviceId": "aws.elasticache",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "ElastiCache encryption at rest",
+    "summary": "Encrypts ElastiCache data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+  },
+  {
+    "id": "aws.sqs.encryption",
+    "serviceId": "aws.sqs",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "SQS encryption at rest",
+    "summary": "Encrypts SQS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+  },
+  {
+    "id": "aws.sns.encryption",
+    "serviceId": "aws.sns",
+    "appliesTo": "node",
+    "configKey": "encryption",
+    "displayName": "SNS encryption at rest",
+    "summary": "Encrypts SNS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
+    "documentationUrl": "https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html"
   }
 ]

@@ -1,6 +1,7 @@
 import type { CatalogSnapshot, CloudService } from './catalog.js';
 import type { ArchEdge, ArchNode, Container, Finding, Project, Severity } from './project.js';
 import { LIMITS } from './project.js';
+import { TOGGLE_REQUIREMENT_IDS, type DesignToggles } from './toggles.js';
 
 export const VALIDATOR_VERSION = 'validator-0.1.0';
 
@@ -43,9 +44,29 @@ function enclosing(ctx: Ctx, containerId: string | undefined, kind: Container['k
   return undefined;
 }
 
+const toggles = (ctx: Ctx): DesignToggles => ctx.project.generation?.toggles ?? {};
+
+/** True when an edge connects the node to a node of `serviceId`, in either direction. */
+function linkedToService(ctx: Ctx, nodeId: string, serviceId: string): boolean {
+  return ctx.project.edges.some((e) => {
+    const other = e.source === nodeId ? e.target : e.target === nodeId ? e.source : undefined;
+    const o = other ? ctx.nodes.get(other) : undefined;
+    return o !== undefined && svc(o) === serviceId;
+  });
+}
+
 const VPC_BOUND = ['aws.ec2', 'aws.rds', 'aws.aurora', 'aws.elasticache', 'aws.efs'];
 const DATABASES = ['aws.rds', 'aws.aurora', 'aws.elasticache'];
 const ASYNC_SOURCES = ['aws.sqs', 'aws.sns', 'aws.eventbridge', 'aws.s3'];
+export const DATA_STORES = [
+  'aws.s3',
+  'aws.dynamodb',
+  'aws.rds',
+  'aws.aurora',
+  'aws.efs',
+  'aws.elasticache',
+];
+const CLIENT_KINDS = ['user', 'client-app'];
 const BASELINE = [
   'aws.cloudwatch',
   'aws.xray',
@@ -59,7 +80,6 @@ const BASELINE = [
 /**
  * Deterministic rules from PRD §11. Each rule's metadata lives in the catalog
  * (`validation-rules.json`); logic lives here, keyed by rule ID.
- * Rules not yet implemented: VR-002, VR-003, VR-008, VR-011 (tracked in ROADMAP E4).
  * VR-016…VR-018 come from the Phase 0 blind review (docs/product/phase0-spike.md).
  */
 const RULES: Rule[] = [
@@ -85,6 +105,83 @@ const RULES: Rule[] = [
           explanation:
             'S3 origin is served through CloudFront without Origin Access Control (OAC).',
           remediation: 'Set originAccess = OAC and keep the bucket private.',
+        })),
+  },
+  {
+    id: 'VR-002',
+    severity: 'warning',
+    check: (ctx) => {
+      const served = new Set(
+        ctx.project.edges
+          .filter(
+            (e) =>
+              e.kind === 'origin' &&
+              svc(ctx.nodes.get(e.source) ?? ({} as ArchNode)) === 'aws.cloudfront',
+          )
+          .map((e) => e.target),
+      );
+      return ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          return (
+            s &&
+            t &&
+            s.external &&
+            CLIENT_KINDS.includes(s.external.kind) &&
+            svc(t) === 'aws.s3' &&
+            served.has(t.id)
+          );
+        })
+        .map((e) => ({
+          ruleId: 'VR-002',
+          severity: 'warning',
+          edgeIds: [e.id],
+          explanation:
+            'Clients reach the S3 bucket directly while CloudFront also serves its content.',
+          remediation:
+            'Route client reads through CloudFront and keep the bucket private behind OAC.',
+        }));
+    },
+  },
+  {
+    id: 'VR-003',
+    severity: 'warning',
+    check: (ctx) =>
+      nodesOf(ctx, 'aws.apigateway', 'aws.alb')
+        .filter((n) => {
+          const incoming = ctx.project.edges.filter((e) => e.target === n.id);
+          const exposed = incoming.some((e) => {
+            const s = ctx.nodes.get(e.source);
+            return s && (s.external || svc(s) === 'aws.cloudfront');
+          });
+          if (!exposed) return false;
+          return (
+            !n.configuration?.authorizer &&
+            !incoming.some((e) => e.configuration?.authorizer) &&
+            !linkedToService(ctx, n.id, 'aws.cognito')
+          );
+        })
+        .map((n) => ({
+          ruleId: 'VR-003',
+          severity: 'warning',
+          nodeIds: [n.id],
+          explanation: `${n.label} is reachable from the internet without a stated authentication mechanism.`,
+          remediation:
+            'Add a Cognito, IAM or Lambda authorizer (or Cognito/OIDC authentication on the ALB).',
+        })),
+  },
+  {
+    id: 'VR-008',
+    severity: 'info',
+    check: (ctx) =>
+      nodesOf(ctx, ...DATA_STORES)
+        .filter((n) => !n.configuration?.encryption)
+        .map((n) => ({
+          ruleId: 'VR-008',
+          severity: 'info',
+          nodeIds: [n.id],
+          explanation: `${n.label} has no stated encryption at rest.`,
+          remediation: 'Set encryption to KMS or AWS-managed.',
         })),
   },
   {
@@ -194,6 +291,25 @@ const RULES: Rule[] = [
           nodeIds: [n.id],
           explanation: `${n.label} is placed in a public subnet.`,
           remediation: 'Move the database to a private subnet.',
+        })),
+  },
+  {
+    id: 'VR-011',
+    severity: 'warning',
+    check: (ctx) =>
+      ctx.project.edges
+        .filter((e) => {
+          const [s, t] = edgeEnds(ctx, e);
+          if (!s || !t || e.kind !== 'write' || !s.external || svc(t) !== 'aws.s3') return false;
+          if (e.configuration?.presignedUrl) return false;
+          return !linkedToService(ctx, s.id, 'aws.cognito');
+        })
+        .map((e) => ({
+          ruleId: 'VR-011',
+          severity: 'warning',
+          edgeIds: [e.id],
+          explanation: 'A client writes to S3 without a stated authorization mechanism.',
+          remediation: 'Issue presigned URLs from a backend, or authorize the client with Cognito.',
         })),
   },
   {
@@ -341,6 +457,207 @@ const RULES: Rule[] = [
             'https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html',
           ],
         }));
+    },
+  },
+  {
+    id: 'VR-019',
+    severity: 'warning',
+    check: (ctx) => {
+      if (!toggles(ctx).serverlessFirst) return [];
+      const requested = (n: ArchNode) =>
+        n.requirementIds.some((rid) => {
+          const r = ctx.project.requirements.find((q) => q.id === rid);
+          return (
+            r !== undefined &&
+            r.status === 'confirmed' &&
+            (r.provenance === 'user' || r.provenance === 'clarification')
+          );
+        });
+      return nodesOf(ctx, 'aws.ec2', 'aws.rds', 'aws.ecs', 'aws.eks')
+        .filter((n) => !requested(n))
+        .map((n) => ({
+          ruleId: 'VR-019',
+          severity: 'warning',
+          nodeIds: [n.id],
+          requirementIds: [TOGGLE_REQUIREMENT_IDS.serverlessFirst],
+          explanation: `${n.label} is a server-based service that no stated requirement asks for, but serverless-first is enabled.`,
+          remediation:
+            'Use a serverless or fully managed alternative, or link the node to a requirement that needs it.',
+        }));
+    },
+  },
+  {
+    id: 'VR-020',
+    severity: 'warning',
+    check: (ctx) =>
+      !toggles(ctx).backups
+        ? []
+        : nodesOf(ctx, ...DATA_STORES)
+            .filter((n) => !n.configuration?.backup)
+            .map((n) => ({
+              ruleId: 'VR-020',
+              severity: 'warning',
+              nodeIds: [n.id],
+              requirementIds: [TOGGLE_REQUIREMENT_IDS.backups],
+              explanation: `${n.label} has no stated backup configuration.`,
+              remediation:
+                'Enable automated backups or point-in-time recovery (versioning for S3).',
+            })),
+  },
+  {
+    id: 'VR-021',
+    severity: 'warning',
+    check: (ctx) =>
+      toggles(ctx).disasterRecovery !== 'multi-az'
+        ? []
+        : nodesOf(ctx, ...DATABASES)
+            .filter((n) => !n.configuration?.multiAz)
+            .map((n) => ({
+              ruleId: 'VR-021',
+              severity: 'warning',
+              nodeIds: [n.id],
+              requirementIds: [TOGGLE_REQUIREMENT_IDS.disasterRecovery],
+              explanation: `${n.label} is not configured Multi-AZ.`,
+              remediation:
+                'Enable Multi-AZ so the data store survives the loss of an Availability Zone.',
+            })),
+  },
+  {
+    id: 'VR-022',
+    severity: 'warning',
+    check: (ctx) => {
+      if (toggles(ctx).disasterRecovery !== 'cross-region') return [];
+      const out: Draft[] = [];
+      const requirementIds = [TOGGLE_REQUIREMENT_IDS.disasterRecovery];
+      const regions = ctx.project.containers.filter((c) => c.kind === 'region');
+      if (regions.length < 2)
+        out.push({
+          ruleId: 'VR-022',
+          severity: 'warning',
+          containerIds: regions.map((c) => c.id),
+          requirementIds,
+          explanation:
+            'Cross-region recovery is enabled but the design has fewer than two Regions.',
+          remediation: 'Add a second Region container with the recovery stack.',
+        });
+      const region = (x: ArchNode) => enclosing(ctx, x.containerId, 'region')?.id;
+      // A store without `replication` is the replica when the same service in another Region has it.
+      const isReplica = (x: ArchNode) =>
+        nodesOf(ctx, svc(x)!).some(
+          (o) =>
+            o.id !== x.id &&
+            Boolean(o.configuration?.replication) &&
+            region(o) !== undefined &&
+            region(x) !== undefined &&
+            region(o) !== region(x),
+        );
+      for (const n of nodesOf(ctx, ...DATA_STORES).filter(
+        (x) =>
+          !['aws.efs', 'aws.elasticache'].includes(svc(x) ?? '') &&
+          !x.configuration?.replication &&
+          !isReplica(x),
+      ))
+        out.push({
+          ruleId: 'VR-022',
+          severity: 'warning',
+          nodeIds: [n.id],
+          requirementIds,
+          explanation: `${n.label} has no stated cross-region replication.`,
+          remediation: 'Configure cross-region replication (global tables, replicas, CRR).',
+        });
+      return out;
+    },
+  },
+  {
+    id: 'VR-023',
+    severity: 'warning',
+    check: (ctx) => {
+      const t = toggles(ctx);
+      if (!t.highAvailability && !t.disasterRecovery) return [];
+      const byVpc = new Map<string, { zones: Set<string>; nodeIds: string[] }>();
+      for (const n of nodesOf(ctx, ...VPC_BOUND, 'aws.alb', 'aws.fargate', 'aws.nat-gateway')) {
+        const vpc = enclosing(ctx, n.containerId, 'vpc');
+        if (!vpc) continue;
+        const entry = byVpc.get(vpc.id) ?? { zones: new Set(), nodeIds: [] };
+        const az = enclosing(ctx, n.containerId, 'availability-zone');
+        if (az) entry.zones.add(az.id);
+        entry.nodeIds.push(n.id);
+        byVpc.set(vpc.id, entry);
+      }
+      return [...byVpc.entries()]
+        .filter(([, v]) => v.zones.size < 2)
+        .map(([vpcId, v]) => ({
+          ruleId: 'VR-023',
+          severity: 'warning',
+          nodeIds: v.nodeIds,
+          containerIds: [vpcId],
+          requirementIds: [
+            t.highAvailability
+              ? TOGGLE_REQUIREMENT_IDS.highAvailability
+              : TOGGLE_REQUIREMENT_IDS.disasterRecovery,
+          ],
+          explanation: 'VPC resources are not spread across at least two Availability Zones.',
+          remediation: 'Place the resources in subnets of two or more Availability Zones.',
+        }));
+    },
+  },
+  {
+    id: 'VR-024',
+    severity: 'info',
+    check: (ctx) =>
+      !toggles(ctx).costOptimized
+        ? []
+        : nodesOf(ctx, 'aws.dax', 'aws.nat-gateway', 'aws.ec2', 'aws.eks')
+            .filter(
+              (n) =>
+                !n.requirementIds.some((rid) => {
+                  const r = ctx.project.requirements.find((q) => q.id === rid);
+                  return r !== undefined && r.provenance !== 'toggle';
+                }),
+            )
+            .map((n) => ({
+              ruleId: 'VR-024',
+              severity: 'info',
+              nodeIds: [n.id],
+              requirementIds: [TOGGLE_REQUIREMENT_IDS.costOptimized],
+              explanation: `${n.label} is a cost driver that no stated requirement asks for.`,
+              remediation:
+                'Remove it or replace it with a cheaper option, or link it to a requirement.',
+            })),
+  },
+  {
+    id: 'VR-025',
+    severity: 'warning',
+    check: (ctx) => {
+      if (!toggles(ctx).securityHardening) return [];
+      const requirementIds = [TOGGLE_REQUIREMENT_IDS.securityHardening];
+      const unprotected = nodesOf(ctx, 'aws.apigateway', 'aws.alb', 'aws.cloudfront')
+        .filter(
+          (n) =>
+            ctx.project.edges.some(
+              (e) => e.target === n.id && ctx.nodes.get(e.source)?.external !== undefined,
+            ) && !linkedToService(ctx, n.id, 'aws.waf'),
+        )
+        .map((n) => ({
+          ruleId: 'VR-025',
+          severity: 'warning' as const,
+          nodeIds: [n.id],
+          requirementIds,
+          explanation: `${n.label} is a public entry point without AWS WAF.`,
+          remediation:
+            'Attach AWS WAF (for API Gateway use a REST API or put CloudFront in front).',
+        }));
+      const unencrypted = nodesOf(ctx, ...DATA_STORES)
+        .filter((n) => n.configuration?.encryption !== 'KMS')
+        .map((n) => ({
+          ruleId: 'VR-025',
+          severity: 'warning' as const,
+          nodeIds: [n.id],
+          requirementIds,
+          explanation: `${n.label} is not encrypted at rest with a KMS key.`,
+          remediation: 'Set encryption to KMS.',
+        }));
+      return [...unprotected, ...unencrypted];
     },
   },
 ];

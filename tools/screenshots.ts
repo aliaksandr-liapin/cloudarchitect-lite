@@ -26,8 +26,51 @@ const WIZARD_DEFAULTS = {
   rateLimitPerMinute: 20,
 };
 
-function mockApi(context: BrowserContext, configured: boolean) {
+const BLOG_PROMPT =
+  'A blog with user signups and a welcome email. Authors upload photos and we need thumbnails.';
+
+/** A fixed clarification round, shaped like the gateway's `questions` response. */
+const QUESTIONS = {
+  status: 'questions',
+  operationId: '00000000-0000-4000-8000-000000000001',
+  operationToken: 'screenshot-placeholder-token',
+  requirements: [
+    { id: 'R1', text: 'Readers browse blog posts.', type: 'functional', status: 'confirmed' },
+    { id: 'R2', text: 'Users sign up for an account.', type: 'functional', status: 'confirmed' },
+    { id: 'R3', text: 'New users get a welcome email.', type: 'functional', status: 'confirmed' },
+    {
+      id: 'R4',
+      text: 'Uploaded photos get thumbnails.',
+      type: 'functional',
+      status: 'confirmed',
+    },
+  ],
+  assumptions: ['Traffic is read-heavy with infrequent writes.'],
+  questions: [
+    {
+      topic: 'auth-methods',
+      text: 'Sign-up options: email only, or also social sign-in?',
+      suggestions: ['Email only', 'Email + Google / Apple', 'Email + Google / Apple / Facebook'],
+    },
+    {
+      topic: 'user-scale',
+      text: 'How many readers do you expect per month?',
+      suggestions: ['Under 10,000', '10,000 – 1 million', 'More than 1 million'],
+    },
+  ],
+};
+
+async function mockApi(context: BrowserContext, configured: boolean) {
+  const sample = JSON.parse(
+    await readFile(
+      new URL('../packages/catalog/samples/myblog.project.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const done = { status: 'done', project: sample, usage: { costUsd: 0 } };
   const responses: Record<string, unknown> = {
+    '/api/ai/generate': QUESTIONS,
+    '/api/ai/generate/continue': done,
     '/api/setup/status': configured
       ? { available: true, configured: true }
       : {
@@ -92,6 +135,20 @@ async function editor(context: BrowserContext, name: string, projectFile: string
   await shot(page, name);
 }
 
+/** The clarification round over the editor: quick answers, You decide, editable requirements. */
+async function clarification(context: BrowserContext) {
+  await mockApi(context, true);
+  const page = await context.newPage();
+  await page.goto(BASE);
+  await page.locator('.react-flow__node').first().waitFor();
+  await page.getByPlaceholder(/Describe your application/).fill(BLOG_PROMPT);
+  await page.getByRole('button', { name: 'Backups' }).click();
+  await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page.getByRole('heading', { name: 'A few questions before drawing' }).waitFor();
+  await page.getByRole('button', { name: 'Email + Google / Apple', exact: true }).click();
+  await shot(page, 'generate-clarify');
+}
+
 async function wizard(context: BrowserContext) {
   await mockApi(context, false);
   const page = await context.newPage();
@@ -153,6 +210,13 @@ try {
       await editor(context, `editor-${colorScheme}`, projectFile);
       await context.close();
     }
+    const clarifyContext = await browser.newContext({
+      viewport,
+      deviceScaleFactor: 2,
+      colorScheme: 'light',
+    });
+    await clarification(clarifyContext);
+    await clarifyContext.close();
     const context = await browser.newContext({
       viewport: { width: 1100, height: 700 },
       deviceScaleFactor: 2,

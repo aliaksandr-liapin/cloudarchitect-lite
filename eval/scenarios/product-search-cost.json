@@ -1,0 +1,47 @@
+{
+  "id": "product-search-cost",
+  "title": "E-commerce catalog with full-text search — cost-optimized toggle; CloudFront caching accepted in place of ElastiCache (a cache cluster is a cost the toggle may trade away)",
+  "class": "containerized-api",
+  "prompt": "Our e-commerce site has 2 million products in a relational database that stays the source of truth. Shoppers need fast full-text search with typo tolerance and filters (brand, price, size). Product pages are read far more often than they change, and price updates must appear in search within a minute. The web API runs in containers.",
+  "expectedRequirements": [
+    {
+      "id": "catalog-db",
+      "keywords": ["relational", "source of truth", "database"]
+    },
+    {
+      "id": "full-text",
+      "keywords": ["full-text", "search", "typo"]
+    },
+    {
+      "id": "filters",
+      "keywords": ["filter", "facet"]
+    },
+    {
+      "id": "read-heavy",
+      "keywords": ["read"]
+    },
+    {
+      "id": "freshness",
+      "keywords": ["within a minute", "minute", "sync"]
+    },
+    {
+      "id": "containers",
+      "keywords": ["container"]
+    }
+  ],
+  "expectedServices": {
+    "required": ["aws.opensearch"],
+    "anyOf": [
+      ["aws.elasticache", "aws.cloudfront"],
+      ["aws.aurora", "aws.rds"],
+      ["aws.ecs", "aws.eks", "aws.fargate"],
+      ["aws.alb", "aws.apigateway"]
+    ],
+    "forbidden": ["aws.dax"]
+  },
+  "maxErrorFindings": 0,
+  "toggles": {
+    "costOptimized": true
+  },
+  "forbiddenRules": ["VR-024"]
+}

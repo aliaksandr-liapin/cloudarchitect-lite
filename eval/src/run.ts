@@ -26,6 +26,7 @@ console.table(
     missingServices: r.missingServices.join(', '),
     forbiddenServices: r.forbiddenServices.join(', '),
     missingUnresolved: r.missingUnresolved.join(', '),
+    forbiddenRuleHits: r.forbiddenRuleHits.join(', '),
   })),
 );
 console.log(

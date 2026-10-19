@@ -57,7 +57,8 @@ describe('gateway', () => {
       '/api/ai/generate',
       post('/api/ai/generate', { prompt: 'x', catalogVersion: 'v', model: 'sonnet' }),
     );
-    expect(ok.status).toBe(501);
+    // Past the model check; stops at the catalog check before any model call.
+    expect(ok.status).toBe(409);
   });
 
   it('rejects a default model outside the enabled list', () => {
@@ -86,10 +87,7 @@ describe('gateway', () => {
 
   it('does not charge credits for unimplemented operations', async () => {
     const { app } = setup();
-    const res = await app.request(
-      '/api/ai/generate',
-      post('/api/ai/generate', { prompt: 'blog', catalogVersion: 'v' }),
-    );
+    const res = await app.request('/api/ai/review', post('/api/ai/review', { project: {} }));
     expect(res.status).toBe(501);
     const status = await app.request('/api/credits/status', {
       headers: { 'x-forwarded-for': '203.0.113.7' },

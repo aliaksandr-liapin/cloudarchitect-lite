@@ -44,6 +44,9 @@ importers:
       '@cloudarchitect/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@cloudarchitect/generator':
+        specifier: workspace:*
+        version: link:../../packages/generator
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.13)
@@ -124,6 +127,9 @@ importers:
       '@cloudarchitect/domain':
         specifier: workspace:*
         version: link:../packages/domain
+      '@cloudarchitect/generator':
+        specifier: workspace:*
+        version: link:../packages/generator
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -166,6 +172,34 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.4
+        version: 5.0.4(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+
+  packages/generator:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.133.0
+        version: 0.133.0(zod@4.6.7)
+      '@cloudarchitect/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@cloudarchitect/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

@@ -1,0 +1,253 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The upload validator starts the workflow on each S3 ObjectCreated event. A claim has several files, so the first upload can start the execution and the automated checks before the remaining photos and PDFs arrive. Later uploads then collide with the execution name, which is the claim ID. A 'submission complete' signal should start the workflow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Business-level auditability relies on Step Functions execution history and CloudTrail. Step Functions history expires after the execution closes, and only CloudWatch logging is shown, so a durable per-step claim audit record for the assumed 7-year retention is not explicit. Object Lock on the audit bucket is not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Automated checks function has no read edge to the documents bucket or claims table. Adjuster read access to the documents (for example presigned GET) is not shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not state the Step Functions workflow type. A Standard workflow with waitForTaskToken and a 14-day timeout is required, because Express workflows are limited to 5 minutes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not mention SES sandbox exit, domain verification, or bounce and complaint handling.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless design: Step Functions callback-token wait with timeout, presigned uploads with validation, a DLQ, CloudTrail integrity validation and KMS. It has a multi-file workflow-start race and a thin business-level audit trail."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The API handler starts the workflow when the claim is submitted, while files are uploaded separately through presigned URLs. Nothing guarantees that the uploads finish before the automated checks read the documents.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design says the notifier retries 'so each email is sent once per decision' and claims 'exactly once' processing. Lambda task retries are at-least-once, so an idempotency record is needed to avoid duplicate emails. The rationale overstates the guarantee.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Object Lock on the audit store is only assumed. CloudTrail logs share the same bucket as the application audit records, and log file integrity validation is not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No dedicated file type and size validation runs before the checks. The checks validate document types afterwards. The KMS key has no edges to the resources it encrypts. No alarm edge is shown for failed workflow executions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not mention SES sandbox exit or domain verification.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless design with a Standard Step Functions wait. It adds a strong application-level audit trail: DynamoDB stream to hash-chained S3 records, with an SQS on-failure destination. Upload ordering is unclear and the exactly-once claims are overstated."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The SNS topic fans out to SQS queues encrypted with 'AWS-managed' keys. If that means the AWS managed KMS key aws/sqs, SNS cannot deliver: the queue's key must be a customer managed key whose policy grants sns.amazonaws.com GenerateDataKey and Decrypt. Messages would never reach the step queues, which breaks the 'never silently lost' requirement. Use SSE-SQS or a customer managed key with an SNS grant.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-enable-encryption-for-topic-sqs-queue-subscriptions.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Order Event Publisher's SQS failure destination appears only as a config value. There is no node for it, and no alarm for it or for stream iterator age.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Lookup by order ID is claimed, but no read or GET path is described. The API purpose covers acceptance only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "IAM (SigV4) authorization for a public customer client is questionable, and the client node marks the authorizer as 'to be confirmed'. CloudWatch has an edge only from the API, not from the DLQs, although the design relies on DLQ depth alarms.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not model the payment provider or inventory system. It does not record per-step status on the order or use partial batch responses for SQS consumers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "It has the right fan-out shape: a DynamoDB stream outbox, then SNS, then per-step SQS queues with DLQs. Gaps remain in the lookup path, publisher failure handling, alarms and authorization, and the encryption choice may block SNS-to-SQS delivery."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream publisher has no on-failure destination or retry limits. If publishing to SNS keeps failing, Lambda retries until the stream records expire after 24 hours and then discards them. Orders would be silently lost from fan-out, which contradicts R5.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The step consumers write status back to the same Orders table that feeds the stream publisher. Without event filtering for INSERT events only, every status update republishes an 'order placed' event. Idempotent consumers mitigate this, but it adds load and noise.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The customer managed KMS key used by the SNS topic and SQS queues needs a key policy statement that grants the SNS service principal access. The KMS key edges show only the Orders table.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, well-wired event-driven design. It adds Cognito auth, a KMS customer managed key, partial batch responses, per-step status, external integrations and DLQ alarms. The main gap is the missing failure destination on the stream publisher."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Running all 12 services on EKS Fargate conflicts with 'minimal change to tooling'. Fargate does not support DaemonSets, privileged containers, HostPort/HostNetwork or EBS volumes, so existing Helm charts that use them (log or metrics agents, node exporters, stateful volumes) must be reworked. The rationale presents Fargate as change-free. A managed EC2 node group, or a mix, would fit the constraint better.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A single NAT Gateway in AZ B is a single point of failure for outbound traffic and contradicts the two-AZ high-availability goal in I1. Interface and gateway VPC endpoints for ECR, Secrets Manager, CloudWatch and X-Ray would cut NAT data-processing cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not say that the ALB must use IP targets through the AWS Load Balancer Controller on Fargate. Nothing shows how Container Insights and the OpenTelemetry collector run without DaemonSets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design specifies no security groups between pods and RDS/ElastiCache, no Redis AUTH or in-transit TLS, and no EKS API endpoint access mode.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct single-ALB, two-AZ EKS layout with Secrets Manager via IRSA, KMS, Multi-AZ RDS and ElastiCache, and OpenTelemetry to X-Ray. The Fargate choice weakens the minimal-change goal, and the single NAT gateway is a weak point."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design models two per-AZ Application Load Balancers, each in one public subnet, with separate Route 53 aliases, WAF associations and certificates. It describes the second one as a 'second load balancer node in a second Availability Zone'. That is a misunderstanding: one ALB is created with subnets in at least two AZs, and ELB places a node in each enabled zone automatically. A single-subnet ALB cannot be created. As drawn, the design is not buildable and would double ALB cost and DNS complexity.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no secret management for MySQL credentials (for example Secrets Manager) and no IAM roles for service accounts or EKS Pod Identity for pod access to AWS APIs. Security groups, Redis AUTH and TLS are not specified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Tracing goes straight from the nodes to X-Ray, with no collector (ADOT or OpenTelemetry) or instrumentation approach. The data store edges are labelled read-only, although services also write.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption uses AWS-managed keys only. This is acceptable, but encryption in transit to the data stores is not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An EC2 managed node group fits the minimal-change goal, and two NAT gateways with Multi-AZ data stores give good resilience. The entry point is modelled incorrectly as two single-AZ ALBs, and secret management is missing."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "Both use a Standard Step Functions callback wait correctly. B better meets 'every step must be auditable' with a stream-driven, hash-chained audit store that has a failure queue. A relies mainly on CloudTrail and execution history and has a multi-file workflow-start race."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B covers lookup, authentication, a working KMS setup for SNS-to-SQS, per-step status, external integrations, partial batch responses and DLQ alarms. A has a likely SNS-to-SQS encryption blocker and thinner coverage. Both need better stream-publisher failure handling."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A's entry point is correct (one multi-AZ ALB) and it handles secrets through IRSA and an OpenTelemetry collector. B's two single-AZ ALBs are a factual error that makes the design unbuildable as drawn, and B lacks secret management. B's EC2 nodes fit the minimal-change goal better than A's Fargate, but they do not outweigh these problems."
+    }
+  ]
+}

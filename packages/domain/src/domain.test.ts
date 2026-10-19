@@ -50,6 +50,8 @@ const catalog: CatalogSnapshot = {
     service('aws.apigateway', 'regional'),
     service('aws.sqs', 'regional'),
     service('aws.alb', 'vpc'),
+    service('aws.cognito', 'regional'),
+    service('aws.dynamodb', 'regional'),
   ],
   features: [],
   facts: [],
@@ -448,7 +450,318 @@ describe('migrateProject', () => {
     expect(p.nodes).toEqual(base().nodes);
   });
 
+  it('upgrades 1.2.0 projects to 1.3.0 unchanged otherwise', () => {
+    expect(PROJECT_SCHEMA_VERSION).toBe('1.3.0');
+    const v12 = { ...base(), schemaVersion: '1.2.0' };
+    const p = migrateProject(v12);
+    expect(p.schemaVersion).toBe('1.3.0');
+    expect(p).toEqual(Project.parse({ ...base(), schemaVersion: '1.3.0' }));
+  });
+
   it('rejects unknown versions', () => {
     expect(() => migrateProject({ schemaVersion: '9.9.9' })).toThrow(UnsupportedSchemaError);
+  });
+});
+
+describe('PRD rules VR-002, VR-003, VR-008, VR-011', () => {
+  const node = (id: string, serviceId: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      provider: 'aws',
+      serviceId,
+      label: id,
+      requirementIds: [],
+      position: pos,
+      containerId: 'region',
+      ...extra,
+    }) as never;
+  const ext = (id: string, kind: string) =>
+    ({
+      id,
+      provider: 'aws',
+      label: id,
+      requirementIds: [],
+      position: pos,
+      external: { kind, name: id },
+    }) as never;
+  const edge = (
+    source: string,
+    target: string,
+    kind: string,
+    configuration?: Record<string, string>,
+  ) =>
+    ({
+      id: `${source}-${target}`,
+      source,
+      target,
+      kind,
+      requirementIds: [],
+      configuration,
+    }) as never;
+  const cw = node('cw', 'aws.cloudwatch');
+
+  it('VR-002 flags clients reading S3 that CloudFront also serves', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('cf', 'aws.cloudfront'), node('s3', 'aws.s3'), cw],
+      edges: [edge('cf', 's3', 'origin', { originAccess: 'OAC' }), edge('u', 's3', 'read')],
+    });
+    expect(ruleIds(p)).toContain('VR-002');
+  });
+  it('VR-002 accepts S3 reached only through CloudFront', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('cf', 'aws.cloudfront'), node('s3', 'aws.s3'), cw],
+      edges: [edge('cf', 's3', 'origin', { originAccess: 'OAC' }), edge('u', 'cf', 'read')],
+    });
+    expect(ruleIds(p)).not.toContain('VR-002');
+  });
+
+  it('VR-003 flags a public API without an authorizer', () => {
+    const p = base({
+      nodes: [ext('u', 'user'), node('api', 'aws.apigateway'), cw],
+      edges: [edge('u', 'api', 'invoke')],
+    });
+    expect(ruleIds(p)).toContain('VR-003');
+  });
+  it('VR-003 accepts an API with authorizer config', () => {
+    const p = base({
+      nodes: [
+        ext('u', 'user'),
+        node('api', 'aws.apigateway', { configuration: { authorizer: 'JWT' } }),
+        cw,
+      ],
+      edges: [edge('u', 'api', 'invoke')],
+    });
+    expect(ruleIds(p)).not.toContain('VR-003');
+  });
+  it('VR-003 accepts an authorizer on the incoming edge or a Cognito link', () => {
+    const nodes = [ext('u', 'user'), node('alb', 'aws.alb'), node('c', 'aws.cognito'), cw];
+    expect(
+      ruleIds(base({ nodes, edges: [edge('u', 'alb', 'invoke', { authorizer: 'OIDC' })] })),
+    ).not.toContain('VR-003');
+    expect(
+      ruleIds(base({ nodes, edges: [edge('u', 'alb', 'invoke'), edge('alb', 'c', 'other')] })),
+    ).not.toContain('VR-003');
+  });
+
+  it('VR-008 flags a data store without encryption', () => {
+    const p = base({ nodes: [node('t', 'aws.dynamodb'), cw] });
+    expect(ruleIds(p)).toContain('VR-008');
+  });
+  it('VR-008 accepts a data store with encryption', () => {
+    const p = base({
+      nodes: [node('t', 'aws.dynamodb', { configuration: { encryption: 'KMS' } }), cw],
+    });
+    expect(ruleIds(p)).not.toContain('VR-008');
+  });
+
+  it('VR-011 flags a client upload to S3 without authorization', () => {
+    const p = base({
+      nodes: [ext('c', 'client-app'), node('s3', 'aws.s3'), cw],
+      edges: [edge('c', 's3', 'write')],
+    });
+    expect(ruleIds(p)).toContain('VR-011');
+  });
+  it('VR-011 accepts a presigned URL or a Cognito link', () => {
+    const nodes = [ext('c', 'client-app'), node('s3', 'aws.s3'), node('cog', 'aws.cognito'), cw];
+    expect(
+      ruleIds(base({ nodes, edges: [edge('c', 's3', 'write', { presignedUrl: 'PUT' })] })),
+    ).not.toContain('VR-011');
+    expect(
+      ruleIds(base({ nodes, edges: [edge('c', 's3', 'write'), edge('c', 'cog', 'invoke')] })),
+    ).not.toContain('VR-011');
+  });
+});
+
+describe('toggle rules VR-019…VR-025', () => {
+  const node = (id: string, serviceId: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      provider: 'aws',
+      serviceId,
+      label: id,
+      requirementIds: [],
+      position: pos,
+      containerId: 'region',
+      ...extra,
+    }) as never;
+  const ext = (id: string) =>
+    ({
+      id,
+      provider: 'aws',
+      label: id,
+      requirementIds: [],
+      position: pos,
+      external: { kind: 'user', name: id },
+    }) as never;
+  const edge = (source: string, target: string) =>
+    ({ id: `${source}-${target}`, source, target, kind: 'invoke', requirementIds: [] }) as never;
+  const gen = (toggles: Record<string, unknown>) => ({
+    toggles,
+    model: 'sonnet',
+    generatedAt: '2026-10-18T00:00:00Z',
+    contentHash: 'h',
+  });
+  const req = (id: string, provenance: string, status = 'confirmed') =>
+    ({ id, text: id, type: 'functional', status, provenance }) as never;
+  const withToggles = (toggles: Record<string, unknown>, over: Partial<Project> = {}) =>
+    base({ generation: gen(toggles) as never, ...over });
+  const found = (p: Project, id: string) =>
+    validateProject(p, catalog).filter((f) => f.ruleId === id);
+
+  it('VR-019 flags unrequested servers and accepts user-requested ones', () => {
+    const bad = withToggles(
+      { serverlessFirst: true },
+      {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['R1'] })],
+        requirements: [req('R1', 'ai')],
+      },
+    );
+    expect(found(bad, 'VR-019')[0]?.requirementIds).toEqual(['T-serverless-first']);
+    const ok = withToggles(
+      { serverlessFirst: true },
+      {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['R1'] })],
+        requirements: [req('R1', 'user')],
+      },
+    );
+    expect(found(ok, 'VR-019')).toHaveLength(0);
+  });
+
+  it('VR-020 flags a data store without backup', () => {
+    const t = { backups: true };
+    expect(found(withToggles(t, { nodes: [node('s3', 'aws.s3')] }), 'VR-020')).toHaveLength(1);
+    const ok = node('s3', 'aws.s3', { configuration: { backup: 'versioning' } });
+    expect(found(withToggles(t, { nodes: [ok] }), 'VR-020')).toHaveLength(0);
+  });
+
+  it('VR-021 flags a database that is not Multi-AZ', () => {
+    const t = { disasterRecovery: 'multi-az' };
+    expect(found(withToggles(t, { nodes: [node('db', 'aws.rds')] }), 'VR-021')).toHaveLength(1);
+    const ok = node('db', 'aws.rds', { configuration: { multiAz: 'true' } });
+    expect(found(withToggles(t, { nodes: [ok] }), 'VR-021')).toHaveLength(0);
+    expect(
+      found(
+        withToggles({ disasterRecovery: 'cross-region' }, { nodes: [node('db', 'aws.rds')] }),
+        'VR-021',
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('VR-022 needs two regions and replicated stores', () => {
+    const t = { disasterRecovery: 'cross-region' };
+    const bad = withToggles(t, { nodes: [node('d', 'aws.dynamodb'), node('e', 'aws.efs')] });
+    expect(found(bad, 'VR-022')).toHaveLength(2); // one region + dynamodb; EFS exempt
+    const ok = withToggles(t, {
+      containers: [
+        { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+        { id: 'region', kind: 'region', parentId: 'cloud', label: 'a' },
+        { id: 'region2', kind: 'region', parentId: 'cloud', label: 'b' },
+      ],
+      nodes: [node('d', 'aws.dynamodb', { configuration: { replication: 'global-table' } })],
+    });
+    expect(found(ok, 'VR-022')).toHaveLength(0);
+  });
+
+  it('VR-022 accepts a replica in another region of a replicated store', () => {
+    const t = { disasterRecovery: 'cross-region' };
+    const containers = [
+      { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+      { id: 'region', kind: 'region', parentId: 'cloud', label: 'a' },
+      { id: 'region2', kind: 'region', parentId: 'cloud', label: 'b' },
+    ];
+    const replicated = { containerId: 'region', configuration: { replication: 'global tables' } };
+    const replica = withToggles(t, {
+      containers: containers as never,
+      nodes: [
+        node('d', 'aws.dynamodb', replicated),
+        node('d2', 'aws.dynamodb', { containerId: 'region2' }),
+      ],
+    });
+    expect(found(replica, 'VR-022')).toHaveLength(0);
+    // Same region, or a different service, is not a replica.
+    const sameRegion = withToggles(t, {
+      containers: containers as never,
+      nodes: [
+        node('d', 'aws.dynamodb', replicated),
+        node('d2', 'aws.dynamodb', { containerId: 'region' }),
+        node('s', 'aws.s3', { containerId: 'region2' }),
+      ],
+    });
+    expect(found(sameRegion, 'VR-022').flatMap((f) => f.nodeIds)).toEqual(['d2', 's']);
+  });
+
+  describe('VR-023', () => {
+    const containers = (azs: string[]) => [
+      { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+      { id: 'region', kind: 'region', parentId: 'cloud', label: 'r' },
+      { id: 'vpc', kind: 'vpc', parentId: 'region', label: 'vpc' },
+      ...azs.map((a) => ({ id: a, kind: 'availability-zone', parentId: 'vpc', label: a })),
+    ];
+    const at = (id: string, serviceId: string, containerId: string) =>
+      node(id, serviceId, { containerId });
+    it('flags a single AZ or no AZ and accepts two', () => {
+      const t = { highAvailability: true };
+      const one = withToggles(t, {
+        containers: containers(['a']) as never,
+        nodes: [at('lb', 'aws.alb', 'a'), at('db', 'aws.rds', 'a')],
+      });
+      expect(found(one, 'VR-023')).toHaveLength(1);
+      const none = withToggles(t, {
+        containers: containers([]) as never,
+        nodes: [at('db', 'aws.rds', 'vpc')],
+      });
+      expect(found(none, 'VR-023')).toHaveLength(1);
+      const two = withToggles(t, {
+        containers: containers(['a', 'b']) as never,
+        nodes: [at('lb', 'aws.alb', 'a'), at('db', 'aws.rds', 'b')],
+      });
+      expect(found(two, 'VR-023')).toHaveLength(0);
+    });
+    it('also runs for disaster recovery', () => {
+      const p = withToggles(
+        { disasterRecovery: 'multi-az' },
+        { containers: containers(['a']) as never, nodes: [at('db', 'aws.rds', 'a')] },
+      );
+      expect(found(p, 'VR-023')[0]?.requirementIds).toEqual(['T-dr']);
+    });
+  });
+
+  it('VR-024 flags cost drivers with only toggle requirements', () => {
+    const t = { costOptimized: true };
+    const mk = (r: string) =>
+      withToggles(t, {
+        nodes: [node('vm', 'aws.ec2', { requirementIds: ['T-cost', 'R1'] })],
+        requirements: [req('T-cost', 'toggle'), req('R1', r)],
+      });
+    expect(found(mk('toggle'), 'VR-024')).toHaveLength(1);
+    expect(found(mk('user'), 'VR-024')).toHaveLength(0);
+  });
+
+  it('VR-025 flags public entry points without WAF and data stores without KMS', () => {
+    const t = { securityHardening: true };
+    const kms = { configuration: { encryption: 'KMS' } };
+    const bad = withToggles(t, {
+      nodes: [ext('u'), node('api', 'aws.apigateway'), node('s3', 'aws.s3')],
+      edges: [edge('u', 'api')],
+    });
+    expect(found(bad, 'VR-025')).toHaveLength(2);
+    const ok = withToggles(t, {
+      nodes: [
+        ext('u'),
+        node('api', 'aws.apigateway'),
+        node('waf', 'aws.waf'),
+        node('s3', 'aws.s3', kms),
+      ],
+      edges: [edge('u', 'api'), edge('waf', 'api')],
+    });
+    expect(found(ok, 'VR-025')).toHaveLength(0);
+  });
+
+  it('never fires without project.generation', () => {
+    const p = base({
+      nodes: [node('vm', 'aws.ec2'), node('s3', 'aws.s3'), node('api', 'aws.apigateway'), ext('u')],
+      edges: [edge('u', 'api')],
+    });
+    expect(ruleIds(p).filter((id) => /^VR-0(19|2[0-5])$/.test(id ?? ''))).toEqual([]);
   });
 });

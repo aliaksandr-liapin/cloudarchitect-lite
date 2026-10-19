@@ -59,6 +59,30 @@ describe('eval harness', () => {
     });
     expect(scoreCandidate(withNeed, withNode)).toMatchObject({ missingUnresolved: [] });
   });
+
+  it('scoreCandidate fails a candidate that hits a forbidden rule', () => {
+    const withBackups = Scenario.parse({
+      ...scenario,
+      toggles: { backups: true },
+      forbiddenRules: ['VR-020'],
+    });
+    const project = structuredClone(reference) as Record<string, unknown> & {
+      nodes: { serviceId?: string; configuration?: Record<string, unknown> }[];
+    };
+    project.generation = {
+      toggles: { backups: true },
+      model: 'haiku',
+      generatedAt: '2026-10-18T00:00:00.000Z',
+      contentHash: '',
+    };
+    const dynamo = project.nodes.find((n) => n.serviceId === 'aws.dynamodb')!;
+    expect(dynamo.configuration?.backup).toBeUndefined();
+    expect(scoreCandidate(withBackups, project)).toMatchObject({
+      forbiddenRuleHits: ['VR-020'],
+      passed: false,
+    });
+    expect(scoreCandidate(scenario, reference)).toMatchObject({ forbiddenRuleHits: [] });
+  });
 });
 
 describe('benchmark scenarios', () => {
@@ -68,10 +92,21 @@ describe('benchmark scenarios', () => {
     .map((f) => Scenario.parse(JSON.parse(readFileSync(new URL(f, dir), 'utf8'))));
   const known = new Set(awsCatalog.services.map((s) => s.id));
 
-  it('has 10-15 scenarios for Phase 0 with unique ids', () => {
-    expect(all.length).toBeGreaterThanOrEqual(10);
+  it('has 15 base and 7 toggle scenarios with unique ids', () => {
+    expect(all.length).toBe(22);
+    expect(all.filter((s) => Object.keys(s.toggles).length).length).toBe(7);
     expect(new Set(all.map((s) => s.id)).size).toBe(all.length);
   });
+
+  it.each(all.filter((s) => s.forbiddenRules.length).map((s) => [s.id, s] as const))(
+    '%s copies prompt and requirements from its base scenario',
+    (id, s) => {
+      const base = all.find((b) => id.startsWith(`${b.id}-`) && !b.forbiddenRules.length)!;
+      expect(s.prompt).toBe(base.prompt);
+      expect(s.expectedRequirements).toEqual(base.expectedRequirements);
+      expect(s.forbiddenRules.every((r) => /^VR-0\d\d$/.test(r))).toBe(true);
+    },
+  );
 
   it.each(all.map((s) => [s.id, s] as const))('%s references only catalog services', (_, s) => {
     const ids = [

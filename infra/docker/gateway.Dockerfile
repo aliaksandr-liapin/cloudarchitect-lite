@@ -10,11 +10,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/gateway/package.json apps/gateway/
 COPY packages/domain/package.json packages/domain/
 COPY packages/catalog/package.json packages/catalog/
+COPY packages/generator/package.json packages/generator/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter @cloudarchitect/gateway...
 COPY tsconfig.base.json ./
 COPY packages/domain packages/domain
 COPY packages/catalog packages/catalog
+COPY packages/generator packages/generator
 COPY apps/gateway apps/gateway
 RUN pnpm --filter @cloudarchitect/gateway build
 
