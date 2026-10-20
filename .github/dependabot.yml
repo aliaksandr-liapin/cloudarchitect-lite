@@ -10,6 +10,10 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      # CodeQL fails unless init and analyze run the same version, so they update together.
+      codeql:
+        patterns: ['github/codeql-action*']
   - package-ecosystem: docker
     directory: /infra/docker
     schedule: { interval: weekly }
