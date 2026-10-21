@@ -67,7 +67,7 @@ Measured on 15 benchmark scenarios × 3, scored by the automated eval harness an
 
 ## Development
 
-Requirements: Node 26+ (see `.nvmrc`), pnpm 10.32 (`npm install -g pnpm@10.32.1`; Node 25+ no longer bundles corepack).
+Requirements: Node 24+ (26 recommended, see `.nvmrc`), pnpm 10.32 (`npm install -g pnpm@10.32.1`; Node 25+ no longer bundles corepack).
 
 ```bash
 pnpm install
