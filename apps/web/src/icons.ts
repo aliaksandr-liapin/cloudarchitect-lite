@@ -47,3 +47,19 @@ export async function loadIcons(source: IconSource): Promise<{ state: IconState;
   const { state, icons } = await source();
   return { state, urls: state === 'ready' && icons ? toDataUrls(icons) : {} };
 }
+
+export const MISSING_POLLS = 5;
+export const FETCHING_POLLS = 100;
+export type IconStep = 'done' | 'poll' | 'retry' | 'give-up';
+
+/**
+ * What to do after the `attempts`-th poll saw `state`. `missing` (no download running, or a gateway
+ * without an icon store) triggers one retry, then a few polls, then gives up; `fetching` polls for
+ * at most ~5 minutes. So neither the notice nor the polling can run forever.
+ */
+export function nextIconStep(state: IconState, attempts: number): IconStep {
+  if (state === 'ready' || state === 'failed') return 'done';
+  if (state === 'fetching') return attempts < FETCHING_POLLS ? 'poll' : 'give-up';
+  if (attempts === 0) return 'retry';
+  return attempts < MISSING_POLLS ? 'poll' : 'give-up';
+}

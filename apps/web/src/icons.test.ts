@@ -1,7 +1,14 @@
 import { migrateProject } from '@cloudarchitect/domain';
 import { samples } from '@cloudarchitect/catalog';
 import { describe, expect, it } from 'vitest';
-import { containerIcon, serviceIcon, toDataUrls } from './icons';
+import {
+  FETCHING_POLLS,
+  MISSING_POLLS,
+  containerIcon,
+  nextIconStep,
+  serviceIcon,
+  toDataUrls,
+} from './icons';
 
 const project = migrateProject(samples.myblog);
 const urls = {
@@ -49,5 +56,21 @@ describe('toDataUrls', () => {
     expect(url.startsWith('data:image/svg+xml;base64,')).toBe(true);
     const bytes = Uint8Array.from(atob(url.split(',')[1]!), (c) => c.charCodeAt(0));
     expect(new TextDecoder().decode(bytes)).toBe(svg);
+  });
+});
+
+describe('nextIconStep', () => {
+  it('stops on ready and failed', () => {
+    expect(nextIconStep('ready', 0)).toBe('done');
+    expect(nextIconStep('failed', 3)).toBe('done');
+  });
+  it('polls while fetching, but gives up eventually', () => {
+    expect(nextIconStep('fetching', 1)).toBe('poll');
+    expect(nextIconStep('fetching', FETCHING_POLLS)).toBe('give-up');
+  });
+  it('retries missing once, polls a bounded number of times, then gives up', () => {
+    expect(nextIconStep('missing', 0)).toBe('retry');
+    expect(nextIconStep('missing', 1)).toBe('poll');
+    expect(nextIconStep('missing', MISSING_POLLS)).toBe('give-up');
   });
 });

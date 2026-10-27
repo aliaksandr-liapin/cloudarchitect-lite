@@ -42,7 +42,14 @@ import {
   type Routes,
 } from './layout';
 import { AiModelPanel, readModelChoice } from './models';
-import { containerIcon, loadIcons, serviceIcon, type IconState, type IconUrls } from './icons';
+import {
+  containerIcon,
+  loadIcons,
+  nextIconStep,
+  serviceIcon,
+  type IconState,
+  type IconUrls,
+} from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
@@ -564,22 +571,26 @@ export function App() {
     [commit],
   );
 
-  /** Loads the official icons once, then polls every 3 s while the gateway is still downloading them. */
+  /** Loads the official icons, polling every 3 s only while a download is plausibly running (see `nextIconStep`). */
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stop = false;
-    const run = async () => {
+    const run = async (attempts: number) => {
       try {
         const { state, urls } = await loadIcons(() => api.icons());
         if (stop) return;
-        setIconState(state);
+        const step = nextIconStep(state, attempts);
         if (state === 'ready') setIconUrls(urls);
-        if (state === 'fetching' || state === 'missing') timer = setTimeout(run, 3000);
+        // 'missing' shows no notice; giving up leaves generic tiles without one either.
+        setIconState(step === 'give-up' || state === 'missing' ? undefined : state);
+        if (step === 'retry') await api.retryIcons().catch(() => undefined);
+        if (step === 'retry' || step === 'poll')
+          timer = setTimeout(() => void run(attempts + 1), 3000);
       } catch {
         if (!stop) setIconState(undefined); // gateway unreachable: generic tiles, no notice
       }
     };
-    void run();
+    void run(0);
     return () => {
       stop = true;
       clearTimeout(timer);
@@ -702,7 +713,7 @@ export function App() {
           <code>docker compose logs gateway</code>) to finish setup; manual editing works meanwhile.
         </div>
       )}
-      {(iconState === 'fetching' || iconState === 'missing') && (
+      {iconState === 'fetching' && (
         <div role="status" className="notice">
           Downloading the official AWS icons (first start only)…
         </div>
