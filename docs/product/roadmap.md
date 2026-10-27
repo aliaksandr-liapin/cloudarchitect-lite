@@ -1,6 +1,6 @@
 # Roadmap & Implementation Backlog — CloudArchitect Lite
 
-**Version:** 0.2 · **Date:** 2026-10-13 · **Dates:** estimates, not commitments · **Aligned with:** PRD v0.2
+**Version:** 0.3 · **Date:** 2026-10-27 · **Dates:** estimates, not commitments · **Aligned with:** PRD v0.2
 
 ## 1. Delivery model
 
@@ -8,7 +8,37 @@
 - **Independent architecture review:** Claude in an isolated, blind reviewer session using the PRD §14 rubric (PRD §15).
 - The schedule holds only if scope stays at P0; each P1 pulled into MVP moves dates.
 
-## 2. Development stages
+## 2. Public release roadmap (from 2026-10-26)
+
+On 2026-10-26 the product owner re-scoped the project. CloudArchitect Lite is a **free, open-source,
+self-hosted** tool: each user brings their own AI key, so nothing costs the maintainer to run. It is
+also a public showcase built in the open. The project ships in small public releases, about one every
+four weeks, each with its own hook, a LinkedIn post and a dev.to article
+([dev.to/aliaksandrliapin](https://dev.to/aliaksandrliapin)). Building-in-public posts (design
+decisions, ADRs, eval numbers, bug stories) fill the weeks between releases.
+
+This replaces stages 3–5 below (MVP engineering, private beta, public beta). The hosted-service work
+they assumed (anonymous free credits, an owner budget cap and kill switch, BYOK direct browser calls,
+hosted Privacy Policy and Terms) is dropped.
+
+| Release | Target | Theme | Scope | Announcement hook / article |
+|---|---|---|---|---|
+| 0.2 | mid-Nov 2026 | **Public MVP** | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers removed (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 18 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
+| 0.3 | mid-Dec 2026 | **Claude vs GPT vs Gemini** | Claude, OpenAI and Gemini, two models each; public blind benchmark with a three-provider review panel ([design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
+| 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
+| 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo | Diff-based AI editing of a graph |
+| 0.6 | Mar 2027 | **Cost estimate** | Monthly AWS cost estimate per diagram from traffic assumptions | "What will this architecture cost?" |
+| 0.7 | Apr 2027 | **Diagram to code** | CloudFormation / Terraform skeleton export | "From a sentence to deployable infrastructure" |
+| 0.8 | May 2027 | **Fully offline** | Local models via Ollama; benchmark update | "Free, private, no API key" |
+| 0.9 | Jun–Jul 2027 | **Multi-cloud** | Azure and GCP catalogs and generation | "Same app, three clouds, side by side" |
+| 0.10 | Aug 2027 | **Bring your infrastructure** | Import Terraform/CloudFormation into a diagram, then review it | "Understand inherited infrastructure in a minute" |
+| 0.11 | Sep–Oct 2027 | **Share** | Share by link, draw.io export, Ask about the design (FR-022); Hacktoberfest contributor push | Contributing to an open-source AI tool |
+| 1.0 | Nov 2027 | **1.0** | Stability, accessibility, documentation site, contribution guide for catalog entries | A year of building in public |
+
+Launch channels for 0.2: LinkedIn, dev.to, Show HN; for 0.3 also r/aws and r/LocalLLaMA. Each
+release gets its own design, plan and PR; dates are targets, and July and October carry slack.
+
+## 3. Development stages (original plan, 2026-10-13)
 
 | Phase | Estimate | Outcome | Exit criterion |
 |---|---|---|---|
@@ -21,7 +51,7 @@
 
 The AI spike is moved into Phase 0 because generation quality is the main product hypothesis; the canvas is lower risk. Original 3–5/4–6 week estimates refer to an aggressive small-scope prototype; the schedule above is the conservative plan.
 
-## 3. Implementation epics
+## 4. Implementation epics
 
 **E1 — Project/Canvas:** editor, graph schema 1.1, **containers (FR-019)**, manual operations, undo/redo, ELK layout in a Web Worker, local save/load, schema migration. Readability pass done 2026-10-19 after Gate A manual testing: orthogonal routing with label space, fit to view, resizable components and groups (schema 1.4.0), light/dark switch, resizable side panel, generation status. Still open: undo/redo, ELK in a Web Worker.
 
@@ -39,20 +69,20 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 **E7 — Legal & compliance (new):** Privacy Policy, Terms of Use, GDPR basis, AI provider data settings, icon attribution page, disclaimers.
 
-## 4. Priority order
+## 5. Priority order
 
 P0: E1 editor + containers → E2 AWS catalog/icons → E3 structured generation + eval harness → E4 details/rules/Review → E5 credits, budget cap, BYOK → E6 core export → E7 legal.  
 P1: AI edit with preview, Ask (FR-022), Mermaid export, draw.io export, OpenRouter OAuth, advanced traceability, manual Architecture Freshness Check.  
 P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP generation, automated catalog pipeline, collaboration.
 
-## 5. Product differentiation to test
+## 6. Product differentiation to test
 
 - Faster **time to accepted diagram** vs manual/editor-plus-chatbot workflow and vs existing text-to-diagram tools.
 - Official consistent iconography and trustworthy supported service IDs.
 - Clear connection descriptions, requirement coverage and rule-based findings.
 - No signup/manual free editor and simple BYOK transition.
 
-## 6. Beta metrics (proposed targets)
+## 7. Beta metrics (proposed targets)
 
 - Valid graph output ≥ 99% on curated benchmark.
 - Key requirements recall ≥ 90% on benchmark.
@@ -63,13 +93,13 @@ P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP 
 - Zero secrets in app bundle/logs; BYOK key never reaches our servers in direct mode; quota bypass controls tested.
 - Manual canvas and exports usable when AI gateway is unavailable.
 
-## 7. Decision gates
+## 8. Decision gates
 
 - **Gate A (after AI PoC):** blind review of ≥ 10 distinct reference scenarios against the rubric — diagram fidelity, correct edges and containers, no critical defects; eval harness green.
 - **Gate B (before private beta):** icon terms recorded for every bundled pack and usage within those terms; security test of keys, quotas and budget cap; Privacy Policy and Terms ready; disaster recovery of local project via JSON export.
 - **Gate C (after beta):** empirical time saved, retention, real generation cost vs budget, willingness to pay; compare reviewer scores with beta user feedback to detect reviewer blind spots.
 
-## 8. Risks and mitigations
+## 9. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|

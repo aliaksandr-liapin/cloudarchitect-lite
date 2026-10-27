@@ -1,6 +1,6 @@
 # Multiple AI providers (Claude, OpenAI, Gemini) — design
 
-Date: 2026-10-26 · Status: draft · Scope: `packages/generator`, `packages/domain`, `apps/gateway`,
+Date: 2026-10-26 · Status: draft, scheduled for release 0.3 (approval before build) · Scope: `packages/generator`, `packages/domain`, `apps/gateway`,
 `apps/web` (setup wizard, AI model panel), `eval`
 
 ## Where this fits
@@ -11,14 +11,10 @@ Phase 3 was re-scoped on 2026-10-26 by the product owner:
   and pays their provider directly; the maintainer pays nothing to run it.
 - The goal is a public showcase for the maintainer's personal brand (LinkedIn launch, GitHub stars
   and forks, visibility to engineers and recruiters). The repository itself is part of the product.
-- Phase 3 is four projects, built in this order, each with its own design, plan and PR:
-  1. **Multiple AI providers** (this document)
-  2. Review (FR-021): AI advisory critique of the current diagram
-  3. Exports: PNG, SVG, JSON, Mermaid (draw.io later)
-  4. Launch polish: clickable demo on GitHub Pages, README GIF, install tested on Windows/macOS/
-     Linux, removal of hosted-only leftovers (free credits, kill switch, Cloudflare deploy), README,
-     repository made public
-- Dropped from Phase 3: protecting a hosted owner key (free credits for strangers, owner budget cap
+- On 2026-10-27 delivery moved to small public releases (`docs/product/roadmap.md` §2). This design
+  is release **0.3** ("Claude vs GPT vs Gemini"), after the 0.2 public MVP (launch polish and
+  PNG/SVG/JSON export). Review and Mermaid export follow in 0.4.
+- Dropped: protecting a hosted owner key (free credits for strangers, owner budget cap
   and kill switch, BYOK direct browser calls, hosted Privacy Policy and Terms).
 
 ## Why
