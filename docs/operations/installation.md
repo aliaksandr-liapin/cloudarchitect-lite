@@ -110,13 +110,14 @@ Values in a `.env` file override the wizard; the wizard shows which ones are loc
 
 ## Troubleshooting
 
-| Problem                     | Fix                                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Port 8080 is in use         | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                |
-| Lost the setup link         | `docker compose logs gateway`; the code changes on every gateway restart                               |
-| "The setup code is wrong"   | Use the link from the latest log; restarting creates a new code                                        |
-| "Could not reach Anthropic" | Check the internet connection or proxy of the machine running Docker                                   |
-| AWS icons do not appear     | They need internet on first start; restart the stack with `docker compose restart gateway` once online |
+| Problem                     | Fix                                                                                                                                                                                                |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Port 8080 is in use         | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                                                                                                            |
+| Lost the setup link         | `docker compose logs gateway`; the code changes on every gateway restart                                                                                                                           |
+| "The setup code is wrong"   | Use the link from the latest log; restarting creates a new code                                                                                                                                    |
+| "Could not reach Anthropic" | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
+| Behind an HTTP(S) proxy     | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
+| AWS icons do not appear     | They need internet on first start; restart the stack with `docker compose restart gateway` once online                                                                                             |
 
 ## Security notes
 
