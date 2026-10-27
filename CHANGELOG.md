@@ -14,7 +14,6 @@ First public release. Includes the Phase 2 work below and a self-hosted install 
 - Official AWS icons on nodes and groups, fetched from aws.amazon.com on first start and not redistributed by this project.
 - A clickable editor demo on GitHub Pages.
 - Export of the diagram as PNG and SVG, next to JSON.
-- A pitch-first README with a demo GIF.
 - AI generation in the editor: a Generate panel with a prompt box, six design-priority toggles (Serverless-first, Backups, Disaster recovery, High availability, Cost-optimized, Security hardening), stage text and Cancel.
 - One clarification round: up to three questions with quick answers, "You decide" and free text, plus editable requirements before drawing (optional review pause when there are no questions).
 - Versions: the current diagram is kept in browser storage (last 10 per project) before a generated one replaces it; a toast offers "Restore previous" and a Versions list restores any earlier diagram. Hand-edited diagrams ask before they are replaced.

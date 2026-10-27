@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)
 
-> Describe your app in plain English and get an AWS architecture, checked against 18 rules, running on your own machine with your own key.
+> Describe your app in plain English and get an AWS architecture, checked against 25 rules, running on your own machine with your own key.
 
 ![CloudArchitect Lite turns a plain-English description into an AWS architecture diagram](docs/images/demo.gif)
 
@@ -39,17 +39,17 @@ Details, upgrading and troubleshooting: [installation guide](docs/operations/ins
 
 1. **Describe** your application in plain language. The AI asks up to three clarifying questions.
 2. **Generate** a design built only from a curated catalog of 38 AWS services, placed in containers (cloud, region, VPC, availability zone, subnet). A service the catalog does not know is flagged as unresolved instead of invented.
-3. **Validate**: 18 deterministic rules (VR-001 to VR-018, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
+3. **Validate**: 25 deterministic rules (VR-001 to VR-025, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
 4. **Edit and export** on the canvas, then export JSON, PNG or SVG.
 
 ## What works today
 
 - Plain-English description, clarifying questions and design-priority toggles (serverless-first, backups, disaster recovery, high availability, cost-optimized, security hardening).
-- AWS diagrams with official icons, containers and 18 validation rules with findings.
+- AWS diagrams with official icons, containers and 25 validation rules with findings.
 - Editor: drag, resize, auto layout, light and dark theme, and versions that keep earlier diagrams.
 - Import and export JSON; export PNG and SVG.
 - Self-hosted with Docker on your own Anthropic key, with daily and monthly spending limits.
-- Choice of Claude Haiku 5.5 or Claude Sonnet 5.5. In the Gate A live runs, Haiku cost about $0.007 per generation and Sonnet about $0.045, and both passed the automated checks on 93% of runs. Blind reviewers scored Haiku 2.29 and Sonnet 2.57 out of 3. Method and caveats: [Gate A report](docs/product/phase2-gate-a.md).
+- Choice of Claude Haiku 5.5 or Claude Sonnet 5.5. In the Gate A live runs, Haiku cost about $0.007 per generation and Sonnet about $0.045, and both passed the automated checks on 93% of runs. On the same nine base scenarios, blind reviewers scored Haiku 2.00 and Sonnet 2.57 out of 3. Method and caveats: [Gate A report](docs/product/phase2-gate-a.md).
 
 ## What's next
 

@@ -9,7 +9,7 @@ someone who clicks through from a post understand the project and want to try it
 The product owner named the two things they must find: **a live demo diagram and a one-command
 install**.
 
-The pitch: _describe your app in plain English and get an AWS architecture, checked against 18 rules,
+The pitch: _describe your app in plain English and get an AWS architecture, checked against 25 rules,
 running on your own machine with your own key._
 
 CloudArchitect Lite is now a free, open-source, self-hosted tool and a public showcase for the
