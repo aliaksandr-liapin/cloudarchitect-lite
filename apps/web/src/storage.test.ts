@@ -1,7 +1,7 @@
 import { samples } from '@cloudarchitect/catalog';
 import { migrateProject } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
-import { bootProject } from './storage';
+import { bootProject, fileBaseName } from './storage';
 
 const sample = migrateProject(samples.myblog);
 
@@ -24,5 +24,11 @@ describe('bootProject', () => {
   it('marks storage unavailable when loading fails, so the sample never overwrites the real project', async () => {
     const r = await bootProject(() => Promise.reject(new Error('blocked')), sample);
     expect(r).toEqual({ project: sample, storage: 'unavailable' });
+  });
+});
+
+describe('fileBaseName', () => {
+  it('collapses unsafe characters into single dashes', () => {
+    expect(fileBaseName('My Blog: v2')).toBe('My-Blog-v2');
   });
 });

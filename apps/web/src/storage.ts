@@ -77,13 +77,18 @@ export async function bootProject(
   }
 }
 
+/** File-name stem for a project: runs of unsafe characters become one dash. */
+export function fileBaseName(name: string): string {
+  return name.replace(/\W+/g, '-');
+}
+
 export function downloadJson(p: Project) {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }),
   );
   const a = Object.assign(document.createElement('a'), {
     href: url,
-    download: `${p.name.replace(/\W+/g, '-')}.json`,
+    download: `${fileBaseName(p.name)}.json`,
   });
   a.click();
   URL.revokeObjectURL(url);

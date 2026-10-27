@@ -41,6 +41,7 @@ import {
 } from './layout';
 import { AiModelPanel, readModelChoice } from './models';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
   idbVersionStore,
@@ -587,6 +588,22 @@ export function App() {
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
   };
 
+  const exportMenu = useRef<HTMLDetailsElement>(null);
+  const exportAs = async (format: ImageFormat) => {
+    if (exportMenu.current) exportMenu.current.open = false;
+    const viewport = document.querySelector<HTMLElement>('.canvas .react-flow__viewport');
+    const flow = flowRef.current;
+    if (!project || !viewport || !flow) return;
+    try {
+      await exportImage(format, viewport, flow.getNodes(), {
+        background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+        fileName: project.name,
+      });
+    } catch (err) {
+      setError(`Could not export the image: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="app">
       <header className="bar">
@@ -599,7 +616,26 @@ export function App() {
         <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
         </button>
-        <button onClick={() => project && downloadJson(project)}>Export JSON</button>
+        <details className="menu" ref={exportMenu}>
+          <summary>Export</summary>
+          <div className="menu-items">
+            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('png')}>
+              PNG image
+            </button>
+            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('svg')}>
+              SVG image
+            </button>
+            <button
+              disabled={!project}
+              onClick={() => {
+                if (project) downloadJson(project);
+                if (exportMenu.current) exportMenu.current.open = false;
+              }}
+            >
+              JSON project
+            </button>
+          </div>
+        </details>
         <button disabled={busy} onClick={() => fileInput.current?.click()}>
           Import JSON
         </button>
