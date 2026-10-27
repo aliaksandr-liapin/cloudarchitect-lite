@@ -30,7 +30,7 @@ curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-l
 curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml; docker compose up
 ```
 
-The images are multi-architecture (Intel/AMD and Arm). Tested on macOS with Apple silicon, Windows 11 on Arm and Linux (in CI). Windows on Intel/AMD is expected to work but has not been tested by hand.
+The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI). Windows 11 on Arm: hand test by the maintainer before the public release. Windows on Intel/AMD is expected to work but has not been tested by hand.
 
 ## 3. What you see on first start
 
