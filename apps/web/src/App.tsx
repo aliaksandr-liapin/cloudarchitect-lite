@@ -650,11 +650,52 @@ export function App() {
   };
 
   const exportMenu = useRef<HTMLDetailsElement>(null);
+  // The Export menu is a <details>; close it on a click outside it and on Escape, like a menu.
+  useEffect(() => {
+    const menu = exportMenu.current;
+    if (!menu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (menu.open && !menu.contains(e.target as globalThis.Node)) menu.open = false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !menu.open) return;
+      menu.open = false;
+      menu.querySelector('summary')?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
   const exportAs = async (format: ImageFormat) => {
     if (exportMenu.current) exportMenu.current.open = false;
     const viewport = document.querySelector<HTMLElement>('.canvas .react-flow__viewport');
     const flow = flowRef.current;
     if (!project || !viewport || !flow) return;
+    // Selection highlighting is editing state, not part of the diagram: drop it for the render and
+    // put it back afterwards (the demo opens with a node selected).
+    const selectedNodes = new Set(
+      flow
+        .getNodes()
+        .filter((n) => n.selected)
+        .map((n) => n.id),
+    );
+    const selectedEdges = new Set(
+      flow
+        .getEdges()
+        .filter((e) => e.selected)
+        .map((e) => e.id),
+    );
+    const detailsFor = selected;
+    const hadSelection = selectedNodes.size > 0 || selectedEdges.size > 0;
+    if (hadSelection) {
+      setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+      setEdges((es) => es.map((e) => (e.selected ? { ...e, selected: false } : e)));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
     try {
       await exportImage(format, viewport, flow.getNodes(), {
         background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
@@ -662,6 +703,12 @@ export function App() {
       });
     } catch (err) {
       setError(`Could not export the image: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      if (hadSelection) {
+        setNodes((ns) => ns.map((n) => (selectedNodes.has(n.id) ? { ...n, selected: true } : n)));
+        setEdges((es) => es.map((e) => (selectedEdges.has(e.id) ? { ...e, selected: true } : e)));
+        setSelected(detailsFor);
+      }
     }
   };
 
