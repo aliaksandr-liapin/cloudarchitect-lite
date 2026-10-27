@@ -41,6 +41,7 @@ import {
   toFlow,
   type Routes,
 } from './layout';
+import { DEMO, DEMO_BANNER, REPO_URL, demoBootSelection, demoIconSource } from './demo';
 import { AiModelPanel, readModelChoice } from './models';
 import {
   containerIcon,
@@ -209,12 +210,19 @@ export function App() {
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
-      return commit(project, false, { recover: true });
+      return commit(project, false, { recover: true }).then(() => {
+        if (!DEMO) return;
+        const id = demoBootSelection(project);
+        if (!id) return;
+        setSelected(id);
+        setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+      });
     });
   }, [commit]);
 
   useEffect(() => {
     // Self-hosted installs: point to the wizard, but never block the local-first editor.
+    if (DEMO) return;
     api.setupStatus().then(
       (s) => setSetupPending(s.available && !s.configured),
       () => undefined,
@@ -577,13 +585,13 @@ export function App() {
     let stop = false;
     const run = async (attempts: number) => {
       try {
-        const { state, urls } = await loadIcons(() => api.icons());
+        const { state, urls } = await loadIcons(DEMO ? demoIconSource : () => api.icons());
         if (stop) return;
         const step = nextIconStep(state, attempts);
         if (state === 'ready') setIconUrls(urls);
         // 'missing' shows no notice; giving up leaves generic tiles without one either.
         setIconState(step === 'give-up' || state === 'missing' ? undefined : state);
-        if (step === 'retry') await api.retryIcons().catch(() => undefined);
+        if (step === 'retry' && !DEMO) await api.retryIcons().catch(() => undefined);
         if (step === 'retry' || step === 'poll')
           timer = setTimeout(() => void run(attempts + 1), 3000);
       } catch {
@@ -707,6 +715,14 @@ export function App() {
           }}
         />
       </header>
+      {DEMO && (
+        <div className="notice">
+          {DEMO_BANNER}{' '}
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            View on GitHub
+          </a>
+        </div>
+      )}
       {setupPending && (
         <div className="notice">
           AI features are not set up yet. Open the setup link printed in the server log (
@@ -718,7 +734,7 @@ export function App() {
           Downloading the official AWS icons (first start only)…
         </div>
       )}
-      {iconState === 'failed' && (
+      {iconState === 'failed' && !DEMO && (
         <div role="alert" className="notice">
           The official AWS icons could not be downloaded, so diagrams show generic tiles.{' '}
           <button type="button" className="link" onClick={retryIcons}>

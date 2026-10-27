@@ -1,5 +1,6 @@
 import { LIMITS, type DesignToggles } from '@cloudarchitect/domain';
 import { useState } from 'react';
+import { DEMO, DEMO_GENERATE_MESSAGE, INSTALL_URL } from './demo';
 import { GenerationStatus, type StepId } from './GenerationStatus';
 
 type Flag = Exclude<keyof DesignToggles, 'disasterRecovery'>;
@@ -119,7 +120,14 @@ export function GeneratePanel({
           Generating replaces the current diagram. The current one is kept in Versions.
         </p>
       )}
-      {step && startedAt !== undefined ? (
+      {DEMO ? (
+        <p className="muted small" role="status">
+          {DEMO_GENERATE_MESSAGE}{' '}
+          <a href={INSTALL_URL} target="_blank" rel="noreferrer">
+            Install
+          </a>
+        </p>
+      ) : step && startedAt !== undefined ? (
         <GenerationStatus
           step={step}
           startedAt={startedAt}

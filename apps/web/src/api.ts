@@ -1,4 +1,5 @@
 import type { IconSet } from '@cloudarchitect/catalog';
+import { DEMO } from './demo';
 import type { IconState } from './icons';
 import type {
   ContinueRequest,
@@ -25,6 +26,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (DEMO) throw new ApiError(0, 'demo_mode'); // the static demo has no backend
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...init?.headers },
