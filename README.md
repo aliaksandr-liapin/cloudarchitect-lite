@@ -7,7 +7,9 @@
 
 > Describe your app in plain English and get an AWS architecture, checked against 25 rules, running on your own machine with your own key.
 
-![CloudArchitect Lite turns a plain-English description into an AWS architecture diagram](docs/images/demo.gif)
+![Replay of a recorded generation: CloudArchitect Lite turns a plain-English description into an AWS architecture diagram](docs/images/demo.gif)
+
+_Replay of a real recorded generation with Claude Haiku, shortened: a real generation takes about 50 seconds._
 
 **[Try the demo](https://aliaksandr-liapin.github.io/cloudarchitect-lite/)** (a clickable editor in your browser, no install) · **[Install](#install)** (one command, needs Docker)
 
