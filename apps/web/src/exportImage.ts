@@ -1,7 +1,7 @@
 import type { Project } from '@cloudarchitect/domain';
 import { getNodesBounds, type Node } from '@xyflow/react';
-import { toPng, toSvg } from 'html-to-image';
-import { fileBaseName } from './storage';
+import { toBlob, toSvg } from 'html-to-image';
+import { downloadBlob, fileBaseName } from './storage';
 
 export type ImageFormat = 'png' | 'svg';
 
@@ -53,18 +53,27 @@ export async function exportImage(
   opts: { background: string; fileName: string },
 ): Promise<void> {
   const { width, height, transform } = imageFrame(diagramBounds(nodes));
-  const render = format === 'png' ? toPng : toSvg;
-  const url = await render(viewport, {
+  const options = {
     backgroundColor: opts.background,
     width,
     height,
     pixelRatio: format === 'png' ? 2 : 1,
     filter: keep,
     style: { width: `${width}px`, height: `${height}px`, transform },
-  });
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `${fileBaseName(opts.fileName)}.${format}`,
-  });
-  a.click();
+  };
+  let blob: Blob;
+  if (format === 'png') {
+    const png = await toBlob(viewport, options);
+    if (!png) throw new Error('the browser could not encode the PNG');
+    blob = png;
+  } else {
+    blob = svgBlob(await toSvg(viewport, options));
+  }
+  downloadBlob(blob, `${fileBaseName(opts.fileName)}.${format}`);
+}
+
+/** html-to-image returns the SVG as a percent-encoded `data:` URL; the file holds the plain markup. */
+export function svgBlob(dataUrl: string): Blob {
+  const svg = decodeURIComponent(dataUrl.slice(dataUrl.indexOf(',') + 1));
+  return new Blob([svg], { type: 'image/svg+xml' });
 }

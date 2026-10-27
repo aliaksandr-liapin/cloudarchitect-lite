@@ -2,7 +2,7 @@ import { migrateProject } from '@cloudarchitect/domain';
 import { samples } from '@cloudarchitect/catalog';
 import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/react';
-import { canExport, diagramBounds, imageFrame } from './exportImage';
+import { canExport, diagramBounds, imageFrame, svgBlob } from './exportImage';
 
 describe('imageFrame', () => {
   it('adds padding and translates to the origin', () => {
@@ -41,5 +41,14 @@ describe('diagramBounds', () => {
     const nodes = [box('c', 200, 100), box('inner', 10, 10, 'c'), box('out', 500, 400, 'inner')];
     // inner is at (210,110); out is at (710,510) and overflows both containers.
     expect(diagramBounds(nodes)).toEqual({ x: 200, y: 100, width: 610, height: 460 });
+  });
+});
+
+describe('svgBlob', () => {
+  it('decodes the data URL into plain SVG markup', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><text>a & b, 100%</text></svg>';
+    const blob = svgBlob(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+    expect(blob.type).toBe('image/svg+xml');
+    expect(await blob.text()).toBe(svg);
   });
 });
