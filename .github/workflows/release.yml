@@ -59,6 +59,8 @@ jobs:
   smoke:
     name: Install smoke test from published images
     needs: publish
+    # The install pins the version from the tag; a manual run from a branch has no published version.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -80,22 +82,36 @@ jobs:
       - name: Setup link is printed and the API answers through nginx
         working-directory: ${{ runner.temp }}/install
         run: |
-          docker compose logs gateway | grep -E 'http://localhost:8080/setup\?code=[0-9a-f]{12}'
-          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
-          curl -fsS http://127.0.0.1:8080/api/setup/status | grep -q '"configured":false'
-          curl -fsS http://127.0.0.1:8080/api/models | grep -q '"sonnet"'
+          # Bodies are captured first: `curl | grep -q` can fail under pipefail when grep exits early.
+          logs=$(docker compose logs gateway)
+          grep -qE 'http://localhost:8080/setup\?code=[0-9a-f]{12}' <<<"$logs"
+          page=$(curl -fsS http://127.0.0.1:8080/)
+          grep -q '<div id="root">' <<<"$page"
+          status=$(curl -fsS http://127.0.0.1:8080/api/setup/status)
+          grep -q '"configured":false' <<<"$status"
+          models=$(curl -fsS http://127.0.0.1:8080/api/models)
+          grep -q '"sonnet"' <<<"$models"
       - name: Icons download on first start
         working-directory: ${{ runner.temp }}/install
         run: |
           for i in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:8080/api/icons | grep -q '"state":"ready"' && exit 0
+            body=$(curl -fsS http://127.0.0.1:8080/api/icons || true)
+            case "$body" in *'"state":"ready"'*) exit 0 ;; esac
             sleep 2
           done
-          curl -fsS http://127.0.0.1:8080/api/icons; exit 1
+          echo "$body"; exit 1
       - name: Images carry no icons
         working-directory: ${{ runner.temp }}/install
         run: |
-          ! docker compose exec -T gateway sh -c 'ls /app' | grep -q '\.svg'
+          # Recursive over each image; the exec must succeed and find nothing. The gateway's /data
+          # volume legitimately holds the downloaded cache, so it is excluded.
+          pattern='\( -name "*.svg" -o -name "icons.json" -o -name "aws-*.json" \)'
+          gateway=$(docker compose exec -T gateway sh -c "find / -xdev $pattern -not -path '/proc/*' -not -path '/data/*' 2>/dev/null | head -1")
+          web=$(docker compose exec -T web sh -c "test -d /usr/share/nginx/html && find /usr/share/nginx/html $pattern | head -1")
+          if [ -n "$gateway$web" ]; then
+            echo "Icon files found in an image: $gateway $web"
+            exit 1
+          fi
       - name: Logs on failure
         if: failure()
         working-directory: ${{ runner.temp }}/install
