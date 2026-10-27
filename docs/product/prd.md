@@ -59,7 +59,7 @@ Let users, without signing up and without knowing any diagram format, turn a des
 | FR-023 | Mermaid export | P1 | Export the graph as a Mermaid flowchart with a subgraph per container; no icon references required. |
 | FR-024 | Cost transparency | P0 | Before an operation, the UI shows exactly what will be sent to the AI provider, and explains when AI is unavailable (no key configured, or a spending limit reached). (Credits and the kill switch dropped 2026-10-26.) |
 | FR-025 | Clarification round | P0 | If extraction returns critical open questions, the user answers or skips them; generation uses the answers within the **same** operation. At most one round per operation. |
-| FR-026 | Model choice with measured benchmark | P0 | The user picks Claude Haiku 5.5 or Sonnet 5.5 for AI operations. The UI shows each model's measured blind-review score, automated pass rate, critical-defect rate, cost per generation and latency (ADR-0011). Models the instance key does not serve are marked as needing the user's own key. |
+| FR-026 | Model choice with measured benchmark | P0 | The user picks Claude Haiku 5.5 or Sonnet 5.5 for AI operations. The UI shows each model's measured blind-review score, automated pass rate, critical-defect rate, cost per generation and latency (ADR-0011). Models the instance does not enable (`AI_MODELS`) are marked as not enabled; requesting one returns `403 model_not_enabled`, and the user enables it by re-running setup. |
 | FR-027 | Self-hosted setup wizard | P0 | `docker compose up` on Windows, macOS or Linux prints a one-time setup link. A five-step browser wizard (code, API key check, models, limits with budget estimate, review) configures the instance without editing files (ADR-0012). |
 
 ## 5. Non-functional requirements
@@ -180,7 +180,7 @@ Use **only** the official packages from the sources below, never redrawn, AI-gen
 - Provider icons are not used in the CloudArchitect Lite logo, branding or marketing.
 - The service name is always shown next to its icon (Azure's recommendation, applied to all providers).
 - The interface and repository give attribution and a source link for each pack; trademarks belong to their owners.
-- Residual risk: the AWS and GCP terms do not explicitly cover embedding the package in a third-party tool. Mitigation: in Phase 0, record the terms text from the downloaded archives (README/LICENSE, if any) and, if anything is ambiguous, serve icons lazily from a versioned asset store rather than a public Git repository. Gate B keeps its "license review" item.
+- Residual risk: the AWS and GCP terms do not explicitly cover embedding the package in a third-party tool. Mitigation: in Phase 0, record the terms text from the downloaded archives (README/LICENSE, if any) and, if anything is ambiguous, keep icons out of the repository and the published images (decision 2026-10-27, release 0.2 design Goal 1): the pack is pinned by SHA-256 in `packages/catalog/data/icon-packs.json`, and the gateway downloads it from the official source on first start, verifies it and keeps only the mapped SVGs in its data volume. The GitHub Pages demo includes icons fetched by its build workflow. Gate B keeps its "license review" item.
 
 ## 13. Quality benchmark and evaluation harness
 

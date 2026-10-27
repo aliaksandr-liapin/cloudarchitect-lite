@@ -53,11 +53,11 @@ Open that link. The wizard has five steps.
 
 **4. Limits.** Requests per minute, daily and monthly spending limits. The wizard estimates how many generations the budget covers.
 
-<img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of generations and visitors the monthly budget covers" width="720">
+<img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of the generations the monthly budget covers" width="720">
 
 **5. Review.** Check the summary and press **Finish setup**.
 
-<img src="../images/setup-5-review.png" alt="Setup step 5: summary of key, models, free operations, budget and rate limit" width="720">
+<img src="../images/setup-5-review.png" alt="Setup step 5: summary of key, models, budget and rate limit" width="720">
 
 Settings apply immediately and survive restarts. Then use the editor at <http://localhost:8080>.
 

@@ -103,7 +103,7 @@ Operations (PRD §6): **Generate**, **Edit**, **Review**, **Ask** (P1).
 
 **Generate**
 1. Prompt → extract structured requirements, assumptions and open questions. Extraction always runs `claude-haiku-5-5`.
-2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; no credit is charged. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
+2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; the operation is not completed until `/continue`. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
 3. Generate architecture JSON with structured output (`output_config.format`) against the catalog contract with the selected model; anything outside the catalog must use `unresolved`. Haiku gets one repair turn with the deterministic validator's findings.
 4. Parse and schema-validate; a schema failure fails the operation.
 5. Client: run the rule set (§10), layout with ELK, render findings.
