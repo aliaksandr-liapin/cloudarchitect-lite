@@ -4,10 +4,10 @@ For the product owner. Every step here is an account-level action. Do them in or
 
 ## Before going public
 
-| Check                                                                                         | Result                             |
-| --------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Secret scan of full history (gitleaks, all refs, plus a filename check for key and env files) | pending — to be filled by the scan |
-| Fork safety of workflows                                                                      | done, see below                    |
+| Check                       | Result                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secret scan of full history | done 2026-10-27: gitleaks v8.30.1 (`ghcr.io/gitleaks/gitleaks:v8.30.1`), `gitleaks git <repo> --log-opts="--all" --redact`, all refs at 41b6b44. 37 commits scanned (all 40 commits in all refs; merge commits carry no diff of their own), 0 findings. File-name check (.zip, .pem, .key, .p12, .pfx, .env*) over all history: only `.env.example`. Re-run the same command right before making the repository public if more commits land. |
+| Fork safety of workflows    | done, see below                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ### Fork safety
 
