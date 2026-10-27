@@ -1,4 +1,4 @@
-import { awsCatalog, awsIconPack } from '@cloudarchitect/catalog';
+import { awsCatalog, awsIconPack, type IconSet } from '@cloudarchitect/catalog';
 import { MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
 import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
@@ -126,13 +126,31 @@ export function createApp({
   );
 
   const iconState = () => icons?.state() ?? 'missing';
+  // The ready body (~150 KB) never changes for a release, so it is serialized once and served with an
+  // ETag; browsers cache it for a day and revalidate with If-None-Match. While the download runs or
+  // has failed, the small status body must not be cached.
+  let readyBody: { set: IconSet; etag: string; body: string } | undefined;
   app.get('/api/icons', (c) => {
     const set = icons?.iconSet();
-    return c.json({
-      state: iconState(),
-      release: awsIconPack.release,
-      ...(set ? { icons: set.icons } : {}),
-    });
+    if (!set) {
+      c.header('Cache-Control', 'no-store');
+      return c.json({ state: iconState(), release: awsIconPack.release });
+    }
+    if (readyBody?.set !== set) {
+      readyBody = {
+        set,
+        etag: `"aws-${set.release}"`,
+        body: JSON.stringify({ state: 'ready', release: set.release, icons: set.icons }),
+      };
+    }
+    c.header('ETag', readyBody.etag);
+    c.header('Cache-Control', 'private, max-age=86400');
+    const match = c.req.header('if-none-match');
+    if (match?.split(',').some((t) => t.trim().replace(/^W\//, '') === readyBody?.etag)) {
+      return c.body(null, 304);
+    }
+    c.header('Content-Type', 'application/json; charset=UTF-8');
+    return c.body(readyBody.body);
   });
   app.post('/api/icons/retry', (c) => {
     const state = iconState();

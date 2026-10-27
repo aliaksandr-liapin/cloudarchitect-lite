@@ -90,7 +90,7 @@ catalog/
     validation-rules.json    # VR-001…VR-018 metadata (logic lives in shared package)
     facts.json               # verified integration facts with evidence (given to the generator)
     lifecycle.json
-    icon-pack.json           # release id, source URL, terms text, SHA-256
+    icon-packs.json          # release id, source URL, terms text, SHA-256
   azure/
     manifest.json
     services.json
@@ -162,8 +162,8 @@ A project records `projectSchemaVersion`, `catalogVersion` per provider, `iconPa
 - Original colors, aspect ratios, silhouettes; no cropping, flipping, rotating or distortion.
 - Service name always shown next to the icon.
 - Attribution and source link for each pack in the app's About/Legal page.
-- Served by the gateway from its data volume and cached by the browser; the pack is downloaded once, not per service.
-- Sanitize SVG on import (no scripts, external references).
+- Downloaded once per install, not per service, and kept as one JSON file in the gateway data volume. `GET /api/icons` serves it with an `ETag` (the release id) and `Cache-Control: private, max-age=86400` once ready, answers `If-None-Match` with 304, and sends `no-store` while the download runs or has failed.
+- Integrity and safety instead of SVG sanitizing: the official ZIP is verified against its pinned SHA-256 before anything is used, only the mapped entries are kept (each capped at 1 MiB decompressed), and icons are rendered only via `<img>` with `data:` URLs, so scripts in an SVG never run. SVG markup is never inlined into the page.
 - Test light and dark canvas contrast without recoloring protected brand assets (use a neutral tile behind the icon if needed).
 
 ## 10. Validation and quality gates

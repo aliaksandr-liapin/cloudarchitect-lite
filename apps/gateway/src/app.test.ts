@@ -297,12 +297,49 @@ describe('icons', () => {
     expect(fetching).toEqual({ state: 'fetching', release: pack.release });
     release();
     await running;
-    const ready = await (await app.request('/api/icons')).json();
-    expect(ready).toEqual({
+    const res = await app.request('/api/icons');
+    expect(res.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(await res.json()).toEqual({
       state: 'ready',
       release: pack.release,
       icons: { 'aws/lambda': SVG },
     });
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('GET /api/icons is not cached while not ready', async () => {
+    const { app } = setup();
+    const res = await app.request('/api/icons');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('etag')).toBeNull();
+  });
+
+  it('GET /api/icons sends an ETag and Cache-Control when ready and honours If-None-Match', async () => {
+    const { app, icons, dir } = await build(async () =>
+      (async function* () {
+        yield zip;
+      })(),
+    );
+    await icons.ensure();
+    const first = await app.request('/api/icons');
+    const etag = first.headers.get('etag');
+    expect(etag).toBe(`"aws-${pack.release}"`);
+    expect(first.headers.get('cache-control')).toBe('private, max-age=86400');
+    const body = await first.text();
+    const again = await app.request('/api/icons');
+    expect(await again.text()).toBe(body);
+
+    const notModified = await app.request('/api/icons', { headers: { 'If-None-Match': etag! } });
+    expect(notModified.status).toBe(304);
+    expect(await notModified.text()).toBe('');
+    expect(notModified.headers.get('etag')).toBe(etag);
+
+    const weak = await app.request('/api/icons', {
+      headers: { 'If-None-Match': `"x", W/${etag}` },
+    });
+    expect(weak.status).toBe(304);
+    const stale = await app.request('/api/icons', { headers: { 'If-None-Match': '"aws-old"' } });
+    expect(stale.status).toBe(200);
     await rm(dir, { recursive: true, force: true });
   });
 
