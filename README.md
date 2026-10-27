@@ -5,95 +5,68 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)
 
-> Describe your application. Get an editable, explainable, validated AWS architecture. Free to start.
+> Describe your app in plain English and get an AWS architecture, checked against 18 rules, running on your own machine with your own key.
 
-Local-first AI cloud architecture designer — AWS first, Azure/GCP ready. The architecture is a typed graph (not an image), validated by deterministic rules and traced back to requirements.
+![CloudArchitect Lite turns a plain-English description into an AWS architecture diagram](docs/images/demo.gif)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/editor-dark.png">
-  <img alt="The editor showing a serverless blog architecture inside AWS and region containers. A validation finding (VR-004, missing failure destination) is selected and its Lambda function is highlighted; the side panel shows the Generate panel with its design-priority toggles, then the component's details and the findings." src="docs/images/editor-light.png">
-</picture>
+**[Try the demo](https://aliaksandr-liapin.github.io/cloudarchitect-lite/)** (a clickable editor in your browser, no install) · **[Install](#install)** (one command, needs Docker)
 
-**Status:** pre-alpha (ROADMAP Phase 2). AI generation from a description works: describe your app, pick design priorities, answer up to three clarifying questions, and get a validated diagram; earlier diagrams are kept in Versions. Generated diagrams are laid out to be readable on first sight, every box can be resized, and the editor has a light/dark switch. The editor, project format, catalog, validation rules, model benchmarks, gateway controls, self-hosted install and CI/CD work too.
+## Install
+
+You need [Docker](https://docs.docker.com/get-docker/) and an [Anthropic API key](https://console.anthropic.com/). Then run one command.
+
+macOS and Linux:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml && docker compose up
+```
+
+Windows (PowerShell):
+
+```powershell
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml; docker compose up
+```
+
+Open the setup link printed in the terminal. A short wizard checks your key, lets you pick a model and sets your daily and monthly spending limits. Then the editor is at <http://localhost:8080>.
+
+Details, upgrading and troubleshooting: [installation guide](docs/operations/installation.md). To build from source, see [development guide](docs/engineering/development.md).
+
+**About the AWS icons.** On first start, CloudArchitect Lite downloads the official AWS icon set from aws.amazon.com, so the internet is needed for that step (offline installs work with generic tiles). AWS terms allow the icons for creating architecture diagrams but do not cover redistribution, which is why they are not in this repository or its images. Each release uses the newest AWS icon set the project has verified, pinned by hash, so every install looks the same.
+
+**Privacy.** Your keys and projects stay on your machine; prompts go only to your AI provider.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  A["Describe your app<br/>(requirements)"] -->|"Claude Haiku or Sonnet<br/>(Phase 2)"| B["Typed architecture graph<br/>services, containers, edges"]
-  B --> CValidation rules<br/>VR-001…018
-  C -->|findings + fixes| D["Edit on the canvas"]
-  D --> C
-  D --> E["Export JSON<br/>(diagrams and IaC later)"]
-```
+1. **Describe** your application in plain language. The AI asks up to three clarifying questions.
+2. **Generate** a design built only from a curated catalog of 38 AWS services, placed in containers (cloud, region, VPC, availability zone, subnet). A service the catalog does not know is flagged as unresolved instead of invented.
+3. **Validate**: 18 deterministic rules (VR-001 to VR-018, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
+4. **Edit and export** on the canvas, then export JSON, PNG or SVG.
 
-1. **Describe** the application in plain language. The AI proposes a design built only from a verified AWS catalog; anything it cannot map is marked as unresolved instead of being made up.
-2. **Review** the design on the canvas: every component links to the requirements it serves, its AWS documentation and its verification status.
-3. **Validate**: deterministic rules (not the AI) flag problems such as a queue consumer without a dead-letter queue, a WAF on an HTTP API or a single-AZ load balancer, each with a suggested fix.
-4. **Edit and export**: move components and auto-layout; the project is saved in your browser and exports as JSON.
+## What works today
 
-## Repository layout
+- Plain-English description, clarifying questions and design-priority toggles (serverless-first, backups, disaster recovery, high availability, cost-optimized, security hardening).
+- AWS diagrams with official icons, containers and 18 validation rules with findings.
+- Editor: drag, resize, auto layout, light and dark theme, and versions that keep earlier diagrams.
+- Import and export JSON; export PNG and SVG.
+- Self-hosted with Docker on your own Anthropic key, with daily and monthly spending limits.
+- Choice of Claude Haiku 5.5 or Claude Sonnet 5.5. In the Gate A live runs, Haiku cost about $0.007 per generation and Sonnet about $0.045, and both passed the automated checks on 93% of runs. Blind reviewers scored Haiku 2.29 and Sonnet 2.57 out of 3. Method and caveats: [Gate A report](docs/product/phase2-gate-a.md).
 
-| Path                                                   | What it is                                                                                                                          |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                                             | React + React Flow editor: nested containers, ELK auto-layout, findings panel, IndexedDB save, JSON import/export                   |
-| `apps/gateway`                                         | Hono API gateway for free AI credits: budget cap + kill switch, rate limits, credit ledger (D1). Runs on Cloudflare Workers or Node |
-| `packages/domain`                                      | Shared project schema (Zod), graph patches, migrations, validation rule engine                                                      |
-| `packages/catalog`                                     | Versioned AWS catalog: services, features, containers, rule metadata, icon-pack records, sample projects                            |
-| `eval`                                                 | Benchmark scenarios and the automated evaluation harness (release gate)                                                             |
-| `infra/docker`                                         | Container images for web (nginx, non-root) and gateway (Node, non-root)                                                             |
-| `docs/product`                                         | PRD, technical architecture, catalog spec, roadmap                                                                                  |
-| `docs/adr`                                             | Architecture decision records                                                                                                       |
-| `docs/security`, `docs/operations`, `docs/engineering` | Threat model, deployment, scalability, observability, runbook, development and testing guides                                       |
+## What's next
 
-## Install and run (Windows, macOS, Linux)
-
-Only Docker is required. Full guide: [docs/operations/installation.md](docs/operations/installation.md).
-
-```bash
-git clone https://github.com/aliaksandr-liapin/cloudarchitect-lite.git
-cd cloudarchitect-lite
-docker compose up --build
-```
-
-Open the setup link printed in the terminal (`http://localhost:8080/setup?code=…`). A [five-step wizard](docs/operations/installation.md#4-finish-setup-in-the-browser) checks your Anthropic API key, lets you choose Claude Haiku 5.5 and/or Sonnet 5.5 based on measured quality and cost, and sets budget limits. Then use the editor at <http://localhost:8080>.
-
-| Model             | Blind review score (0–3) | Checks passed | Cost per generation | Typical wait |
-| ----------------- | ------------------------ | ------------- | ------------------- | ------------ |
-| Claude Haiku 5.5  | 2.29                     | 96%           | $0.006              | 44 s         |
-| Claude Sonnet 5.5 | 2.86                     | 93%           | $0.080              | 51 s         |
-
-Measured on 15 benchmark scenarios × 3, scored by the automated eval harness and a blind rubric review by isolated Claude reviewer sessions; see [phase0-spike.md](docs/product/phase0-spike.md).
-
-## Development
-
-Requirements: Node 24+ (26 recommended, see `.nvmrc`), pnpm 10.32 (`npm install -g pnpm@10.32.1`; Node 25+ no longer bundles corepack).
-
-```bash
-pnpm install
-pnpm dev                        # web on :5173 (proxies /api), gateway on :8787; setup link in the gateway log
-```
-
-## Quality gates
-
-```bash
-pnpm run ci     # lint, format check, typecheck, unit tests, build
-pnpm eval       # evaluation harness against eval/scenarios
-```
-
-CI runs the same checks plus container builds with vulnerability scanning, CodeQL, dependency review, `pnpm audit` and secret scanning. See [docs/engineering/development.md](docs/engineering/development.md).
+0.3 compares Claude, GPT and Gemini with a public benchmark. 0.4 adds Review (an AI critique of any diagram) and Mermaid export. See the [roadmap](docs/product/roadmap.md#2-public-release-roadmap-from-2026-10-26).
 
 ## Documentation
 
 - Product: [overview](docs/product/README.md) · [PRD](docs/product/prd.md) · [technical architecture](docs/product/technical-architecture.md) · [catalog](docs/product/cloud-provider-catalog.md) · [roadmap](docs/product/roadmap.md)
 - Decisions: [docs/adr](docs/adr/)
 - Security: [SECURITY.md](SECURITY.md) · [threat model](docs/security/threat-model.md)
-- Operations: [deployment](docs/operations/deployment.md) · [scalability](docs/operations/scalability.md) · [observability](docs/operations/observability.md) · [runbook](docs/operations/runbook.md)
+- Operations: [installation](docs/operations/installation.md) · [deployment](docs/operations/deployment.md) · [runbook](docs/operations/runbook.md)
+- Engineering: [development](docs/engineering/development.md) · [testing](docs/engineering/testing.md)
 
 ## Contributing and support
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md) and the [code of conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md) and the [code of conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache License 2.0](LICENSE). Cloud provider names, icons and trademarks belong to their owners and are not included in this repository; see [NOTICE](NOTICE) and [the catalog spec](docs/product/cloud-provider-catalog.md#2-sources-of-truth). This project is not affiliated with or endorsed by any cloud provider.
+[Apache License 2.0](LICENSE). Cloud provider names, icons and trademarks belong to their owners and are not included in this repository; see [NOTICE](NOTICE). This project is not affiliated with or endorsed by any cloud provider.

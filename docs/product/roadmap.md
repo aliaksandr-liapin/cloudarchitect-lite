@@ -23,7 +23,7 @@ hosted Privacy Policy and Terms).
 
 | Release | Target | Theme | Scope | Announcement hook / article |
 |---|---|---|---|---|
-| 0.2 | mid-Nov 2026 | **Public MVP** | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 18 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
+| 0.2 | mid-Nov 2026 | **Public MVP** (in release) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 18 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
 | 0.3 | mid-Dec 2026 | **Claude vs GPT vs Gemini** | Claude, OpenAI and Gemini, two models each; public blind benchmark with a three-provider review panel ([design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
 | 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
 | 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo | Diff-based AI editing of a graph |

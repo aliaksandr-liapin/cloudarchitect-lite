@@ -10,3 +10,9 @@ This project is not affiliated with or endorsed by any cloud provider.
 Cloud provider architecture icons are not included in this repository. They are downloaded from
 the providers' official icon pages under the providers' own terms
 (see docs/product/cloud-provider-catalog.md, section 2).
+
+AWS Architecture Icons
+The AWS Architecture Icons belong to Amazon Web Services. Each installation fetches them at
+runtime from aws.amazon.com; this project does not redistribute them. AWS states: "We allow
+customers and partners to use these toolkits and assets to create architecture diagrams."
+Source: https://aws.amazon.com/architecture/icons/ (checked 2026-10-27).
