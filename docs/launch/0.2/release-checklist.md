@@ -30,15 +30,19 @@ GitHub does not pass repository secrets to workflows triggered by `pull_request`
    git push origin v0.2.0
    ```
 4. Wait for the Release images workflow and its published-image smoke job to finish green.
-5. Make the repository public: Settings, General, Danger Zone, Change visibility.
-6. Make both GHCR packages public (Packages, package settings, Change visibility):
+5. Re-run the secret scan on all refs, now that the changelog date and the merge have landed. Expect "no leaks found". If anything is found, stop and do not make the repository public:
+   ```bash
+   docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --log-opts="--all" --redact --no-banner
+   ```
+6. Make the repository public: Settings, General, Danger Zone, Change visibility.
+7. Make both GHCR packages public (Packages, package settings, Change visibility):
    - `ghcr.io/aliaksandr-liapin/cloudarchitect-lite/web`
    - `ghcr.io/aliaksandr-liapin/cloudarchitect-lite/gateway`
 
    Then check an anonymous pull works: `docker logout ghcr.io && docker pull ghcr.io/aliaksandr-liapin/cloudarchitect-lite/web:0.2.0` (and the same for `gateway`). Use the tag format the Release images workflow publishes.
 
-7. Enable Pages: Settings, Pages, Source: GitHub Actions. Run `pages.yml` (Actions, Pages, Run workflow). Check <https://aliaksandr-liapin.github.io/cloudarchitect-lite/>. Publishing the GitHub release in step 12 also triggers this workflow.
-8. Set the description and topics:
+8. Enable Pages: Settings, Pages, Source: GitHub Actions. Run `pages.yml` (Actions, Pages, Run workflow). Check <https://aliaksandr-liapin.github.io/cloudarchitect-lite/>. Publishing the GitHub release in step 13 also triggers this workflow.
+9. Set the description and topics:
    ```bash
    gh repo edit aliaksandr-liapin/cloudarchitect-lite \
      --description "Describe your app, get an AWS architecture checked against 25 rules, on your own key. Self-hosted." \
@@ -46,12 +50,12 @@ GitHub does not pass repository secrets to workflows triggered by `pull_request`
      --add-topic aws --add-topic architecture --add-topic diagram --add-topic llm \
      --add-topic claude --add-topic react-flow --add-topic self-hosted
    ```
-9. Upload `docs/images/social-preview.png` in Settings, General, Social preview.
-10. Hand-test the install on Windows 11 ARM (Parallels) with the PowerShell command from the README.
-11. Fill the tested-platforms table below.
-12. Publish the GitHub release for `v0.2.0` with the 0.2.0 section of `CHANGELOG.md` as the notes.
-13. Before posting, confirm `docs/images/demo.gif` is in the repository and shows in the README.
-14. Post the drafts (`linkedin.md`, `devto.md`) after editing them.
+10. Upload `docs/images/social-preview.png` (1280x640, already in the repository) in Settings, General, Social preview.
+11. Hand-test the install on Windows 11 ARM (Parallels) with the PowerShell command from the README.
+12. Fill the tested-platforms table below.
+13. Publish the GitHub release for `v0.2.0` with the 0.2.0 section of `CHANGELOG.md` as the notes.
+14. Before posting, confirm `docs/images/demo.gif` is on `main` (merged) and shows in the README; `devto.md` embeds it from `main`.
+15. Post the drafts (`linkedin.md`, `devto.md`) after editing them.
 
 ## Tested platforms
 
