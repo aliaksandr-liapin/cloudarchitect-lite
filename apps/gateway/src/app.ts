@@ -1,4 +1,4 @@
-import { awsCatalog } from '@cloudarchitect/catalog';
+import { awsCatalog, awsIconPack } from '@cloudarchitect/catalog';
 import { MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
 import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
@@ -9,6 +9,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { z } from 'zod';
 import type { Config } from './config.js';
 import { registerGenerateRoutes } from './generate.js';
+import type { IconStore } from './icons.js';
 import { SetupError, SetupInput, type SetupService } from './setup.js';
 import type { SpendStore } from './store.js';
 
@@ -18,6 +19,8 @@ export interface Deps {
   /** First-run wizard; present only on self-hosted Node installs (ADR-0012). */
   setup?: SetupService;
   store: SpendStore;
+  /** Official icons fetched on first start; absent in tests and edge runtimes. */
+  icons?: IconStore;
   /** Structured logger. Must never receive prompts, graphs or keys (NFR-006). */
   log?: (event: Record<string, unknown>) => void;
   /** Provider client factory; tests inject a fake. */
@@ -51,6 +54,7 @@ export function createApp({
   config: configSource,
   setup,
   store,
+  icons,
   log = () => {},
   llm = anthropicClient,
   now = Date.now,
@@ -79,7 +83,10 @@ export function createApp({
   app.use('/api/*', async (c, next) => {
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     c.set('clientKey', await sha256(`${cfg().CLIENT_KEY_SALT}:${ip}`));
-    if (!allow(c.get('clientKey'))) return c.json({ error: 'rate_limited' }, 429);
+    // The web app polls GET /api/icons every 3 s while the first download runs; that is ~20 calls/min
+    // and would exhaust the default budget. The route is cheap and serves a fixed in-memory object.
+    const exempt = c.req.method === 'GET' && c.req.path === '/api/icons';
+    if (!exempt && !allow(c.get('clientKey'))) return c.json({ error: 'rate_limited' }, 429);
     await next();
   });
 
@@ -117,6 +124,21 @@ export function createApp({
       options: MODEL_OPTIONS,
     }),
   );
+
+  const iconState = () => icons?.state() ?? 'missing';
+  app.get('/api/icons', (c) => {
+    const set = icons?.iconSet();
+    return c.json({
+      state: iconState(),
+      release: awsIconPack.release,
+      ...(set ? { icons: set.icons } : {}),
+    });
+  });
+  app.post('/api/icons/retry', (c) => {
+    const state = iconState();
+    if (icons && (state === 'missing' || state === 'failed')) void icons.ensure();
+    return c.json({ state: icons?.state() ?? state }, 202);
+  });
 
   const setupFailure = (c: Context<Env>, err: unknown) => {
     if (err instanceof SetupError) return c.json({ error: err.code }, err.status);

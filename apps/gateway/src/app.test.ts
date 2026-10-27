@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { awsIconPack, type AwsIconPack } from '@cloudarchitect/catalog';
+import { strToU8, zipSync } from 'fflate';
+import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { loadConfig, resolveConfig, type Settings } from './config.js';
+import { IconStore } from './icons.js';
 import { SetupService, type KeyCheck } from './setup.js';
 import { MemorySpendStore } from './store.js';
 
@@ -244,5 +251,77 @@ describe('config', () => {
     const fromEnv = resolveConfig({ FREE_CREDITS: '3', FREE_AI_DISABLED: 'true' }, base);
     expect(fromEnv).not.toHaveProperty('FREE_CREDITS');
     expect(fromEnv).not.toHaveProperty('FREE_AI_DISABLED');
+  });
+});
+
+describe('icons', () => {
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>';
+  const zip = zipSync({ 'a/lambda.svg': strToU8(SVG) });
+  const pack: AwsIconPack = {
+    ...awsIconPack,
+    sha256: createHash('sha256').update(zip).digest('hex'),
+    files: { 'aws/lambda': 'a/lambda.svg' },
+    noIcon: [],
+  };
+
+  const build = async (download: () => Promise<AsyncIterable<Uint8Array>>) => {
+    const dir = await mkdtemp(join(tmpdir(), 'icons-app-'));
+    const icons = new IconStore({ dir, pack, download });
+    const config = loadConfig({ CLIENT_KEY_SALT: 'test-salt-0123456789' });
+    const app = createApp({ config, store: new MemorySpendStore(), icons });
+    return { app, icons, dir };
+  };
+
+  it('does not rate-limit GET /api/icons polling', async () => {
+    const { app } = setup({ RATE_LIMIT_PER_MINUTE: '2' });
+    for (let i = 0; i < 5; i++) expect((await app.request('/api/icons')).status).toBe(200);
+  });
+
+  it('reports missing without a store', async () => {
+    const { app } = setup();
+    const res = await app.request('/api/icons');
+    expect(await res.json()).toEqual({ state: 'missing', release: awsIconPack.release });
+  });
+
+  it('GET /api/icons has no icons while fetching and includes them when ready', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { app, icons, dir } = await build(async () =>
+      (async function* () {
+        await gate;
+        yield zip;
+      })(),
+    );
+    const running = icons.ensure();
+    const fetching = await (await app.request('/api/icons')).json();
+    expect(fetching).toEqual({ state: 'fetching', release: pack.release });
+    release();
+    await running;
+    const ready = await (await app.request('/api/icons')).json();
+    expect(ready).toEqual({
+      state: 'ready',
+      release: pack.release,
+      icons: { 'aws/lambda': SVG },
+    });
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('POST /api/icons/retry after a failure starts another download', async () => {
+    let fail = true;
+    const download = vi.fn(async () => {
+      if (fail) throw new Error('boom');
+      return (async function* () {
+        yield zip;
+      })();
+    });
+    const { app, icons, dir } = await build(download);
+    await icons.ensure();
+    expect(icons.state()).toBe('failed');
+    fail = false;
+    const res = await app.request('/api/icons/retry', { method: 'POST' });
+    expect(res.status).toBe(202);
+    await vi.waitFor(() => expect(icons.state()).toBe('ready'));
+    expect(download).toHaveBeenCalledTimes(2);
+    await rm(dir, { recursive: true, force: true });
   });
 });
