@@ -1,3 +1,5 @@
+import type { IconSet } from '@cloudarchitect/catalog';
+import type { IconState } from './icons';
 import type {
   ContinueRequest,
   GenerateRequest,
@@ -33,6 +35,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /** The wire body carries the id → SVG map; it is wrapped back into an `IconSet` for `loadIcons`. */
+  icons: async (): Promise<{ state: IconState; icons?: IconSet }> => {
+    const body = await request<{
+      state: IconState;
+      release: string;
+      icons?: IconSet['icons'];
+    }>('/api/icons');
+    return {
+      state: body.state,
+      ...(body.icons
+        ? { icons: { provider: 'aws', release: body.release, icons: body.icons } }
+        : {}),
+    };
+  },
+  retryIcons: () => request<{ state: string }>('/api/icons/retry', { method: 'POST' }),
   setupStatus: () =>
     request<{
       available: boolean;

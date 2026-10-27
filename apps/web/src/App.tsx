@@ -31,6 +31,8 @@ import type { StepId } from './GenerationStatus';
 import { edgeTypes } from './edges';
 import {
   applyLayout,
+  type ContainerNodeData,
+  type ServiceNodeData,
   containerMinSize,
   dropRoutes,
   fitsChildren,
@@ -40,6 +42,7 @@ import {
   type Routes,
 } from './layout';
 import { AiModelPanel, readModelChoice } from './models';
+import { containerIcon, loadIcons, serviceIcon, type IconState, type IconUrls } from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
@@ -128,6 +131,9 @@ export function App() {
   const [cancellable, setCancellable] = useState(false);
   /** A replace flow (generated result, Restore) is running; see `exclusive`. */
   const [replacing, setReplacing] = useState(false);
+  const [iconState, setIconState] = useState<IconState>();
+  const [iconUrls, setIconUrls] = useState<IconUrls>({});
+  const [iconTick, setIconTick] = useState(0);
   const replacingRef = useRef(false);
   const dialogOpenRef = useRef(false);
   const flowRef = useRef<ReactFlowInstance>(undefined);
@@ -558,6 +564,36 @@ export function App() {
     [commit],
   );
 
+  /** Loads the official icons once, then polls every 3 s while the gateway is still downloading them. */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stop = false;
+    const run = async () => {
+      try {
+        const { state, urls } = await loadIcons(() => api.icons());
+        if (stop) return;
+        setIconState(state);
+        if (state === 'ready') setIconUrls(urls);
+        if (state === 'fetching' || state === 'missing') timer = setTimeout(run, 3000);
+      } catch {
+        if (!stop) setIconState(undefined); // gateway unreachable: generic tiles, no notice
+      }
+    };
+    void run();
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [iconTick]);
+
+  const retryIcons = () => {
+    setIconState('fetching');
+    api.retryIcons().then(
+      () => setIconTick((t) => t + 1),
+      () => setIconState('failed'),
+    );
+  };
+
   /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
   const shownNodes = useMemo(
     () =>
@@ -572,9 +608,15 @@ export function App() {
               }
             : {}),
         };
-        return { ...n, data: { ...n.data, ...editable } };
+        const data = n.data as Partial<ServiceNodeData & ContainerNodeData>;
+        const iconUrl = data.node
+          ? serviceIcon(data.node, iconUrls)
+          : data.container
+            ? containerIcon(data.container, iconUrls)
+            : undefined;
+        return { ...n, data: { ...n.data, ...editable, ...(iconUrl ? { iconUrl } : {}) } };
       }),
-    [nodes, busy, onResized, project],
+    [nodes, busy, onResized, project, iconUrls],
   );
 
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
@@ -658,6 +700,19 @@ export function App() {
         <div className="notice">
           AI features are not set up yet. Open the setup link printed in the server log (
           <code>docker compose logs gateway</code>) to finish setup; manual editing works meanwhile.
+        </div>
+      )}
+      {(iconState === 'fetching' || iconState === 'missing') && (
+        <div role="status" className="notice">
+          Downloading the official AWS icons (first start only)…
+        </div>
+      )}
+      {iconState === 'failed' && (
+        <div role="alert" className="notice">
+          The official AWS icons could not be downloaded, so diagrams show generic tiles.{' '}
+          <button type="button" className="link" onClick={retryIcons}>
+            Retry
+          </button>
         </div>
       )}
       {storageDown && (
@@ -771,8 +826,10 @@ export function App() {
             />
             <AiModelPanel />
             <p className="muted small">
-              Generated designs require professional review before production use. Icons shown are
-              generic placeholders until the official packs are imported.
+              Generated designs require professional review before production use.{' '}
+              {iconState === 'ready'
+                ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
+                : 'Icons shown are generic placeholders until the official icons are downloaded.'}
             </p>
           </div>
         </aside>

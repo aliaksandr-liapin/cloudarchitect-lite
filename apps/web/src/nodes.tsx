@@ -11,14 +11,17 @@ export type EditableData = {
   minSize?: { width: number; height: number };
   /** Containers only: whether a proposed box still holds the children plus padding. */
   fits?: (rect: ResizeRect) => boolean;
+  /** Data URL of the official icon, once the pack is ready; absent means a generic tile. */
+  iconUrl?: string;
 };
 
 /**
- * Service node. Official icons are not imported yet (see CLOUD_PROVIDER_CATALOG §2), so every node
- * shows a generic tile that is visibly marked as generic — never a look-alike of an official icon.
+ * Service node. Shows the official icon (unaltered, on a neutral tile) when `iconUrl` is set; nodes
+ * without one (unresolved, external, or icons not downloaded) show a generic tile that is visibly
+ * marked as generic — never a look-alike of an official icon.
  */
 export function ServiceNode({ id, data, selected }: NodeProps) {
-  const { node, displayName, variant, resizable, onResized } = data as ServiceNodeData &
+  const { node, displayName, variant, resizable, onResized, iconUrl } = data as ServiceNodeData &
     EditableData;
   const unresolved = variant === 'unresolved';
   const service = unresolved ? `${displayName} · not in verified catalog` : displayName;
@@ -31,9 +34,15 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
         onResizeEnd={(_, p) => onResized?.(id, p)}
       />
       <Handle type="target" position={Position.Left} />
-      <div className="svc-icon" aria-hidden="true" title="Generic icon">
-        {unresolved ? '?' : variant === 'external' ? '○' : '▢'}
-      </div>
+      {iconUrl ? (
+        <div className="svc-icon is-official">
+          <img src={iconUrl} alt="" draggable={false} />
+        </div>
+      ) : (
+        <div className="svc-icon" aria-hidden="true" title="Generic icon">
+          {unresolved ? '?' : variant === 'external' ? '○' : '▢'}
+        </div>
+      )}
       <div className="svc-text">
         <div className="svc-label" title={node.label}>
           {node.label}
@@ -48,7 +57,7 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
 }
 
 export function ContainerNode({ id, data, selected }: NodeProps) {
-  const { container, resizable, onResized, minSize, fits } = data as ContainerNodeData &
+  const { container, resizable, onResized, minSize, fits, iconUrl } = data as ContainerNodeData &
     EditableData;
   const subnet = container.properties?.subnetType;
   return (
@@ -63,6 +72,7 @@ export function ContainerNode({ id, data, selected }: NodeProps) {
         onResizeEnd={(_, p) => onResized?.(id, p)}
       />
       <div className="ctr-label">
+        {iconUrl && <img className="ctr-icon" src={iconUrl} alt="" draggable={false} />}
         {container.label}
         <span className="ctr-kind">{subnet ? `${subnet} subnet` : container.kind}</span>
       </div>
