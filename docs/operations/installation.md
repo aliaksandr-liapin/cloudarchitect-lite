@@ -51,7 +51,7 @@ Open that link. The wizard has five steps.
 
 <img src="../images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
 
-**4. Limits.** Free AI operations per visitor, requests per minute, daily and monthly budget. The wizard estimates how many generations the budget covers.
+**4. Limits.** Requests per minute, daily and monthly spending limits. The wizard estimates how many generations the budget covers.
 
 <img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of generations and visitors the monthly budget covers" width="720">
 

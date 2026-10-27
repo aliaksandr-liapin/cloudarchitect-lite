@@ -1,41 +1,33 @@
 # Deployment
 
-## Targets
+CloudArchitect Lite is self-hosted only ([ADR-0013](../adr/0013-self-hosted-only.md)): nobody runs a hosted service. Users run the two container images on their own machine.
 
-| Component | Primary                                                                    | Alternative                                                                   |
-| --------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Web       | Cloudflare Pages (static, `apps/web/dist`, headers from `public/_headers`) | `web` container image (nginx) on any container platform                       |
-| Gateway   | Cloudflare Workers + D1 (`apps/gateway/wrangler.toml`)                     | `gateway` container image (Node) — single replica until a shared store exists |
+## Runtime
+
+| Component | Implementation                                                                                 |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| Web       | `web` container image (nginx serving `apps/web/dist`, proxying `/api` to the gateway)          |
+| Gateway   | `gateway` container image (Node), single replica, settings and icon set on a named data volume |
+
+The Cloudflare Workers + D1 and Cloudflare Pages deployment (staging and production, `wrangler`) was dropped 2026-10-26.
 
 ## Environments
 
-| Environment         | Trigger                                                                           | Approval                                           |
-| ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Local / self-hosted | `docker compose up --build` ([installation guide](installation.md)) or `pnpm dev` | —                                                  |
-| Staging             | push to `main` (`.github/workflows/deploy.yml`)                                   | none                                               |
-| Production          | published GitHub release                                                          | required reviewers on the `production` environment |
+| Environment         | How                                                                               |
+| ------------------- | --------------------------------------------------------------------------------- |
+| Local / self-hosted | `docker compose up --build` ([installation guide](installation.md)) or `pnpm dev` |
+| Demo                | Static editor on GitHub Pages, built by a GitHub Actions workflow on each release |
 
-## One-time setup
-
-1. `wrangler d1 create cloudarchitect` and put the database ID into `apps/gateway/wrangler.toml` (default and `env.production`).
-2. `wrangler secret put CLIENT_KEY_SALT` (and provider keys when the LLM adapter ships), per environment.
-3. Create the Pages project `cloudarchitect-lite`.
-4. In GitHub: repository variable `CLOUDFLARE_ACCOUNT_ID`; environment secret `CLOUDFLARE_API_TOKEN` (scoped to Workers, D1, Pages) in `staging` and `production`; add required reviewers to `production`.
-5. Set `ALLOWED_ORIGINS` in `env.production.vars` to the real web origin.
-
-Until step 4 is done, the deploy workflow skips cleanly.
+The demo has no gateway and no AI. It is planned for release 0.2 (see the roadmap).
 
 ## Releases
 
-Tag `vX.Y.Z` → `release.yml` publishes `ghcr.io/<repo>/web` and `/gateway` with SBOM and build provenance. Publishing a GitHub release from the tag deploys production.
+Tag `vX.Y.Z` → `release.yml` publishes `ghcr.io/<repo>/web` and `/gateway` with SBOM and build provenance. Users upgrade by pulling the new images.
 
 ## Rollback
 
-- Workers: `wrangler rollback` (or redeploy the previous tag).
-- Pages: promote the previous deployment in the Cloudflare dashboard.
-- D1 migrations are forward-only; write additive migrations and keep old columns until the next release.
-- Containers: redeploy the previous image digest.
+Redeploy the previous image tag or digest. Saved settings and the data volume are kept.
 
 ## Repository security features
 
-The repository is private. CodeQL always runs and its SARIF is kept as the `codeql-sarif` workflow artifact. Uploading results to GitHub code scanning and running dependency review both require GitHub Advanced Security on private repositories; once it is enabled, set the repository variable `GHAS_ENABLED=true` to turn both on. Dependabot alerts and security updates work without it — enable them under Settings → Code security.
+The repository is private until the public release. CodeQL always runs and its SARIF is kept as the `codeql-sarif` workflow artifact. Uploading results to GitHub code scanning and running dependency review both require GitHub Advanced Security on private repositories; once it is enabled, set the repository variable `GHAS_ENABLED=true` to turn both on. Dependabot alerts and security updates work without it — enable them under Settings → Code security.

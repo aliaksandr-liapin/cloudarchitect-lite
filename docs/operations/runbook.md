@@ -1,22 +1,23 @@
 # Runbook
 
-## Free AI costs are spiking
+For people who run their own instance. The gateway logs go to `docker compose logs gateway`.
 
-1. Check spend: `wrangler d1 execute cloudarchitect --remote --command "SELECT * FROM spend ORDER BY period DESC LIMIT 5"`.
-2. Disable free AI immediately: set `FREE_AI_DISABLED = "true"` in the environment vars and redeploy (`wrangler deploy --env production`). Manual mode and BYOK keep working.
-3. Look for abuse patterns in logs (429 rates, request bursts). Lower `RATE_LIMIT_PER_MINUTE` or the budget caps if needed.
+## AI spend is higher than expected
+
+1. Check the spending limits in the setup wizard (or `DAILY_BUDGET_MICRO_USD` and `MONTHLY_BUDGET_MICRO_USD`). When a limit is reached, AI routes return `ai_unavailable` until the period rolls over; manual editing keeps working.
+2. Lower the limits, or `RATE_LIMIT_PER_MINUTE`, and restart the gateway if they are set in the environment.
+3. Set a monthly limit at the provider as well, and check usage in the provider's console.
 
 ## Gateway errors (5xx)
 
-1. Check Workers logs for `level: error` with request IDs.
-2. Roll back: `wrangler rollback` or redeploy the previous tag.
+1. Check `docker compose logs gateway` for `level: error` with request IDs.
+2. Roll back by starting the previous image tag.
 3. The editor is unaffected; only AI features degrade.
 
 ## Suspected key leak
 
-1. Rotate the provider key at the provider, then `wrangler secret put <NAME>` per environment.
-2. Rotate `CLIENT_KEY_SALT` only if the salt leaked (this resets per-client credit counts).
-3. Review CI secret-scan results and git history.
+1. Rotate the key at the provider, then enter the new one (re-run setup with `node node.js reset-setup` in the gateway container, or update the environment variable).
+2. Review CI secret-scan results and git history if the key was ever committed.
 
 ## Catalog problem (wrong fact or broken icon)
 

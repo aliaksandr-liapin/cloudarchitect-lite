@@ -1,6 +1,6 @@
 # ADR-0003: Hybrid free credits + BYOK
 
-**Status:** Accepted (limit adjustable) · **Date:** 2026-10-13
+**Status:** Superseded by [ADR-0013](0013-self-hosted-only.md) (dropped 2026-10-26) · **Date:** 2026-10-13
 
 **Context.** Users should try AI without signing up; the owner's AI spend must stay bounded.
 

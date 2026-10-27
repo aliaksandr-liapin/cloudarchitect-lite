@@ -9,8 +9,8 @@ someone who clicks through from a post understand the project and want to try it
 The product owner named the two things they must find: **a live demo diagram and a one-command
 install**.
 
-The pitch: *describe your app in plain English and get an AWS architecture, checked against 18 rules,
-running on your own machine with your own key.*
+The pitch: _describe your app in plain English and get an AWS architecture, checked against 18 rules,
+running on your own machine with your own key._
 
 CloudArchitect Lite is now a free, open-source, self-hosted tool and a public showcase for the
 maintainer's work (roadmap §2). The repository itself is judged: README, demo, docs, tests and CI.
@@ -61,7 +61,7 @@ maintainer's work (roadmap §2). The repository itself is judged: README, demo, 
   `v0.2.0`). The README shows the one command (a `curl … && docker compose up` line per platform,
   with PowerShell for Windows).
 - Building from source stays available for contributors (`docker compose -f compose.yaml -f
-  compose.build.yaml up --build` or equivalent), documented in the development guide.
+compose.build.yaml up --build` or equivalent), documented in the development guide.
 - GHCR packages are made public together with the repository.
 - Images are built for both amd64 and arm64 (my call), so Apple Silicon Macs, Windows on ARM and ARM
   Linux run them natively.

@@ -12,10 +12,9 @@ Only the latest `main` and the latest release are supported during pre-1.0 devel
 
 ## Security principles
 
-- **No owner secrets in the browser.** Provider keys for the free tier live only in the gateway (Workers secrets or container env).
-- **BYOK keys never reach our servers** in direct-browser mode and are held in memory only by default.
+- **Self-hosted only.** There is no hosted service, no accounts and no telemetry. Your AI key lives only in your own gateway (a data volume with mode 0600, or the container environment), is never sent to the browser, and prompts go only to your AI provider.
 - **No private content in logs.** The gateway logs request metadata only — never prompts, project graphs, keys or raw IP addresses (client keys are salted hashes). This is covered by tests.
-- **Budget protection.** Free AI is bounded by daily and monthly spend caps with an automatic kill switch, plus per-client rate limits.
+- **Budget protection.** AI use is bounded by daily and monthly spending limits you set, plus rate limits.
 - **Untrusted AI output.** Every AI response is schema-parsed and validated before rendering; catalog IDs are constrained.
 - **Supply chain.** Pinned GitHub Actions (commit SHAs), Dependabot, dependency review, CodeQL, `pnpm audit`, gitleaks, Trivy image scans, SBOM and build provenance on released images.
 - **Hardened runtime.** Non-root containers, read-only filesystems, dropped capabilities, strict CSP and security headers.

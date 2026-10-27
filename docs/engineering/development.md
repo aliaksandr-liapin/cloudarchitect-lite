@@ -6,8 +6,7 @@
 npm install -g pnpm@10.32.1  # Node 25+ no longer bundles corepack
 pnpm install
 cp .env.example .env       # set CLIENT_KEY_SALT
-pnpm dev                   # web :5173, gateway :8787 (Node runtime)
-pnpm --filter @cloudarchitect/gateway dev:worker   # gateway on the Workers runtime (needs .dev.vars)
+pnpm dev                   # web :5173, gateway :8787 (Node runtime, the only runtime)
 ```
 
 Containers: `docker compose up --build` (tested with Rancher Desktop).
@@ -30,6 +29,6 @@ Packages typecheck with TypeScript 7 (native compiler). typescript-eslint does n
 
 ## Package boundaries
 
-- `packages/domain` has no runtime dependencies besides Zod and must stay platform-neutral (browser, Workers, Node).
+- `packages/domain` has no runtime dependencies besides Zod and must stay platform-neutral (browser and Node).
 - `packages/catalog` holds data only, parsed with domain schemas at import time.
 - Apps depend on packages; packages never depend on apps.

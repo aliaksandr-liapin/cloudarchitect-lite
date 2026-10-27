@@ -1,6 +1,6 @@
 # ADR-0006: BYOK via direct browser calls
 
-**Status:** Accepted (threat model pending) · **Date:** 2026-10-13
+**Status:** Superseded by [ADR-0013](0013-self-hosted-only.md) (dropped 2026-10-26) · **Date:** 2026-10-13
 
 **Context.** Routing user keys through our proxy creates liability and erodes trust.
 
