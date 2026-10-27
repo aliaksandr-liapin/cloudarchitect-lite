@@ -1,7 +1,8 @@
 import { migrateProject } from '@cloudarchitect/domain';
 import { samples } from '@cloudarchitect/catalog';
 import { describe, expect, it } from 'vitest';
-import { canExport, imageFrame } from './exportImage';
+import type { Node } from '@xyflow/react';
+import { canExport, diagramBounds, imageFrame } from './exportImage';
 
 describe('imageFrame', () => {
   it('adds padding and translates to the origin', () => {
@@ -24,4 +25,21 @@ describe('canExport', () => {
   it('is true for a project with nodes', () => expect(canExport(sample)).toBe(true));
   it('is false without nodes and containers', () =>
     expect(canExport({ ...sample, nodes: [], containers: [] })).toBe(false));
+});
+
+describe('diagramBounds', () => {
+  const box = (id: string, x: number, y: number, parentId?: string): Node => ({
+    id,
+    position: { x, y },
+    width: 100,
+    height: 50,
+    data: {},
+    ...(parentId ? { parentId } : {}),
+  });
+
+  it('uses absolute positions for children, even outside their parent box', () => {
+    const nodes = [box('c', 200, 100), box('inner', 10, 10, 'c'), box('out', 500, 400, 'inner')];
+    // inner is at (210,110); out is at (710,510) and overflows both containers.
+    expect(diagramBounds(nodes)).toEqual({ x: 200, y: 100, width: 610, height: 460 });
+  });
 });

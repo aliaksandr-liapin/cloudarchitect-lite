@@ -20,6 +20,21 @@ export function imageFrame(
   };
 }
 
+/**
+ * Bounds of all nodes in flow coordinates. Child nodes carry positions relative to their parent, and
+ * `getNodesBounds` only resolves parents through a node lookup, so absolute positions are computed here.
+ */
+export function diagramBounds(nodes: Node[]) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const absolute = (n: Node, seen = new Set<string>()): { x: number; y: number } => {
+    const parent = n.parentId && !seen.has(n.id) ? byId.get(n.parentId) : undefined;
+    if (!parent) return n.position;
+    const at = absolute(parent, seen.add(n.id));
+    return { x: at.x + n.position.x, y: at.y + n.position.y };
+  };
+  return getNodesBounds(nodes.map((n) => ({ ...n, parentId: undefined, position: absolute(n) })));
+}
+
 /** Controls, minimap and resize handles are editing chrome, not part of the diagram. */
 const keep = (el: Element) =>
   !(el instanceof HTMLElement) ||
@@ -37,7 +52,7 @@ export async function exportImage(
   nodes: Node[],
   opts: { background: string; fileName: string },
 ): Promise<void> {
-  const { width, height, transform } = imageFrame(getNodesBounds(nodes));
+  const { width, height, transform } = imageFrame(diagramBounds(nodes));
   const render = format === 'png' ? toPng : toSvg;
   const url = await render(viewport, {
     backgroundColor: opts.background,
