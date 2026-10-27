@@ -10,7 +10,18 @@ import type { AwsIconPack, IconSet } from './icons.js';
 /** Bytes per Unzip.push call; bounds fflate's per-entry recursion. */
 const UNZIP_SLICE = 4096;
 
-export type IconPackErrorCode = 'hash_mismatch' | 'missing_file' | 'not_svg';
+/** Real icons are a few KB each and the whole mapped set is ~149 KB; these caps leave wide margin. */
+export const MAX_ENTRY_BYTES = 1024 * 1024;
+export const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
+
+export interface ExtractLimits {
+  /** Largest decompressed size of one mapped entry. */
+  maxEntryBytes?: number;
+  /** Largest decompressed size of all mapped entries together. */
+  maxTotalBytes?: number;
+}
+
+export type IconPackErrorCode = 'hash_mismatch' | 'missing_file' | 'not_svg' | 'too_large';
 
 export class IconPackError extends Error {
   readonly code: IconPackErrorCode;
@@ -23,13 +34,18 @@ export class IconPackError extends Error {
 
 /**
  * Reads the ZIP once, chunk by chunk: every byte goes into the SHA-256, and only entries the pack maps
- * are decompressed and kept. Nothing is returned unless the hash matches the pinned one and every
- * mapped file is present and is an SVG.
+ * are decompressed and kept, up to a size cap per entry and in total. Nothing is returned unless the
+ * hash matches the pinned one and every mapped file is present, within the caps and is an SVG.
  */
 export async function extractIcons(
   chunks: AsyncIterable<Uint8Array>,
   pack: AwsIconPack,
+  limits: ExtractLimits = {},
 ): Promise<IconSet> {
+  const maxEntry = limits.maxEntryBytes ?? MAX_ENTRY_BYTES;
+  const maxTotal = limits.maxTotalBytes ?? MAX_TOTAL_BYTES;
+  let total = 0;
+  let tooLarge: string | undefined;
   const wanted = new Set(Object.values(pack.files));
   const parts = new Map<string, Uint8Array[]>();
   const done = new Set<string>();
@@ -40,9 +56,20 @@ export async function extractIcons(
     if (!wanted.has(file.name)) return;
     const buf: Uint8Array[] = [];
     parts.set(file.name, buf);
+    let size = 0;
     file.ondata = (err, data, final) => {
       if (err) {
         unzipError ??= err;
+        return;
+      }
+      // A hostile or garbled archive could inflate a mapped entry to gigabytes: stop buffering and
+      // stop decompressing it as soon as it crosses a cap, before it can exhaust the gateway's memory.
+      size += data.length;
+      total += data.length;
+      if (size > maxEntry || total > maxTotal) {
+        tooLarge ??= file.name;
+        buf.length = 0;
+        file.terminate();
         return;
       }
       buf.push(data);
@@ -78,6 +105,12 @@ export async function extractIcons(
     throw new IconPackError(
       'hash_mismatch',
       `Icon pack ${pack.release} has SHA-256 ${actual}, expected ${pack.sha256}`,
+    );
+  }
+  if (tooLarge !== undefined) {
+    throw new IconPackError(
+      'too_large',
+      `Icon pack file ${tooLarge} decompresses beyond the size cap`,
     );
   }
   if (unzipError !== undefined) throw unzipError;

@@ -93,6 +93,36 @@ describe('extractIcons', () => {
     expect(err.code).toBe('not_svg');
   });
 
+  it('extract: too_large stops a mapped entry that inflates past the per-entry cap', async () => {
+    // Zeros compress ~1000:1, so a few KB of ZIP inflate to 4 MB.
+    const bomb = zipSync({ 'a.svg': new Uint8Array(4 * 1024 * 1024) }, { level: 9 });
+    expect(bomb.length).toBeLessThan(64 * 1024);
+    const bombPack = pack({
+      sha256: createHash('sha256').update(bomb).digest('hex'),
+      files: { 'aws/lambda': 'a.svg' },
+    });
+    const err = await rejection(
+      extractIcons(oneChunk(bomb), bombPack, { maxEntryBytes: 64 * 1024 }),
+    );
+    expect(err.code).toBe('too_large');
+    expect(err.message).toContain('a.svg');
+    // The default 1 MiB cap catches it too.
+    expect((await rejection(extractIcons(oneChunk(bomb), bombPack))).code).toBe('too_large');
+  });
+
+  it('extract: too_large when mapped entries together pass the total cap', async () => {
+    const svg = (n: number) => strToU8(`<svg>${' '.repeat(n)}</svg>`);
+    const two = zipSync({ 'a.svg': svg(40_000), 'b.svg': svg(40_000) });
+    const twoPack = pack({
+      sha256: createHash('sha256').update(two).digest('hex'),
+      files: { 'aws/lambda': 'a.svg', 'aws/s3': 'b.svg' },
+    });
+    const limits = { maxEntryBytes: 50_000, maxTotalBytes: 60_000 };
+    expect((await rejection(extractIcons(oneChunk(two), twoPack, limits))).code).toBe('too_large');
+    const ok = await extractIcons(oneChunk(two), twoPack, { maxEntryBytes: 50_000 });
+    expect(Object.keys(ok.icons)).toEqual(['aws/lambda', 'aws/s3']);
+  });
+
   it('handles one huge chunk holding thousands of tiny entries', async () => {
     // fflate's Unzip.push recurses once per entry in the chunk it is given; the real pack has
     // ~8,400 entries, which overflowed the stack when a download arrived in large chunks.

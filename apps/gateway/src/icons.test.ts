@@ -91,6 +91,22 @@ describe('IconStore', () => {
     expect(logs).toContainEqual({ event: 'icons', state: 'failed', error: 'hash_mismatch' });
   });
 
+  it('a mapped entry that inflates past the cap fails with too_large and no cache file', async () => {
+    const logs: Record<string, unknown>[] = [];
+    const bomb = zipSync({ 'a/lambda.svg': new Uint8Array(4 * 1024 * 1024) }, { level: 9 });
+    const bombPack = { ...pack, sha256: createHash('sha256').update(bomb).digest('hex') };
+    const store = new IconStore({
+      dir,
+      pack: bombPack,
+      download: vi.fn(async () => chunks(bomb)),
+      log: (e) => logs.push(e),
+    });
+    await store.ensure();
+    expect(store.state()).toBe('failed');
+    expect(await readdir(dir)).toEqual([]);
+    expect(logs).toContainEqual({ event: 'icons', state: 'failed', error: 'too_large' });
+  });
+
   it('refetches a corrupt cache', async () => {
     await writeFile(cacheFile(), '{"provider":"aws"');
     const download = okDownload();
