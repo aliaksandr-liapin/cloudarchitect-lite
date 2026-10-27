@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { OPERATION_TTL_MS } from './operation-token.js';
-import { MemoryCreditStore } from './store.js';
+import { MemorySpendStore } from './store.js';
 
 const catalogVersion = awsCatalog.manifest.catalogVersion;
 const PROMPT = 'A secret-sauce order pipeline for llamas';
@@ -96,13 +96,13 @@ function fakeLlm(opts: FakeOptions = {}) {
   return { factory: (_apiKey: string) => llm, requests };
 }
 
-function setup(opts: FakeOptions & { credits?: string } = {}) {
+function setup(opts: FakeOptions & { env?: Record<string, string> } = {}) {
   const config = loadConfig({
     CLIENT_KEY_SALT: 'test-salt-0123456789',
     ANTHROPIC_API_KEY: 'sk-ant-test-not-a-real-key',
-    FREE_CREDITS: opts.credits ?? '3',
+    ...opts.env,
   });
-  const store = new MemoryCreditStore(config.FREE_CREDITS);
+  const store = new MemorySpendStore();
   const logs: Record<string, unknown>[] = [];
   const clock = { t: Date.parse('2026-10-18T10:00:00.000Z') };
   const fake = fakeLlm(opts);
@@ -123,15 +123,6 @@ const post = (body: unknown, ip = '203.0.113.7', signal?: AbortSignal) => ({
   ...(signal ? { signal } : {}),
 });
 
-const remaining = async (app: ReturnType<typeof setup>['app'], ip = '203.0.113.7') =>
-  (
-    (await (
-      await app.request('/api/credits/status', { headers: { 'x-forwarded-for': ip } })
-    ).json()) as {
-      remaining: number;
-    }
-  ).remaining;
-
 type Questions = {
   status: 'questions';
   operationId: string;
@@ -150,7 +141,7 @@ async function startWithQuestions(s: ReturnType<typeof setup>) {
 }
 
 describe('/api/ai/generate', () => {
-  it('generate without questions returns a project and charges one credit', async () => {
+  it('generate without questions returns a project', async () => {
     const s = setup();
     const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
     expect(res.status).toBe(200);
@@ -158,17 +149,15 @@ describe('/api/ai/generate', () => {
     expect(body.status).toBe('done');
     expect(body.project.nodes.map((n) => n.id)).toEqual(['queue', 'fn', 'logs']);
     expect(body.usage.costUsd).toBeGreaterThan(0);
-    expect(await remaining(s.app)).toBe(2);
     expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(0);
     expect(s.requests[0]?.model).toBe('claude-haiku-5-5');
   });
 
-  it('generate with questions returns a token and charges nothing; continue returns the project and charges once', async () => {
+  it('generate with questions returns a token; continue returns the project', async () => {
     const s = setup({ questions: [question] });
     const q = await startWithQuestions(s);
     expect(q.questions.map((x) => x.topic)).toEqual(['auth-methods']);
     expect(q.requirements.map((r) => r.id)).toEqual(['R1']);
-    expect(await remaining(s.app)).toBe(3);
     const afterExtract = (await s.store.spend()).dayMicroUsd;
     expect(afterExtract).toBeGreaterThan(0);
 
@@ -184,7 +173,6 @@ describe('/api/ai/generate', () => {
     const body = (await res.json()) as Done;
     expect(body.status).toBe('done');
     expect(body.project.requirements.map((r) => r.id)).toContain('C-auth-methods');
-    expect(await remaining(s.app)).toBe(2);
     expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(afterExtract);
   });
 
@@ -197,7 +185,6 @@ describe('/api/ai/generate', () => {
     const body = (await res.json()) as Questions;
     expect(body.status).toBe('questions');
     expect(body.questions).toEqual([]);
-    expect(await remaining(s.app)).toBe(3);
   });
 
   it('an untidy extraction is normalised so continue with the returned requirements succeeds', async () => {
@@ -235,7 +222,6 @@ describe('/api/ai/generate', () => {
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as Done).status).toBe('done');
-    expect(await remaining(s.app)).toBe(2);
   });
 
   it('continue with edited requirements uses them and marks changed ones as user provenance', async () => {
@@ -291,7 +277,6 @@ describe('/api/ai/generate', () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'invalid_operation' });
     expect(s.requests.length).toBe(calls);
-    expect(await remaining(s.app, '198.51.100.9')).toBe(3);
   });
 
   it('continue rejects a token for another operation id or a tampered token', async () => {
@@ -324,7 +309,6 @@ describe('/api/ai/generate', () => {
     expect(res.status).toBe(410);
     expect(await res.json()).toEqual({ error: 'operation_expired' });
     expect(s.requests.length).toBe(calls);
-    expect(await remaining(s.app)).toBe(3);
   });
 
   it('continue rejects edited requirement ids reserved for clarification and toggle requirements', async () => {
@@ -344,7 +328,6 @@ describe('/api/ai/generate', () => {
       expect(await res.json()).toEqual({ error: 'invalid_request', issues: ['requirements'] });
     }
     expect(s.requests.length).toBe(calls);
-    expect(await remaining(s.app)).toBe(3);
   });
 
   it('continue rejects duplicate, empty or oversized edited requirements', async () => {
@@ -369,39 +352,53 @@ describe('/api/ai/generate', () => {
       expect(((await res.json()) as { error: string }).error).toBe('invalid_request');
     }
     expect(s.requests.length).toBe(calls);
-    expect(await remaining(s.app)).toBe(3);
   });
 
-  it('two parallel generates with one credit: exactly one 200 done, one 402 without a project', async () => {
-    const s = setup({ credits: '1' });
-    const [a, b] = await Promise.all([
-      s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion })),
-      s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion })),
-    ]);
-    const bodies = [await a!.json(), await b!.json()] as Record<string, unknown>[];
-    expect([a!.status, b!.status].sort()).toEqual([200, 402]);
-    const rejected = bodies[a!.status === 402 ? 0 : 1]!;
-    expect(rejected).toEqual({ error: 'no_credits', byok: true });
-    expect(rejected).not.toHaveProperty('project');
-    expect(await remaining(s.app)).toBe(0);
-    // Both requests made the same calls, so the spend is an even multiple of one request's cost.
-    const done = bodies[a!.status === 200 ? 0 : 1] as Done;
-    expect((await s.store.spend()).dayMicroUsd).toBe(Math.round(done.usage.costUsd * 2e6));
+  it('repeated generations from one client are not limited', async () => {
+    const s = setup();
+    for (let i = 0; i < 4; i++) {
+      const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
+      expect(res.status).toBe(200);
+    }
   });
 
-  it('aborted request is not charged', async () => {
+  it('returns ai_unavailable once the daily limit is reached', async () => {
+    const s = setup({ env: { DAILY_BUDGET_MICRO_USD: '100' } });
+    await s.store.addSpend(100);
+    const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'ai_unavailable' });
+    expect(s.requests.length).toBe(0);
+  });
+
+  it('returns ai_unavailable once the monthly limit is reached', async () => {
+    const s = setup({ env: { MONTHLY_BUDGET_MICRO_USD: '100' } });
+    await s.store.addSpend(100);
+    const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'ai_unavailable' });
+  });
+
+  it('returns setup_required when no API key is configured', async () => {
+    const s = setup({ env: { ANTHROPIC_API_KEY: '' } });
+    const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'setup_required' });
+    expect(s.requests.length).toBe(0);
+  });
+
+  it('aborted request is not delivered', async () => {
     const controller = new AbortController();
     const s = setup({ onCall: (req) => req.maxTokens !== 4000 && controller.abort() });
     await s.app.request(
       '/api/ai/generate',
       post({ prompt: PROMPT, catalogVersion }, undefined, controller.signal),
     );
-    expect(await remaining(s.app)).toBe(3);
     expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(0);
     expect(s.logs.find((l) => l.event === 'ai_generate')?.outcome).toBe('aborted');
   });
 
-  it('a disconnect while a model call is in flight still records its spend and charges nothing', async () => {
+  it('a disconnect while a model call is in flight still records its spend', async () => {
     const controller = new AbortController();
     const s = setup({ onCall: (req) => req.maxTokens === 4000 && controller.abort() });
     const res = await s.app.request(
@@ -410,7 +407,6 @@ describe('/api/ai/generate', () => {
     );
     expect(res.status).toBe(499);
     expect(await res.json()).toEqual({ error: 'client_closed' });
-    expect(await remaining(s.app)).toBe(3);
     const event = s.logs.find((l) => l.event === 'ai_generate')!;
     expect(event.outcome).toBe('aborted');
     // Every call ran to completion and was priced, including the one in flight at the disconnect.
@@ -447,10 +443,9 @@ describe('/api/ai/generate', () => {
     expect(res.status).toBe(499);
     expect(s.requests.length).toBe(before + 1);
     expect(s.logs.find((l) => l.event === 'ai_continue')?.outcome).toBe('aborted');
-    expect(await remaining(s.app)).toBe(3);
   });
 
-  it('runs model calls, spend writes and the credit step under waitUntil when the runtime has one', async () => {
+  it('runs model calls, spend writes and the log step under waitUntil when the runtime has one', async () => {
     const s = setup();
     const pending: Promise<unknown>[] = [];
     const ctx = {
@@ -465,21 +460,20 @@ describe('/api/ai/generate', () => {
       ctx,
     );
     expect(res.status).toBe(200);
-    // One per model call (call + spend write) plus one for the credit and log step.
+    // One per model call (call + spend write) plus one for the delivery and log step.
     expect(pending).toHaveLength(s.requests.length + 1);
     await Promise.all(pending);
   });
 
-  it('schema-invalid output returns 502 generation_failed and no charge', async () => {
+  it('schema-invalid output returns 502 generation_failed', async () => {
     const s = setup({ graphText: '{"not":"a graph"}' });
     const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'generation_failed' });
-    expect(await remaining(s.app)).toBe(3);
     expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(0);
   });
 
-  it('provider errors return 502 provider_error and no charge', async () => {
+  it('provider errors return 502 provider_error', async () => {
     const s = setup({
       onCall: () => {
         throw new Error('overloaded');
@@ -488,7 +482,6 @@ describe('/api/ai/generate', () => {
     const res = await s.app.request('/api/ai/generate', post({ prompt: PROMPT, catalogVersion }));
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'provider_error' });
-    expect(await remaining(s.app)).toBe(3);
   });
 
   it('rejects a catalog version mismatch before any model call', async () => {

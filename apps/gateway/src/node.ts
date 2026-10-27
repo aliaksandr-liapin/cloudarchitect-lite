@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createApp } from './app.js';
 import { FileSettings } from './settings-file.js';
 import { SetupService } from './setup.js';
-import { MemoryCreditStore } from './store.js';
+import { MemorySpendStore } from './store.js';
 
 // Node runtime for local development and self-hosted containers. The in-memory store is per-process:
 // run a single replica, or replace it with a shared transactional store before scaling out.
@@ -28,7 +28,7 @@ if (process.argv[2] === 'reset-setup') {
 const app = createApp({
   config: () => setup.config(),
   ...(wizard ? { setup } : {}),
-  store: new MemoryCreditStore(() => setup.config().FREE_CREDITS),
+  store: new MemorySpendStore(),
   // Container health checks run every 30 s; logging them would bury real traffic.
   log: (e) => {
     if (e.path !== '/health') console.log(JSON.stringify(e));

@@ -3,16 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Free-AI gateway: credits, budget cap, abuse controls, LLM adapters. Runs on Cloudflare Workers or Node.",
+  "description": "AI gateway: setup wizard, spending limits, LLM calls. Runs on Node.",
   "scripts": {
     "dev": "tsx watch src/node.ts",
-    "dev:worker": "wrangler dev",
     "build": "esbuild src/node.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/node.js --sourcemap --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "start": "node dist/node.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 migrations apply cloudarchitect --local"
+    "test": "vitest run"
   },
   "dependencies": {
     "@cloudarchitect/catalog": "workspace:*",
@@ -23,13 +20,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261013.1",
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.4",
-    "wrangler": "^4.150.0"
+    "vitest": "^5.0.4"
   },
   "license": "Apache-2.0"
 }

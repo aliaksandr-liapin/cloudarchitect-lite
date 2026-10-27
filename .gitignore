@@ -3,12 +3,10 @@ dist/
 build/
 coverage/
 .turbo/
-.wrangler/
 *.tsbuildinfo
 .env
 .env.*
 !.env.example
-.dev.vars
 *.log
 .DS_Store
 .idea/

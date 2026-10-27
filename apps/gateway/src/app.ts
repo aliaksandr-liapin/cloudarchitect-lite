@@ -10,14 +10,14 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import { registerGenerateRoutes } from './generate.js';
 import { SetupError, SetupInput, type SetupService } from './setup.js';
-import type { CreditStore } from './store.js';
+import type { SpendStore } from './store.js';
 
 export interface Deps {
   /** A getter lets the setup wizard change settings without a restart. */
   config: Config | (() => Config);
   /** First-run wizard; present only on self-hosted Node installs (ADR-0012). */
   setup?: SetupService;
-  store: CreditStore;
+  store: SpendStore;
   /** Structured logger. Must never receive prompts, graphs or keys (NFR-006). */
   log?: (event: Record<string, unknown>) => void;
   /** Provider client factory; tests inject a fake. */
@@ -33,7 +33,7 @@ async function sha256(text: string) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Fixed-window limiter per client key. Per-instance only; production Workers use the Rate Limiting binding. */
+/** Fixed-window limiter per client key. Per-instance only. */
 function rateLimiter(limitPerMinute: () => number) {
   const windows = new Map<string, { start: number; count: number }>();
   return (key: string, now = Date.now()) => {
@@ -77,10 +77,7 @@ export function createApp({
 
   // Anonymous client key: salted hash of the connecting IP. Raw IPs are never stored or logged.
   app.use('/api/*', async (c, next) => {
-    const ip =
-      c.req.header('cf-connecting-ip') ??
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-      'unknown';
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     c.set('clientKey', await sha256(`${cfg().CLIENT_KEY_SALT}:${ip}`));
     if (!allow(c.get('clientKey'))) return c.json({ error: 'rate_limited' }, 429);
     await next();
@@ -98,10 +95,10 @@ export function createApp({
     });
   });
 
-  /** Kill switch: manual flag or either budget cap reached (NFR-009). */
-  async function freeAiAvailable() {
+  /** True when a key is configured and neither the daily nor the monthly limit is reached (NFR-009). */
+  async function aiAvailable() {
     const config = cfg();
-    if (config.FREE_AI_DISABLED || !config.ANTHROPIC_API_KEY) return false;
+    if (!config.ANTHROPIC_API_KEY) return false;
     const { dayMicroUsd, monthMicroUsd } = await store.spend();
     return (
       dayMicroUsd < config.DAILY_BUDGET_MICRO_USD && monthMicroUsd < config.MONTHLY_BUDGET_MICRO_USD
@@ -158,18 +155,11 @@ export function createApp({
     }
   });
 
-  app.get('/api/credits/status', async (c) =>
-    c.json({
-      remaining: await store.remaining(c.get('clientKey')),
-      freeAiAvailable: await freeAiAvailable(),
-    }),
-  );
-
-  registerGenerateRoutes(app, { cfg, setup, store, log, freeAiAvailable, llm, now });
+  registerGenerateRoutes(app, { cfg, setup, store, log, aiAvailable, llm, now });
 
   /**
-   * Edit, Review and Ask are Phase 3. Request validation, kill switch and credit checks are live; a
-   * valid request returns 501 without charging a credit.
+   * Edit, Review and Ask are Phase 3. Request validation and the key and spending-limit checks are live; a
+   * valid request returns 501.
    */
   const aiOperation = (schema: z.ZodType) => async (c: Context<Env>) => {
     const raw: unknown = await c.req.json().catch(() => null);
@@ -186,13 +176,11 @@ export function createApp({
         400,
       );
     if (setup && !setup.status().configured) return c.json({ error: 'setup_required' }, 503);
-    // Models outside AI_MODELS are only available with the user's own key (ADR-0011).
     const chosen = model.data.model ?? cfg().DEFAULT_MODEL;
     if (!cfg().AI_MODELS.includes(chosen))
-      return c.json({ error: 'model_not_enabled', model: chosen, byok: true }, 403);
-    if (!(await freeAiAvailable())) return c.json({ error: 'free_ai_unavailable' }, 503);
-    if ((await store.remaining(c.get('clientKey'))) <= 0)
-      return c.json({ error: 'no_credits', byok: true }, 402);
+      return c.json({ error: 'model_not_enabled', model: chosen }, 403);
+    if (!cfg().ANTHROPIC_API_KEY) return c.json({ error: 'setup_required' }, 503);
+    if (!(await aiAvailable())) return c.json({ error: 'ai_unavailable' }, 503);
     return c.json({ error: 'not_implemented' }, 501);
   };
 

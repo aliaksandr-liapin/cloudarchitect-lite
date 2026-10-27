@@ -97,7 +97,7 @@ export function readModelChoice(): ModelChoice | undefined {
   }
 }
 
-/** Editor panel: pick the model for AI operations; models the server key does not serve need BYOK. */
+/** Editor panel: pick the model for AI operations; models this instance does not enable are disabled. */
 export function AiModelPanel() {
   const [enabled, setEnabled] = useState<readonly ModelChoice[]>();
   const [choice, setChoice] = useState<ModelChoice>();

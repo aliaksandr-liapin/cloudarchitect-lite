@@ -71,7 +71,6 @@ export interface SetupRequest {
   apiKey?: string;
   models: ModelChoice[];
   defaultModel: ModelChoice;
-  freeCredits: number;
   dailyBudgetUsd: number;
   monthlyBudgetUsd: number;
   rateLimitPerMinute: number;

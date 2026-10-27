@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
-import { loadConfig, type Settings } from './config.js';
+import { loadConfig, resolveConfig, type Settings } from './config.js';
 import { SetupService, type KeyCheck } from './setup.js';
-import { MemoryCreditStore } from './store.js';
+import { MemorySpendStore } from './store.js';
 
-const setup = (env: Record<string, string> = {}) => {
+const setup = (env: Record<string, string | undefined> = {}) => {
   const config = loadConfig({
     CLIENT_KEY_SALT: 'test-salt-0123456789',
     ANTHROPIC_API_KEY: 'sk-ant-test-not-a-real-key',
     ...env,
   });
-  const store = new MemoryCreditStore(config.FREE_CREDITS);
+  const store = new MemorySpendStore();
   const logs: Record<string, unknown>[] = [];
   return { app: createApp({ config, store, log: (e) => logs.push(e) }), store, logs };
 };
@@ -29,7 +29,7 @@ describe('gateway', () => {
     expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
   });
 
-  it('defaults to Haiku on the instance key and lists both models with benchmarks', async () => {
+  it('defaults to Haiku and lists both models with benchmarks', async () => {
     const res = await setup().app.request('/api/models');
     const body = (await res.json()) as {
       defaultModel: string;
@@ -44,14 +44,14 @@ describe('gateway', () => {
     );
   });
 
-  it('rejects a model the instance key does not serve, with a BYOK hint', async () => {
+  it('rejects a model that is not enabled', async () => {
     const { app } = setup();
     const res = await app.request(
       '/api/ai/generate',
       post('/api/ai/generate', { prompt: 'x', catalogVersion: 'v', model: 'sonnet' }),
     );
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ error: 'model_not_enabled', byok: true });
+    expect(await res.json()).toEqual({ error: 'model_not_enabled', model: 'sonnet' });
     const both = setup({ AI_MODELS: 'haiku,sonnet' }).app;
     const ok = await both.request(
       '/api/ai/generate',
@@ -71,9 +71,9 @@ describe('gateway', () => {
     expect(() => loadConfig({})).toThrow(/CLIENT_KEY_SALT/);
   });
 
-  it('reports credits and availability', async () => {
+  it('has no credits endpoint', async () => {
     const res = await setup().app.request('/api/credits/status');
-    expect(await res.json()).toEqual({ remaining: 3, freeAiAvailable: true });
+    expect(res.status).toBe(404);
   });
 
   it('validates AI requests and enforces the prompt limit', async () => {
@@ -85,44 +85,36 @@ describe('gateway', () => {
     );
   });
 
-  it('does not charge credits for unimplemented operations', async () => {
+  it('answers 501 for unimplemented operations', async () => {
     const { app } = setup();
     const res = await app.request('/api/ai/review', post('/api/ai/review', { project: {} }));
     expect(res.status).toBe(501);
-    const status = await app.request('/api/credits/status', {
-      headers: { 'x-forwarded-for': '203.0.113.7' },
-    });
-    expect(((await status.json()) as { remaining: number }).remaining).toBe(3);
   });
 
-  it('kill switch: manual flag and budget cap both disable free AI', async () => {
-    const off = setup({ FREE_AI_DISABLED: 'true' });
-    expect(
-      (await off.app.request('/api/ai/review', post('/api/ai/review', { project: {} }))).status,
-    ).toBe(503);
-
-    const capped = setup({ DAILY_BUDGET_MICRO_USD: '100' });
-    await capped.store.addSpend(100);
-    expect(
-      (
-        (await (await capped.app.request('/api/credits/status')).json()) as {
-          freeAiAvailable: boolean;
-        }
-      ).freeAiAvailable,
-    ).toBe(false);
+  it('spending limits: a reached daily or monthly limit returns ai_unavailable', async () => {
+    for (const env of [{ DAILY_BUDGET_MICRO_USD: '100' }, { MONTHLY_BUDGET_MICRO_USD: '100' }]) {
+      const capped = setup(env);
+      await capped.store.addSpend(100);
+      const res = await capped.app.request(
+        '/api/ai/review',
+        post('/api/ai/review', { project: {} }),
+      );
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: 'ai_unavailable' });
+    }
   });
 
-  it('returns 402 with a BYOK hint when credits are exhausted', async () => {
-    const { app } = setup({ FREE_CREDITS: '0' });
+  it('without an API key, AI routes return setup_required, not ai_unavailable', async () => {
+    const { app } = setup({ ANTHROPIC_API_KEY: '' });
     const res = await app.request('/api/ai/review', post('/api/ai/review', { project: {} }));
-    expect(res.status).toBe(402);
-    expect(await res.json()).toEqual({ error: 'no_credits', byok: true });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'setup_required' });
   });
 
   it('rate limits per client', async () => {
     const { app } = setup({ RATE_LIMIT_PER_MINUTE: '2' });
     const codes = [];
-    for (let i = 0; i < 3; i++) codes.push((await app.request('/api/credits/status')).status);
+    for (let i = 0; i < 3; i++) codes.push((await app.request('/api/models')).status);
     expect(codes).toEqual([200, 200, 429]);
   });
 
@@ -151,7 +143,7 @@ describe('setup wizard', () => {
     const app = createApp({
       config: () => service.config(),
       setup: service,
-      store: new MemoryCreditStore(() => service.config().FREE_CREDITS),
+      store: new MemorySpendStore(),
     });
     return { app, saved: () => saved };
   };
@@ -160,7 +152,6 @@ describe('setup wizard', () => {
     apiKey: 'sk-ant-test-0123456789abcdef',
     models: ['haiku', 'sonnet'],
     defaultModel: 'sonnet',
-    freeCredits: 10,
     dailyBudgetUsd: 2,
     monthlyBudgetUsd: 20,
     rateLimitPerMinute: 30,
@@ -197,16 +188,11 @@ describe('setup wizard', () => {
     expect(saved()).toMatchObject({
       AI_MODELS: 'haiku,sonnet',
       DEFAULT_MODEL: 'sonnet',
-      FREE_CREDITS: '10',
       MONTHLY_BUDGET_MICRO_USD: '20000000',
     });
     expect(await (await app.request('/api/models')).json()).toMatchObject({
       defaultModel: 'sonnet',
       enabled: ['haiku', 'sonnet'],
-    });
-    expect(await (await app.request('/api/credits/status')).json()).toEqual({
-      remaining: 10,
-      freeAiAvailable: true,
     });
     expect((await app.request('/api/setup/complete', post('', input))).status).toBe(409);
   });
@@ -226,7 +212,6 @@ describe('setup wizard', () => {
       current: {
         models: ['haiku', 'sonnet'],
         defaultModel: 'sonnet',
-        freeCredits: 10,
         monthlyBudgetUsd: 20,
       },
     });
@@ -243,8 +228,21 @@ describe('setup wizard', () => {
     expect(saved().ANTHROPIC_API_KEY).toBeUndefined();
   });
 
-  it('is absent when the gateway runs without a wizard (Workers)', async () => {
+  it('is absent when the gateway runs without a wizard', async () => {
     const res = await setup().app.request('/api/setup/complete', post('', input));
     expect(res.status).toBe(404);
+  });
+});
+
+describe('config', () => {
+  const base = { DEFAULT_MODEL: 'haiku', AI_MODELS: 'haiku', CLIENT_KEY_SALT: 'x'.repeat(16) };
+
+  it('ignores removed settings', () => {
+    const config = resolveConfig({}, { ...base, FREE_CREDITS: '3' } as Settings);
+    expect(config.DEFAULT_MODEL).toBe('haiku');
+    expect(config).not.toHaveProperty('FREE_CREDITS');
+    const fromEnv = resolveConfig({ FREE_CREDITS: '3', FREE_AI_DISABLED: 'true' }, base);
+    expect(fromEnv).not.toHaveProperty('FREE_CREDITS');
+    expect(fromEnv).not.toHaveProperty('FREE_AI_DISABLED');
   });
 });

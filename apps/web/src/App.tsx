@@ -72,7 +72,7 @@ type Questions = Extract<GenerateResponse, { status: 'questions' }>;
 
 /** Extraction is quick; after this the request is almost always in the generation step. */
 const DESIGNING_AFTER_MS = 8000;
-const CANCELLED = 'Generation cancelled — no credit used.';
+const CANCELLED = 'Generation cancelled.';
 
 interface DialogSpec {
   message: string;
@@ -299,7 +299,7 @@ export function App() {
 
   /**
    * Replace step (spec §2.4), before any request: confirm hand edits and keep the current diagram
-   * as a version. False means "do not generate": no request is sent, no credit is used.
+   * as a version. False means "do not generate": no request is sent.
    */
   const prepare = async (): Promise<boolean> => {
     const current = projectRef.current;

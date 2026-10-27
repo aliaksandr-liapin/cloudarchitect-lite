@@ -20,7 +20,6 @@ const FAKE_KEY = 'sk-ant-api03-placeholder-for-screenshots-0000000000';
 const WIZARD_DEFAULTS = {
   models: ['haiku'],
   defaultModel: 'haiku',
-  freeCredits: 3,
   dailyBudgetUsd: 5,
   monthlyBudgetUsd: 50,
   rateLimitPerMinute: 20,

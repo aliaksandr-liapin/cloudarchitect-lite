@@ -33,7 +33,6 @@ export function SetupWizard() {
   const [keyState, setKeyState] = useState<'unchecked' | 'checking' | 'valid'>('unchecked');
   const [models, setModels] = useState<ModelChoice[]>(['haiku']);
   const [defaultModel, setDefaultModel] = useState<ModelChoice>('haiku');
-  const [freeCredits, setFreeCredits] = useState(3);
   const [dailyBudgetUsd, setDaily] = useState(5);
   const [monthlyBudgetUsd, setMonthly] = useState(50);
   const [rateLimitPerMinute, setRate] = useState(20);
@@ -49,7 +48,6 @@ export function SetupWizard() {
         if (s.current) {
           setModels(s.current.models);
           setDefaultModel(s.current.defaultModel);
-          setFreeCredits(s.current.freeCredits);
           setDaily(s.current.dailyBudgetUsd);
           setMonthly(s.current.monthlyBudgetUsd);
           setRate(s.current.rateLimitPerMinute);
@@ -91,7 +89,6 @@ export function SetupWizard() {
         ...(status?.keyFromEnvironment ? {} : { apiKey: apiKey.trim() }),
         models,
         defaultModel,
-        freeCredits,
         dailyBudgetUsd,
         monthlyBudgetUsd,
         rateLimitPerMinute,
@@ -115,7 +112,6 @@ export function SetupWizard() {
 
   const cost = modelOption(defaultModel).benchmark.costPerOperationUsd;
   const generationsPerMonth = Math.floor(monthlyBudgetUsd / cost);
-  const visitorsPerMonth = freeCredits > 0 ? Math.floor(generationsPerMonth / freeCredits) : 0;
 
   return (
     <div className="wizard">
@@ -284,21 +280,9 @@ export function SetupWizard() {
             <p>AI stops automatically when a budget is reached; manual editing keeps working.</p>
             <Locked
               status={status}
-              keys={[
-                'FREE_CREDITS',
-                'RATE_LIMIT_PER_MINUTE',
-                'DAILY_BUDGET_MICRO_USD',
-                'MONTHLY_BUDGET_MICRO_USD',
-              ]}
+              keys={['RATE_LIMIT_PER_MINUTE', 'DAILY_BUDGET_MICRO_USD', 'MONTHLY_BUDGET_MICRO_USD']}
             />
             <div className="grid2">
-              <NumberField
-                label="Free AI operations per visitor"
-                disabled={isLocked('FREE_CREDITS')}
-                value={freeCredits}
-                min={0}
-                onChange={setFreeCredits}
-              />
               <NumberField
                 label="Requests per minute per visitor"
                 disabled={isLocked('RATE_LIMIT_PER_MINUTE')}
@@ -329,15 +313,7 @@ export function SetupWizard() {
             <p className="estimate">
               With {modelOption(defaultModel).label} at about ${cost} per generation, $
               {monthlyBudgetUsd} a month covers about{' '}
-              <strong>{generationsPerMonth.toLocaleString()}</strong> generations
-              {freeCredits > 0 && (
-                <>
-                  {' '}
-                  — roughly <strong>{visitorsPerMonth.toLocaleString()}</strong> visitors using all{' '}
-                  {freeCredits} free operations
-                </>
-              )}
-              .
+              <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
             </p>
           </section>
         ) : (
@@ -355,8 +331,6 @@ export function SetupWizard() {
               <dd>{models.map((m) => modelOption(m).label).join(', ')}</dd>
               <dt>Default model</dt>
               <dd>{modelOption(defaultModel).label}</dd>
-              <dt>Free operations per visitor</dt>
-              <dd>{freeCredits}</dd>
               <dt>Budget</dt>
               <dd>
                 ${dailyBudgetUsd} per day, ${monthlyBudgetUsd} per month
