@@ -40,6 +40,7 @@ First public release. Includes the Phase 2 work below and a self-hosted install 
 
 - Settings for the removed features are ignored.
 - The first start downloads the AWS icons, so the internet is needed once.
+- If you run 0.1 from a clone of the repository: `compose.yaml` now pulls the published images instead of building. To keep building from your checkout, run `docker compose -f compose.yaml -f compose.build.yaml up --build`.
 
 ### Fixed
 
@@ -64,5 +65,6 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/releases/tag/v0.1.0

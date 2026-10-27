@@ -103,6 +103,6 @@ Caveats:
 | No critical defect | ≥ 90% of scenarios | 11/12 = 91.7% | **Met** (thin margin: one critical defect) |
 | Live gate (Haiku) | green | PASS: schema-valid 100%, pass 93.2% | **Met** |
 
-**Gate A: passed** (the base-only Haiku median is 2.00, exactly at the bar; regressions versus Phase 0 accepted by the product owner on 2026-10-27). Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
+**Gate A: passed** (the base-only Haiku median is 2.00, exactly at the bar; regressions versus Phase 0 accepted by the product owner on 2026-10-27). Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)) (as of 2026-10-18; free tier and BYOK dropped 2026-10-26, [ADR-0013](../adr/0013-self-hosted-only.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
 
 **Limits:** one reviewed design per variant per scenario; the quality review used pre-fix outputs and an AI reviewer; the 91.7% critical-defect margin is one design. Re-review a sample of post-fix designs and run a human spot check before public beta.
