@@ -86,10 +86,24 @@ Settings apply immediately and survive restarts. Then use the editor at <http://
 
 ## Upgrading
 
-Download the `compose.yaml` of the new version (change the version in the URL above), then:
+Run these commands **in the same folder** as the original install. Docker names the `gateway-data` volume after the folder, so a new, empty folder starts over with a fresh setup. Set the version you upgrade to, download its `compose.yaml`, then pull and restart:
+
+**macOS and Linux**
 
 ```bash
+cd path/to/your/install/folder
+VERSION=0.2.0   # the version you upgrade to
+curl -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$VERSION/compose.yaml"
 docker compose pull && docker compose up -d
+```
+
+**Windows (PowerShell)**
+
+```powershell
+cd path\to\your\install\folder
+$Version = '0.2.0'   # the version you upgrade to
+curl.exe -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$Version/compose.yaml"
+docker compose pull; docker compose up -d
 ```
 
 Settings and downloaded icons live in the `gateway-data` volume and are kept. To pin a version without editing the file, set `CLOUDARCHITECT_VERSION` (for example in `.env` or the shell).
