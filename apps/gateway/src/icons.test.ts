@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { awsIconPack, type AwsIconPack } from '@cloudarchitect/catalog';
@@ -138,5 +138,96 @@ describe('IconStore', () => {
     await writeFile(join(dir, 'aws-2025-01-31.json'), '{}');
     await new IconStore({ dir, pack, download: okDownload() }).ensure();
     expect(await readdir(dir)).toEqual([`aws-${pack.release}.json`]);
+  });
+
+  it('removes leftover .json.tmp files after a successful fetch', async () => {
+    await writeFile(join(dir, `aws-${pack.release}.json.tmp`), '{"partial');
+    await writeFile(join(dir, 'aws-2025-01-31.json.tmp'), '{}');
+    await new IconStore({ dir, pack, download: okDownload() }).ensure();
+    expect(await readdir(dir)).toEqual([`aws-${pack.release}.json`]);
+  });
+
+  it('a cleanup failure never marks a good fetch failed', async () => {
+    // A directory with the name of an old cache cannot be removed by rm without `recursive`.
+    await mkdir(join(dir, 'aws-2025-01-31.json'));
+    await writeFile(join(dir, 'aws-2025-01-31.json', 'x'), '');
+    const store = new IconStore({ dir, pack, download: okDownload() });
+    await store.ensure();
+    expect(store.state()).toBe('ready');
+    expect(await readdir(dir)).toContain(`aws-${pack.release}.json`);
+  });
+});
+
+describe('IconStore download timeouts', () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('a slow but steady download succeeds although it outlasts the idle timeout', async () => {
+    const download = vi.fn(async () =>
+      (async function* () {
+        for (let i = 0; i < zip.length; i += 16) {
+          await sleep(20);
+          yield zip.subarray(i, i + 16);
+        }
+      })(),
+    );
+    expect(Math.ceil(zip.length / 16) * 20).toBeGreaterThan(80);
+    const store = new IconStore({ dir, pack, download, timeouts: { idleMs: 80, totalMs: 10_000 } });
+    await store.ensure();
+    expect(store.state()).toBe('ready');
+  });
+
+  it('aborts a download that stalls, even if the source ignores the signal', async () => {
+    const logs: Record<string, unknown>[] = [];
+    let signal: AbortSignal | undefined;
+    const download = vi.fn(async (_url: string, s: AbortSignal) => {
+      signal = s;
+      return (async function* () {
+        yield zip.subarray(0, 64);
+        await new Promise(() => {});
+      })();
+    });
+    const store = new IconStore({
+      dir,
+      pack,
+      download,
+      log: (e) => logs.push(e),
+      timeouts: { idleMs: 50, totalMs: 10_000 },
+    });
+    await store.ensure();
+    expect(store.state()).toBe('failed');
+    expect(signal?.aborted).toBe(true);
+    expect(logs).toContainEqual({ event: 'icons', state: 'failed', error: 'network' });
+    expect(await readdir(dir)).toEqual([]);
+  });
+
+  it('aborts a response that never starts', async () => {
+    const download = vi.fn(() => new Promise<AsyncIterable<Uint8Array>>(() => {}));
+    const store = new IconStore({ dir, pack, download, timeouts: { idleMs: 50, totalMs: 10_000 } });
+    await store.ensure();
+    expect(store.state()).toBe('failed');
+  });
+
+  it('aborts a steady download that passes the total cap', async () => {
+    const download = vi.fn(async () =>
+      (async function* () {
+        for (;;) {
+          await sleep(10);
+          yield new Uint8Array(1);
+        }
+      })(),
+    );
+    const store = new IconStore({ dir, pack, download, timeouts: { idleMs: 1_000, totalMs: 100 } });
+    await store.ensure();
+    expect(store.state()).toBe('failed');
+  });
+
+  it('aborts the signal after a successful download too', async () => {
+    let signal: AbortSignal | undefined;
+    const download = vi.fn(async (_url: string, s: AbortSignal) => {
+      signal = s;
+      return chunks(zip);
+    });
+    await new IconStore({ dir, pack, download }).ensure();
+    expect(signal?.aborted).toBe(true);
   });
 });

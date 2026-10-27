@@ -9,7 +9,15 @@ export type IconState = 'missing' | 'fetching' | 'ready' | 'failed';
 
 export type Download = (url: string, signal: AbortSignal) => Promise<AsyncIterable<Uint8Array>>;
 
-const DOWNLOAD_TIMEOUT_MS = 120_000;
+/** Abort when no bytes arrive for this long; slow links still finish as long as data keeps coming. */
+const IDLE_TIMEOUT_MS = 60_000;
+/** Hard cap on the whole download (~22 MB at well under 1 Mbit/s still fits). */
+const TOTAL_TIMEOUT_MS = 15 * 60_000;
+
+export interface DownloadTimeouts {
+  idleMs: number;
+  totalMs: number;
+}
 
 const fetchDownload: Download = async (url, signal) => {
   const res = await fetch(url, { signal });
@@ -30,13 +38,19 @@ export class IconStore {
   readonly #pack: AwsIconPack;
   readonly #download: Download;
   readonly #log: (e: Record<string, unknown>) => void;
+  readonly #timeouts: DownloadTimeouts;
 
   constructor(deps: {
     dir: string;
     pack: AwsIconPack;
     download?: Download;
     log?: (e: Record<string, unknown>) => void;
+    timeouts?: Partial<DownloadTimeouts>;
   }) {
+    this.#timeouts = {
+      idleMs: deps.timeouts?.idleMs ?? IDLE_TIMEOUT_MS,
+      totalMs: deps.timeouts?.totalMs ?? TOTAL_TIMEOUT_MS,
+    };
     this.#dir = deps.dir;
     this.#pack = deps.pack;
     this.#download = deps.download ?? fetchDownload;
@@ -109,13 +123,15 @@ export class IconStore {
 
   async #fetchAndStore(): Promise<IconSet> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
     let set: IconSet;
     try {
-      const body = await this.#download(this.#pack.downloadUrl, controller.signal);
-      set = await extractIcons(body, this.#pack);
+      set = await extractIcons(
+        watchdog(this.#download, this.#pack.downloadUrl, controller, this.#timeouts),
+        this.#pack,
+      );
     } finally {
-      clearTimeout(timer);
+      // Always abort: releases the connection whether the read finished, failed or timed out.
+      controller.abort();
     }
     await mkdir(this.#dir, { recursive: true });
     const tmp = `${this.#file}.tmp`;
@@ -126,11 +142,66 @@ export class IconStore {
       await rm(tmp, { force: true });
       throw err;
     }
-    const keep = `aws-${this.#pack.release}.json`;
-    for (const name of await readdir(this.#dir)) {
-      if (/^aws-.*\.json$/.test(name) && name !== keep)
-        await rm(join(this.#dir, name), { force: true });
-    }
+    await this.#removeOldCaches();
     return set;
+  }
+
+  /** Best effort: a leftover file from an old release or a crashed write never fails a good fetch. */
+  async #removeOldCaches(): Promise<void> {
+    const keep = `aws-${this.#pack.release}.json`;
+    try {
+      for (const name of await readdir(this.#dir)) {
+        if (/^aws-.*\.json(\.tmp)?$/.test(name) && name !== keep) {
+          await rm(join(this.#dir, name), { force: true }).catch(() => {});
+        }
+      }
+    } catch {
+      // Cleanup is retried after the next successful fetch.
+    }
+  }
+}
+
+/**
+ * Yields the download's chunks, aborting if no chunk arrives within `idleMs` (the wait for the
+ * response counts too) or the whole download takes longer than `totalMs`. The abort rejects the
+ * pending read even if the source ignores the signal.
+ */
+async function* watchdog(
+  download: Download,
+  url: string,
+  controller: AbortController,
+  { idleMs, totalMs }: DownloadTimeouts,
+): AsyncIterable<Uint8Array> {
+  const { signal } = controller;
+  const aborted = new Promise<never>((_, reject) => {
+    const fail = () =>
+      reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+    if (signal.aborted) fail();
+    else signal.addEventListener('abort', fail, { once: true });
+  });
+  aborted.catch(() => {});
+  const total = setTimeout(() => controller.abort(new Error('download timed out')), totalMs);
+  let idle: ReturnType<typeof setTimeout> | undefined;
+  const touch = () => {
+    clearTimeout(idle);
+    idle = setTimeout(() => controller.abort(new Error('download stalled')), idleMs);
+  };
+  try {
+    touch();
+    const body = await Promise.race([download(url, signal), aborted]);
+    const it = body[Symbol.asyncIterator]();
+    try {
+      for (;;) {
+        touch();
+        const next = await Promise.race([it.next(), aborted]);
+        if (next.done) return;
+        yield next.value;
+      }
+    } finally {
+      void it.return?.()?.catch(() => {});
+    }
+  } finally {
+    clearTimeout(total);
+    clearTimeout(idle);
   }
 }
