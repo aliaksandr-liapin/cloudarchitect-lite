@@ -1,12 +1,12 @@
 {
   "name": "@cloudarchitect/gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "AI gateway: setup wizard, spending limits, LLM calls. Runs on Node.",
   "scripts": {
     "dev": "tsx watch src/node.ts",
-    "build": "esbuild src/node.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/node.js --sourcemap --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "build": "esbuild src/node.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/node.js --sourcemap --banner:js=\"import{createRequire as __bannerCreateRequire}from'module';const require=__bannerCreateRequire(import.meta.url);\"",
     "start": "node dist/node.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

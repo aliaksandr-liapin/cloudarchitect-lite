@@ -1,12 +1,13 @@
 # CloudArchitect Lite — self-hosted stack (Docker Desktop, Rancher Desktop or Docker Engine).
 #
-#   docker compose up --build
+#   docker compose up
 #
 # Then open the setup link printed by the gateway (http://localhost:8080/setup?code=…).
+# To build from source instead: docker compose -f compose.yaml -f compose.build.yaml up --build
 # Optional: copy .env.example to .env to preset values; environment variables override the wizard.
 services:
   web:
-    build: { context: ., dockerfile: infra/docker/web.Dockerfile }
+    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/web:${CLOUDARCHITECT_VERSION:-0.2.0}
     # Bound to this machine only: the app has no login, so it must not be reachable from the network.
     ports: ['127.0.0.1:${WEB_PORT:-8080}:8080']
     read_only: true
@@ -18,7 +19,7 @@ services:
       gateway: { condition: service_healthy }
 
   gateway:
-    build: { context: ., dockerfile: infra/docker/gateway.Dockerfile }
+    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/gateway:${CLOUDARCHITECT_VERSION:-0.2.0}
     # Not published: the web container proxies /api to it.
     env_file:
       - path: .env

@@ -9,7 +9,7 @@ cp .env.example .env       # set CLIENT_KEY_SALT
 pnpm dev                   # web :5173, gateway :8787 (Node runtime, the only runtime)
 ```
 
-Containers: `docker compose up --build` (tested with Rancher Desktop).
+Containers, built from source: `docker compose -f compose.yaml -f compose.build.yaml up --build` (tested with Rancher Desktop). Plain `docker compose up` pulls the published images instead.
 
 ## Commands
 
