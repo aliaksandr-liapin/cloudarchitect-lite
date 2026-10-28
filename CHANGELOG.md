@@ -4,7 +4,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-11-xx
+## [0.2.0] - 2026-11-03
 
 First public release. Includes the Phase 2 work below and a self-hosted install anyone can run.
 

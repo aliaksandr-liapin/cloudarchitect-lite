@@ -21,7 +21,7 @@ GitHub does not pass repository secrets to workflows triggered by `pull_request`
 
 ## Release steps (in order)
 
-1. Set the date of 0.2.0 in `CHANGELOG.md` (now `2026-11-xx`) before tagging, and commit it on the release branch.
+1. Set the date of 0.2.0 in `CHANGELOG.md` before tagging, and commit it on the release branch. Done: 2026-11-03 (tag on Monday 2 November, go public and post on Tuesday 3 November).
 2. Merge the 0.2 pull request into `main` (CI must be green).
 3. Push the tag from the merged `main`:
    ```bash
