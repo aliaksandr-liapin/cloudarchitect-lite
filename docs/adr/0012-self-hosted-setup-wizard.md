@@ -2,14 +2,14 @@
 
 **Status:** Accepted · **Date:** 2026-10-14
 
-**Context.** The project is meant to be installed by anyone with Docker on Windows, macOS or Linux. Editing `.env` files by hand is error-prone (wrong keys, unknown budget values) and differs per platform. The hosted Cloudflare deployment is configured by its operator and does not need a wizard.
+**Context.** The project is meant to be installed by anyone with Docker on Windows, macOS or Linux. Editing `.env` files by hand is error-prone (wrong keys, unknown budget values) and differs per platform. (A hosted Cloudflare deployment, dropped 2026-10-26, would have been configured by its operator; self-hosted is now the only mode, [ADR-0013](0013-self-hosted-only.md).)
 
 **Decision.**
 
 - `docker compose up` is the only install command. The gateway starts unconfigured, generates the client salt, and prints a setup link with a one-time code to its log.
 - A five-step wizard at `/setup` covers: code, API key (checked against Anthropic before saving), models (with the measured benchmark from ADR-0011), limits (with a budget estimate), review.
 - Settings are saved to `/data/settings.json` on a named volume (atomic write, mode 0600) and applied without a restart. Environment variables always override saved settings; the wizard shows which ones are locked.
-- Only the Node runtime has the wizard. On Workers, `/api/setup/*` returns 404 and configuration stays in wrangler vars and secrets. `SETUP_WIZARD=disabled` turns it off on Node too.
+- `SETUP_WIZARD=disabled` turns the wizard off; configuration then comes from environment variables only. (The Workers runtime was dropped 2026-10-26; it returned 404 for `/api/setup/*`.)
 - Ports bind to `127.0.0.1`; nginx proxies `/api`, so the gateway port is not published.
 
 **Consequences.**

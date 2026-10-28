@@ -1,0 +1,7 @@
+# CodeQL configuration for security.yml.
+# tools/ holds maintainer-only scripts (icon fetch, recording, screenshots) that are never shipped
+# in the images. Downloading a pinned URL to disk is their purpose, which the
+# js/http-to-file-access and js/file-access-to-http rules report as findings.
+# Shipped code (apps/, packages/) stays fully scanned.
+paths-ignore:
+  - tools

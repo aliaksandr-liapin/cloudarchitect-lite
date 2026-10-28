@@ -1,6 +1,6 @@
 # Technical Architecture — CloudArchitect Lite
 
-**Version:** 0.2 · **Date:** 2026-10-13 · **Status:** target design, pending spikes and security review · **Aligned with:** PRD v0.2
+**Version:** 0.3 · **Date:** 2026-10-27 · **Status:** design; updated 2026-10-27 for self-hosted only ([ADR-0013](../adr/0013-self-hosted-only.md)) · **Aligned with:** PRD v0.2
 
 ## 1. Architecture principles
 
@@ -9,7 +9,7 @@
 - Provider-neutral domain IDs; provider-specific metadata and validators.
 - Separate visual assets, cloud facts and AI output.
 - Untrusted AI output → schema parse → normalize → validate → render.
-- **Validation runs on the client** from a shared TypeScript package, so it works offline, in BYOK mode and without the gateway.
+- **Validation runs on the client** from a shared TypeScript package, so it works offline and without the gateway.
 - **Rule findings and advisory AI findings are separate classes** and never displayed as the same thing.
 - No secrets in static JS bundle, analytics or application logs.
 
@@ -22,16 +22,15 @@
 | Layout | ELK.js | layered layout with `hierarchyHandling: INCLUDE_CHILDREN` for nested containers; preserve manually set positions |
 | Local data | IndexedDB | project persistence and drafts |
 | Shared domain package | TypeScript + Zod | project schema, patch ops, validation rules; used by client and gateway |
-| Free-AI gateway | Cloudflare Workers (candidate) | owner keys protected on server |
-| Credit ledger + budget | D1 or durable transactional store | authoritative counts and spend; KV alone not safe for atomic decrements |
-| Abuse controls | Turnstile + rate limits + global budget cap | privacy-sensitive, configurable, kill switch |
-| LLM | Adapter interface | Anthropic, OpenAI; OpenRouter (P1); Ollama later. Same adapter used by gateway and by browser BYOK |
-| Icons | Versioned asset store | official packs only (PRD §12), lazy-loaded, hashed |
+| AI gateway | Node (Hono) in a Docker container | the only runtime; holds the user's own AI key; dropped 2026-10-26: Cloudflare Workers + D1 |
+| Spending limits | Daily and monthly spend counters in the gateway | protect the user's own key; rate limits per client |
+| LLM | Adapter interface | Anthropic now; OpenAI and Gemini in 0.3; Ollama later. The adapter runs in the gateway only |
+| Icons | Official AWS pack pinned by SHA-256 (`packages/catalog/data/icon-packs.json`) | fetched by the gateway on first start, only mapped SVGs kept in its data volume; never committed or in images; generic tiles if unavailable (catalog spec §9) |
 | Exporters | SVG/PNG from canvas; JSON; Mermaid (P1); draw.io (P1) | all support containers |
 | Eval harness | Node script in CI | benchmark prompts, metrics, regression gate (§13) |
-| Hosting | Static hosting / Cloudflare Pages candidate | minimal operations |
+| Hosting | `web` and `gateway` images on the user's machine; static demo on GitHub Pages | no hosted service |
 
-Infrastructure choice is **proposal**, not locked vendor commitment.
+Self-hosted only is a decision ([ADR-0013](../adr/0013-self-hosted-only.md)); the original hosted plan (Cloudflare, free credits, browser BYOK) is dropped 2026-10-26.
 
 ## 3. Runtime modules
 
@@ -42,21 +41,19 @@ flowchart LR
   UI --> DB[(IndexedDB)]
   UI --> C[Catalog Client]
   UI --> V[Validator - shared package]
-  UI -->|free credits| API[AI Gateway]
-  UI -->|BYOK direct| LLMB[User's LLM provider]
-  API --> Abuse[Credits / Budget / Abuse]
+  UI --> API[AI Gateway]
+  API --> Limits[Spending limits / rate limits]
   API --> Adapter[LLM Provider Adapter]
-  Adapter --> LLM[Owner's LLM provider]
+  Adapter --> LLM[User's LLM provider]
   LLM --> Parse[Schema Parser]
-  LLMB --> ParseC[Schema Parser - client]
   Parse --> UI
-  ParseC --> V
+  UI --> V
   V --> UI
   C --> Catalog[Versioned Provider Catalog]
-  C --> Icons[Versioned Icon Store]
+  C --> Icons[Icon set in the gateway data volume]
 ```
 
-In free mode the gateway parses and schema-checks the response before returning it; the client always re-runs full validation. In BYOK mode the whole pipeline runs in the browser.
+The gateway parses and schema-checks the response before returning it; the client always re-runs full validation. The browser never calls an AI provider.
 
 ## 4. Data contracts
 
@@ -102,13 +99,13 @@ Graph uses stable resource IDs, never icon file names as the primary key. Servic
 
 ## 5. AI pipeline
 
-Operations (1 credit each, PRD §6): **Generate**, **Edit**, **Review**, **Ask** (P1).
+Operations (PRD §6): **Generate**, **Edit**, **Review**, **Ask** (P1).
 
 **Generate**
 1. Prompt → extract structured requirements, assumptions and open questions. Extraction always runs `claude-haiku-5-5`.
-2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; no credit is charged. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
+2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; the operation is not completed until `/continue`. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
 3. Generate architecture JSON with structured output (`output_config.format`) against the catalog contract with the selected model; anything outside the catalog must use `unresolved`. Haiku gets one repair turn with the deterministic validator's findings.
-4. Parse and schema-validate; a schema failure fails the operation without charging.
+4. Parse and schema-validate; a schema failure fails the operation.
 5. Client: run the rule set (§10), layout with ELK, render findings.
 
 **Edit** — returns a patch (§8) against `baseRevision`; preview + confirm.  
@@ -122,50 +119,41 @@ A single orchestrated request can implement Generate stages during PoC, but pres
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/ai/generate` | create draft graph from text + catalog version; may return clarification questions + `operationId` |
-| POST | `/api/ai/generate/continue` | continue an operation with clarification answers and edited requirements (one credit per operation, charged once) |
+| POST | `/api/ai/generate/continue` | continue an operation with clarification answers and edited requirements (one operation) |
 | POST | `/api/ai/edit` | return graph patch and rationale; confirmation on client |
 | POST | `/api/ai/review` | return advisory findings for the current graph |
 | POST | `/api/ai/ask` | P1 — answer a question about the design with cited sources |
 | GET | `/api/catalog/manifest` | current provider manifest / version URLs (can be static) |
-| GET | `/api/credits/status` | remaining free credits + `freeAiAvailable` (false when kill switch is active) |
+| GET | `/api/models` | model options and measured benchmark (ADR-0011) |
 
 **Generate contract** (schemas in `packages/domain/src/ai.ts`):
 
 - `POST /api/ai/generate` takes `GenerateRequest` `{ prompt, catalogVersion, model?, toggles, reviewRequirements }` and returns `GenerateResponse`: either `{ status: 'questions', operationId, operationToken, requirements, assumptions, questions }` or `{ status: 'done', project, usage: { costUsd } }`.
 - `POST /api/ai/generate/continue` takes `ContinueRequest` `{ operationId, operationToken, answers, requirements? }` and returns the `done` shape. Edited requirements (1–100, unique ids, text 1–2 000 characters) replace the extracted ones; a requirement whose text changed, or whose id is new, gets `provenance: 'user'`.
-- Errors, in check order: `400 invalid_request`, `503 setup_required`, `403 model_not_enabled`, `503 free_ai_unavailable`, `402 no_credits`, `409 catalog_mismatch` (generate only, `catalogVersion` differs from the served catalog); on continue, `400 invalid_operation` and `410 operation_expired` come before the model, kill-switch and credit checks. Model failures: `502 generation_failed` (schema-invalid output) and `502 provider_error` (any provider error).
+- Errors, in check order: `400 invalid_request`, `503 setup_required` (no key configured), `403 model_not_enabled`, `503 ai_unavailable` (a spending limit is reached), `409 catalog_mismatch` (generate only, `catalogVersion` differs from the served catalog); on continue, `400 invalid_operation` and `410 operation_expired` come before the model and spending-limit checks. Model failures: `502 generation_failed` (schema-invalid output) and `502 provider_error` (any provider error).
 
 **Operation token.** The server is stateless between the two calls: the token is `base64url(JSON state) + '.' + base64url(HMAC-SHA256)` with the secret `operation-token:<CLIENT_KEY_SALT>`. The state holds the operation id, the client key, model, toggles, prompt, project name, extracted requirements, assumptions and questions, and an expiry 15 minutes out. `/continue` rejects a token that fails the signature or the state check, or whose `clientKey` or `operationId` does not match the caller and the body (`400 invalid_operation`), and an expired one (`410 operation_expired`), before any model call. The token is signed, not encrypted; it only goes back to the client that wrote the prompt.
 
-**Charging rules.**
+**Spend rules.**
 
 - Every completed model call is priced and added to the daily and monthly spend counters straight away, including calls of failed, aborted and question-only operations.
-- A credit is charged once per operation, only after a schema-valid project, and only if the client is still connected. Questions cost no credit; `/continue` re-checks the kill switch, the model and the credit.
-- The charge is an atomic `consume`; if it fails (a parallel request took the last credit), the response is `402 no_credits` with no project, and the model cost stays in the spend counters.
+- A schema failure fails the operation. `/continue` re-checks the model and the spending limits. (Dropped 2026-10-26: per-operation credits, `402 no_credits`.)
 - Each AI request logs one event `{ requestId, event: 'ai_generate' | 'ai_continue', model, calls, inputTokens, outputTokens, costMicroUsd, outcome }` and nothing else (NFR-006).
 
 - Reject oversized inputs: prompt ≤ 8 000 characters; graph ≤ 150 nodes.
 - Per-request input/output token ceilings, per-session throttles, idempotency key, max parallel jobs per session, upstream timeouts.
-- **Budget control:** each operation's cost is added to daily and monthly spend counters atomically; when a cap is reached the kill switch disables free AI and `/api/credits/status` reports it. Manual mode is unaffected.
-- Credits are charged only after a successful response; server/provider failures are not charged.
+- **Budget control:** each operation's cost is added to daily and monthly spend counters atomically; when a limit is reached, AI routes return `503 ai_unavailable` until the period rolls over. Manual mode is unaffected. (The manual kill switch was dropped 2026-10-26.)
 - Cache only safe, non-private assets; never cache user prompts.
 - Use provider settings that exclude training on data and minimize retention.
 
-## 7. BYOK — design
+## 7. AI key handling
 
-**Never publish application owner API keys in frontend.**
+**Never publish API keys in the frontend.** Each user runs their own gateway with their own key ([ADR-0013](../adr/0013-self-hosted-only.md)).
 
-**Primary: direct browser calls** to providers that officially support them (as of 2026-10-13: Anthropic via its browser-access header, OpenAI). The user's key never reaches our servers.
-- Key held **in memory only** by default; persisting to browser storage is an explicit opt-in with a warning.
-- Prompt templates and catalog subsets are loaded by the client; parsing and validation run in the browser using the shared package.
-- CSP restricts `connect-src` to our origin plus the supported provider API hosts; no third-party scripts on pages that hold the key.
-- The key is never sent to analytics, error reporting or logs (scrubbing enforced in the error reporter).
-
-**Fallback: ephemeral proxy** for providers without browser access — key passed per request, never stored or logged, not cached. Requires a written threat model before release.
-
-**P1: OpenRouter via OAuth PKCE** so users can connect without copying a raw key.
-
-Provider browser support can change; the adapter declares `supportsBrowserDirect` per provider and the UI only offers supported options.
+- The key is entered in the setup wizard or set in the container environment; it rests on the host's Docker volume (mode 0600) and is sent only to the AI provider by the gateway. The browser never holds it.
+- CSP `connect-src` is `'self'`; the browser talks only to the web origin, which proxies `/api` to the gateway.
+- The key is never sent to analytics, error reporting or logs.
+- Dropped 2026-10-26: BYOK direct browser calls, the ephemeral proxy fallback and OpenRouter OAuth PKCE (all were part of the hosted plan).
 
 ## 8. Manual edit & AI edit coexistence
 
@@ -196,8 +184,8 @@ Rules are declared as data in `catalog/aws/validation-rules.json` (id, severity,
 
 - CSP, safe SVG rendering/sanitization of icon assets, dependency scanning, input validation.
 - No prompt content in analytics or logs by default; document third-party AI transmission in the Privacy Policy.
-- Privacy Policy and Terms of Use published before public beta; GDPR lawful basis documented (PRD NFR-010).
-- Credit ledger and budget counters use atomic/transactional changes; anti-abuse is best-effort without identity; the global budget cap is the hard limit.
+- No hosted service, accounts or telemetry, so no hosted Privacy Policy or Terms (dropped 2026-10-26); the README states what leaves the machine.
+- Spend counters are updated after every completed model call; the spending limits are the hard limit.
 - Icon packs used only under the source terms recorded in PRD §12; manifest stores source URL, release ID and SHA-256.
 - Explicit disclaimers: generated designs require professional review before production deployment.
 
@@ -205,7 +193,7 @@ Rules are declared as data in `catalog/aws/validation-rules.json` (id, severity,
 
 - Canvas interaction smooth at ≤ 150 nodes and ≤ 10 nesting levels.
 - ELK layout ≤ 2 s for 50 nodes; run in a Web Worker so the UI does not freeze.
-- Icons lazy-loaded per service on first use.
+- Icons served from the gateway's data volume and cached by the browser.
 
 ## 13. Evaluation harness
 
@@ -217,10 +205,11 @@ Rules are declared as data in `catalog/aws/validation-rules.json` (id, severity,
 
 - ADR-001: Graph JSON as canonical model (accepted).
 - ADR-002: AWS-first provider-neutral registry (accepted).
-- ADR-003: Hybrid 3-free + BYOK (accepted direction; limit adjustable after cost measurement).
-- ADR-004: Cloudflare Workers + D1 (proposed, validate during PoC).
+- ADR-003: Hybrid 3-free + BYOK (superseded by ADR-013, dropped 2026-10-26).
+- ADR-004: Cloudflare Workers + D1 (superseded by ADR-013, dropped 2026-10-26).
 - ADR-005: React Flow + ELK.js (proposed preferred implementation; containers spike in Phase 1).
-- ADR-006: BYOK via direct browser calls, proxy as fallback (accepted in PRD v0.2; threat model pending).
+- ADR-006: BYOK via direct browser calls, proxy as fallback (superseded by ADR-013, dropped 2026-10-26).
 - ADR-007: Containers as first-class model entities, not nodes (accepted in PRD v0.2).
 - ADR-008: Rule findings vs advisory findings as separate classes (accepted in PRD v0.2).
 - ADR-009: Automated eval harness as release gate (accepted in PRD v0.2).
+- ADR-013: Self-hosted only (accepted 2026-10-26).

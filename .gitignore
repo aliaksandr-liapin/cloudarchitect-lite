@@ -3,12 +3,10 @@ dist/
 build/
 coverage/
 .turbo/
-.wrangler/
 *.tsbuildinfo
 .env
 .env.*
 !.env.example
-.dev.vars
 *.log
 .DS_Store
 .idea/
@@ -21,3 +19,5 @@ assets/icons/
 eval/results/
 # Local agent workflow scratch (plans and specs live in docs/superpowers)
 .superpowers/
+# Downloaded provider icon packs and generated icon sets (tools/fetch-icons.ts)
+.cache/

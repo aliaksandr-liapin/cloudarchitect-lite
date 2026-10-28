@@ -2,18 +2,15 @@
 
 ## Load profile
 
-Most work happens in the browser: editing, layout, validation, storage and export cost the backend nothing. Server load is limited to AI operations, which are rate-limited, credit-bounded and budget-capped.
+Most work happens in the browser: editing, layout, validation, storage and export cost the backend nothing. Server load is limited to AI operations, which are rate-limited and bounded by the user's spending limits. The product is self-hosted for one person or a small team ([ADR-0013](../adr/0013-self-hosted-only.md)); scaling out is not a goal.
 
 ## Components
 
-| Component           | Scaling model                               | Limits and plan                                                                                                                                                    |
-| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Web                 | Static assets on CDN                        | Effectively unlimited; hashed assets cached for a year                                                                                                             |
-| Gateway (Workers)   | Stateless isolates, auto-scaled at the edge | CPU per request is small; LLM latency dominates and is I/O wait                                                                                                    |
-| Credit ledger (D1)  | Single primary database, read replicas      | Writes are one small row per operation; far below D1 write limits at expected volumes. If exceeded, shard by client-key prefix or move counters to Durable Objects |
-| Rate limiting       | Per-isolate in scaffold                     | Move to the Workers Rate Limiting binding before public beta (per-isolate counters do not aggregate)                                                               |
-| Gateway (container) | Single replica (in-memory store)            | Horizontal scaling requires a shared transactional store (e.g. Postgres or Redis with atomic ops) behind the `CreditStore` interface                               |
-| AI providers        | External quotas                             | Concurrency cap per session, upstream timeouts, kill switch; BYOK shifts load to user quotas                                                                       |
+| Component   | Scaling model                       | Limits and plan                                                                                  |
+| ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Web         | Static assets behind nginx          | Hashed assets cached for a year                                                                  |
+| Gateway     | Single replica (in-memory counters) | LLM latency dominates and is I/O wait; horizontal scaling would need a shared store, not planned |
+| AI provider | The user's own account and quotas   | Concurrency cap per session, upstream timeouts, spending limits                                  |
 
 ## Client-side limits
 
@@ -23,4 +20,4 @@ Most work happens in the browser: editing, layout, validation, storage and expor
 
 ## Cost scaling
 
-Cost grows with AI operations, not users. The budget cap bounds the worst case; Phase 0 measures cost per operation (PRD §7) to set the cap and the free quota.
+Cost grows with AI operations, not users. The spending limits bound the worst case; Phase 0 measured the cost per operation (PRD §7), and the setup wizard shows how many generations a limit covers.

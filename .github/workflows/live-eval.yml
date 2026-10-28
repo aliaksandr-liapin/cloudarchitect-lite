@@ -35,7 +35,11 @@ concurrency:
 jobs:
   live-eval:
     # Draft PRs skip the paid run; it runs when the PR is marked ready, and on manual dispatch.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # Fork PRs never get the secret, so they skip the job instead of running without it.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     name: Live generator evaluation (spends API budget)
     runs-on: ubuntu-latest
     timeout-minutes: 20

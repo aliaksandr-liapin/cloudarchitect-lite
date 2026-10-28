@@ -77,16 +77,33 @@ export async function bootProject(
   }
 }
 
+/** File-name stem for a project: runs of unsafe characters become one dash. */
+export function fileBaseName(name: string): string {
+  return name.replace(/\W+/g, '-');
+}
+
+/**
+ * Saves `blob` as a file: an object URL on an anchor that is attached to the document (Firefox ignores
+ * clicks on detached anchors), clicked, removed, and the URL revoked.
+ */
+export function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  a.style.display = 'none';
+  document.body.append(a);
+  try {
+    a.click();
+  } finally {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function downloadJson(p: Project) {
-  const url = URL.createObjectURL(
+  downloadBlob(
     new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }),
+    `${fileBaseName(p.name)}.json`,
   );
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `${p.name.replace(/\W+/g, '-')}.json`,
-  });
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export async function readJsonFile(file: File): Promise<Project> {

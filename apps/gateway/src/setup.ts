@@ -30,7 +30,6 @@ export const SetupInput = z.object({
   apiKey: z.string().min(20).max(300).optional(),
   models: z.array(ModelChoice).min(1),
   defaultModel: ModelChoice,
-  freeCredits: z.number().int().min(0).max(1000),
   dailyBudgetUsd: z.number().min(0).max(100_000),
   monthlyBudgetUsd: z.number().min(0).max(1_000_000),
   rateLimitPerMinute: z.number().int().min(1).max(10_000),
@@ -93,7 +92,6 @@ export class SetupService {
       current: {
         models: this.current.AI_MODELS,
         defaultModel: this.current.DEFAULT_MODEL,
-        freeCredits: this.current.FREE_CREDITS,
         dailyBudgetUsd: this.current.DAILY_BUDGET_MICRO_USD / 1_000_000,
         monthlyBudgetUsd: this.current.MONTHLY_BUDGET_MICRO_USD / 1_000_000,
         rateLimitPerMinute: this.current.RATE_LIMIT_PER_MINUTE,
@@ -141,7 +139,6 @@ export class SetupService {
       ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
       AI_MODELS: input.models.join(','),
       DEFAULT_MODEL: input.defaultModel,
-      FREE_CREDITS: String(input.freeCredits),
       DAILY_BUDGET_MICRO_USD: String(Math.round(input.dailyBudgetUsd * 1_000_000)),
       MONTHLY_BUDGET_MICRO_USD: String(Math.round(input.monthlyBudgetUsd * 1_000_000)),
       RATE_LIMIT_PER_MINUTE: String(input.rateLimitPerMinute),

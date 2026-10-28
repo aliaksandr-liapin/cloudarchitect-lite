@@ -2,6 +2,7 @@ import { MODEL_OPTIONS, type ModelChoice, type ModelOption } from '@cloudarchite
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Collapsible } from './Collapsible';
+import { DEMO } from './demo';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const usd = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(3)}`);
@@ -97,13 +98,14 @@ export function readModelChoice(): ModelChoice | undefined {
   }
 }
 
-/** Editor panel: pick the model for AI operations; models the server key does not serve need BYOK. */
+/** Editor panel: pick the model for AI operations; models this instance does not enable are disabled. */
 export function AiModelPanel() {
   const [enabled, setEnabled] = useState<readonly ModelChoice[]>();
   const [choice, setChoice] = useState<ModelChoice>();
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
+    if (DEMO) return; // read-only benchmark table, nothing to fetch
     api.models().then(
       (m) => {
         setEnabled(m.enabled);
@@ -132,13 +134,13 @@ export function AiModelPanel() {
 
   return (
     <Collapsible id="model" title="AI model" defaultOpen={false}>
-      {offline && (
+      {offline && !DEMO && (
         <p className="muted small">AI service unavailable — manual editing still works.</p>
       )}
       <ModelComparison
         selected={choice}
         enabled={enabled}
-        onSelect={offline ? undefined : select}
+        onSelect={offline || DEMO ? undefined : select}
       />
     </Collapsible>
   );

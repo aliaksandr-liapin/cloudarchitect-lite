@@ -93,7 +93,7 @@ Caveats:
 - **Different scenario sets.** Phase 0 used the 15 base scenarios; Gate A uses 22 (15 base + 7 toggle scenarios) for the live runs and 12 reviewed scenarios (9 base + 3 toggle) for the blind review, so the rates are not measured on the same population.
 - **Pre-fix packets.** The blind review scored pre-fix outputs (flat diagrams without container ids); the shipped generator was not re-reviewed.
 - **Cost and latency.** The spec (§7) accepts a cost or latency increase up to 1.5× over the Phase 0 single-call numbers for the added extraction call; Haiku's +10% cost and +11% latency are inside that.
-- **Anti-goal.** Spec §4 lists "any regression on the Phase 0 benchmark numbers in `MODEL_OPTIONS`" as an anti-goal. The Haiku pass rate, no-critical-defect rate and Sonnet blind median are below Phase 0. **The product owner's acceptance of these regressions is pending.**
+- **Anti-goal.** Spec §4 lists "any regression on the Phase 0 benchmark numbers in `MODEL_OPTIONS`" as an anti-goal. The Haiku pass rate, no-critical-defect rate and Sonnet blind median are below Phase 0. **Regressions versus Phase 0 accepted by the product owner on 2026-10-27.**
 
 ## Verdict against Gate A
 
@@ -103,6 +103,6 @@ Caveats:
 | No critical defect | ≥ 90% of scenarios | 11/12 = 91.7% | **Met** (thin margin: one critical defect) |
 | Live gate (Haiku) | green | PASS: schema-valid 100%, pass 93.2% | **Met** |
 
-**Gate A: passed** (the base-only Haiku median is 2.00, exactly at the bar; the Phase 0 regressions above await the product owner's acceptance). Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
+**Gate A: passed** (the base-only Haiku median is 2.00, exactly at the bar; regressions versus Phase 0 accepted by the product owner on 2026-10-27). Free tier stays on Haiku 5.5 with one repair turn; Sonnet 5.5 stays the BYOK default ([ADR-0011](../adr/0011-model-selection.md)) (as of 2026-10-18; free tier and BYOK dropped 2026-10-26, [ADR-0013](../adr/0013-self-hosted-only.md)). Sonnet costs about 7× more per generation ($0.0454 vs $0.0067) and was preferred in 7 of 9 blind pairs.
 
 **Limits:** one reviewed design per variant per scenario; the quality review used pre-fix outputs and an AI reviewer; the 91.7% critical-defect margin is one design. Re-review a sample of post-fix designs and run a human spot check before public beta.

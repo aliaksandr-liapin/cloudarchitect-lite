@@ -4,8 +4,16 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
+First public release. Includes the Phase 2 work below and a self-hosted install anyone can run.
+
 ### Added
 
+- One-command install from published multi-arch images (`compose.yaml` plus `docker compose up`) for Windows, macOS and Linux; see the [installation guide](docs/operations/installation.md).
+- Official AWS icons on nodes and groups, fetched from aws.amazon.com on first start and not redistributed by this project.
+- A clickable editor demo on GitHub Pages.
+- Export of the diagram as PNG and SVG, next to JSON.
 - AI generation in the editor: a Generate panel with a prompt box, six design-priority toggles (Serverless-first, Backups, Disaster recovery, High availability, Cost-optimized, Security hardening), stage text and Cancel.
 - One clarification round: up to three questions with quick answers, "You decide" and free text, plus editable requirements before drawing (optional review pause when there are no questions).
 - Versions: the current diagram is kept in browser storage (last 10 per project) before a generated one replaces it; a toast offers "Restore previous" and a Versions list restores any earlier diagram. Hand-edited diagrams ask before they are replaced.
@@ -21,6 +29,18 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 - Project format 1.4.0: components may store a `size`. Older files load unchanged (migration from 1.3.0) and keep their positions.
 - The editor follows its own theme switch instead of the operating system's color scheme.
+
+### Removed
+
+- Free AI credits and the credit ledger.
+- The kill switch (`FREE_AI_DISABLED`).
+- The Cloudflare deployment.
+
+### Upgrade notes
+
+- Settings for the removed features are ignored.
+- The first start downloads the AWS icons, so the internet is needed once.
+- If you run 0.1 from a clone of the repository: `compose.yaml` now pulls the published images instead of building. To keep building from your checkout, run `docker compose -f compose.yaml -f compose.build.yaml up --build`.
 
 ### Fixed
 
@@ -45,5 +65,6 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/releases/tag/v0.1.0

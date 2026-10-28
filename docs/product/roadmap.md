@@ -4,7 +4,7 @@
 
 ## 1. Delivery model
 
-- **Implementation:** Claude, with the product owner making decisions and providing accounts (AI provider, Cloudflare, hosting, domain).
+- **Implementation:** Claude, with the product owner making decisions and providing accounts (AI provider, GitHub, domain). Cloudflare was dropped 2026-10-26.
 - **Independent architecture review:** Claude in an isolated, blind reviewer session using the PRD §14 rubric (PRD §15).
 - The schedule holds only if scope stays at P0; each P1 pulled into MVP moves dates.
 
@@ -18,12 +18,12 @@ four weeks, each with its own hook, a LinkedIn post and a dev.to article
 decisions, ADRs, eval numbers, bug stories) fill the weeks between releases.
 
 This replaces stages 3–5 below (MVP engineering, private beta, public beta). The hosted-service work
-they assumed (anonymous free credits, an owner budget cap and kill switch, BYOK direct browser calls,
-hosted Privacy Policy and Terms) is dropped.
+they assumed is dropped (anonymous free credits, an owner budget cap and kill switch, BYOK direct browser calls,
+hosted Privacy Policy and Terms).
 
 | Release | Target | Theme | Scope | Announcement hook / article |
 |---|---|---|---|---|
-| 0.2 | mid-Nov 2026 | **Public MVP** | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers removed (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 18 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
+| 0.2 | mid-Nov 2026 | **Public MVP** (in release) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 25 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
 | 0.3 | mid-Dec 2026 | **Claude vs GPT vs Gemini** | Claude, OpenAI and Gemini, two models each; public blind benchmark with a three-provider review panel ([design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
 | 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
 | 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo | Diff-based AI editing of a graph |
@@ -45,7 +45,7 @@ release gets its own design, plan and PR; dates are targets, and July and Octobe
 | 0. Discovery / Benchmark | Week 1 | 10–15 reference prompts with labels, rubric, project schema 1.1 (incl. containers), icon packs downloaded and terms recorded, **AI quality spike** (one-shot generation on the benchmark), **token/cost measurement** | Benchmark + rubric ready; spike shows schema-valid output and acceptable recall; cost per operation measured; budget cap decided |
 | 1. Visual PoC | Weeks 2–3 | React Flow canvas, **nested containers + ELK layout spike**, official AWS icons, JSON roundtrip, undo/redo | Editable, saveable diagram with containers, no AI dependency |
 | 2. AI PoC | Weeks 3–4 | Requirements extraction, clarification round, catalog retrieval, constrained generation, unresolved nodes, rule set VR-001…018, **eval harness in CI** | Gate A — **passed 2026-10-18** (Haiku blind median 2.29, no critical defect in 11/12, live gate green; [report](phase2-gate-a.md)) |
-| 3. MVP engineering | Weeks 5–7 | Gateway, credits, **budget cap + kill switch**, BYOK direct browser, Review, exports, Privacy Policy / Terms | End-to-end workflow; Gate B |
+| 3. MVP engineering | Weeks 5–7 | Gateway, Review, exports (dropped 2026-10-26: credits, budget cap + kill switch, BYOK direct browser, Privacy Policy / Terms) | End-to-end workflow; Gate B |
 | 4. Private beta | Weeks 8–9 | 15–30 testers, full benchmark blind review, bug fixes | Meaningful user acceptance and reliable core |
 | 5. Public beta | ~Weeks 9–10+ | Release, analytics, user feedback | Usage, cost and reliability monitored |
 
@@ -61,17 +61,17 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 **E4 — Knowledge & Validation UX:** node/edge/container details, requirement traceability, docs links, rule engine VR-001…018, finding display, **Review (FR-021)**.
 
-**E5 — Hybrid AI:** 3 anonymous free operations (configurable), gateway/secrets, provider adapters, **budget cap + kill switch (NFR-009)**, credit transparency (FR-024), **BYOK direct browser** with proxy fallback, anti-abuse.
+**E5 — AI gateway:** gateway/secrets, provider adapters, spending limits (NFR-009), rate limits. dropped 2026-10-26: 3 anonymous free operations, kill switch, credit transparency, BYOK direct browser with proxy fallback, anti-abuse.
 
 **E8 — Self-hosted install (new):** one-command `docker compose up`, browser setup wizard (FR-027), installation guide for Windows/macOS/Linux, model choice with benchmark (FR-026). Done 2026-10-14.
 
 **E6 — Export & QA:** PNG/SVG/JSON with containers; Mermaid and draw.io (P1); graph/icon rendering tests, browser QA, accessibility baseline, performance targets (NFR-012).
 
-**E7 — Legal & compliance (new):** Privacy Policy, Terms of Use, GDPR basis, AI provider data settings, icon attribution page, disclaimers.
+**E7 — Legal & compliance (new):** icon attribution and terms, AI provider data notice in the README, disclaimers. Dropped 2026-10-26: hosted Privacy Policy, Terms of Use, GDPR basis.
 
 ## 5. Priority order
 
-P0: E1 editor + containers → E2 AWS catalog/icons → E3 structured generation + eval harness → E4 details/rules/Review → E5 credits, budget cap, BYOK → E6 core export → E7 legal.  
+P0: E1 editor + containers → E2 AWS catalog/icons → E3 structured generation + eval harness → E4 details/rules/Review → E5 gateway and spending limits (credits and BYOK dropped 2026-10-26) → E6 core export → E7 legal.  
 P1: AI edit with preview, Ask (FR-022), Mermaid export, draw.io export, OpenRouter OAuth, advanced traceability, manual Architecture Freshness Check.  
 P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP generation, automated catalog pipeline, collaboration.
 
@@ -80,7 +80,7 @@ P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP 
 - Faster **time to accepted diagram** vs manual/editor-plus-chatbot workflow and vs existing text-to-diagram tools.
 - Official consistent iconography and trustworthy supported service IDs.
 - Clear connection descriptions, requirement coverage and rule-based findings.
-- No signup/manual free editor and simple BYOK transition.
+- No signup; a manual editor that is free; a simple setup wizard for the user's own key.
 
 ## 7. Beta metrics (proposed targets)
 
@@ -89,27 +89,27 @@ P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP 
 - Median rubric score ≥ 2.0 / 3 and no critical defect in ≥ 90% of scenarios (blind review).
 - No unsupported service ID accepted as officially verified.
 - MyBlog: welcome email traced to SES; DAX not generated without a justifying requirement; manually added DAX flagged by VR-006 and Review.
-- Measured cost per operation within the budget model; kill switch tested.
-- Zero secrets in app bundle/logs; BYOK key never reaches our servers in direct mode; quota bypass controls tested.
+- Measured cost per operation shown to the user; spending limits tested (the kill switch was dropped 2026-10-26).
+- Zero secrets in app bundle/logs; the AI key never reaches the browser (BYOK direct mode and quota-bypass controls dropped 2026-10-26).
 - Manual canvas and exports usable when AI gateway is unavailable.
 
 ## 8. Decision gates
 
 - **Gate A (after AI PoC):** blind review of ≥ 10 distinct reference scenarios against the rubric — diagram fidelity, correct edges and containers, no critical defects; eval harness green.
-- **Gate B (before private beta):** icon terms recorded for every bundled pack and usage within those terms; security test of keys, quotas and budget cap; Privacy Policy and Terms ready; disaster recovery of local project via JSON export.
+- **Gate B (before private beta; replaced 2026-10-26 by the 0.2 release checklist):** icon terms recorded for every pack and usage within those terms; security test of keys and spending limits; disaster recovery of local project via JSON export. (Privacy Policy and Terms dropped.)
 - **Gate C (after beta):** empirical time saved, retention, real generation cost vs budget, willingness to pay; compare reviewer scores with beta user feedback to detect reviewer blind spots.
 
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Free AI abuse and unexpected costs | Global daily/monthly budget cap, kill switch, throttling, Turnstile, capped tokens |
+| ~~Free AI abuse and unexpected costs~~ (dropped 2026-10-26) | Was: global budget cap, kill switch, Turnstile. Now the user's own key plus daily/monthly spending limits and capped tokens |
 | Generation quality below targets | AI spike in Phase 0, eval harness in CI, catalog subset retrieval, clarification round |
 | Hallucinated cloud knowledge | Curated sourced catalog + structured enum + unresolved status + rule validation |
 | Nested container layout complexity | Phase 1 spike with ELK hierarchical layout; fallback to manual container sizing |
-| Icon trademark/licensing breach | Only the three official sources; terms recorded per pack; lazy asset store, not public Git; no use in branding |
-| BYOK key exposure | Direct browser mode keeps key off our servers; memory-only default; CSP; log scrubbing; proxy threat model |
-| Provider drops browser-direct support | Adapter capability flag; proxy fallback |
+| Icon trademark/licensing breach | Only the three official sources; terms recorded per pack; icons never committed or in images, fetched on first start; no use in branding |
+| ~~BYOK key exposure~~ (dropped 2026-10-26) | Was: direct browser mode, memory-only key, proxy threat model. Now the key stays in the user's own gateway; CSP `connect-src 'self'`; log scrubbing |
+| ~~Provider drops browser-direct support~~ (dropped 2026-10-26) | The browser no longer calls providers |
 | Reviewer shares blind spots with generator | Doc-cited findings, optional human spot-check, compare with beta feedback (Gate C) |
 | Model drift | Regression benchmark gates every model/prompt change |
 | Browser storage loss | Export/backup with migration metadata and UI reminder |

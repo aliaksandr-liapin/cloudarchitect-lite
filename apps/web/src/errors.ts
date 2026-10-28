@@ -2,12 +2,12 @@ import { ApiError } from './api';
 
 /** Plain messages for gateway error codes (spec §5); manual editing stays available for all of them. */
 const ERROR_MESSAGES: Record<string, string> = {
-  no_credits: 'Free generations used up. Bring your own key arrives in a later version.',
-  model_not_enabled: 'This model needs your own API key.',
-  free_ai_unavailable: 'AI generation is paused right now. Manual editing still works.',
+  model_not_enabled: 'This model is not enabled. Re-run setup to enable it.',
+  ai_unavailable:
+    'AI generation is paused: the daily or monthly spending limit is reached. Manual editing still works.',
   setup_required: 'AI features are not set up yet — see the setup notice above.',
-  generation_failed: 'Generation failed — no credit used. Try again.',
-  provider_error: 'Generation failed — no credit used. Try again.',
+  generation_failed: 'Generation failed. Try again.',
+  provider_error: 'Generation failed. Try again.',
   rate_limited: 'Too many requests — wait a minute and try again.',
   operation_expired: 'The questions expired. Generate again.',
   invalid_operation: 'These questions are no longer valid — generate again.',

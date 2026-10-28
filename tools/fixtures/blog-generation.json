@@ -1,0 +1,575 @@
+{
+  "recordedAt": "2026-10-27T21:32:32.160Z",
+  "model": "haiku",
+  "prompt": "A blog with user signups and a welcome email. Authors upload photos and we need thumbnails.",
+  "toggles": {
+    "backups": true
+  },
+  "questions": {
+    "status": "questions",
+    "operationId": "00000000-0000-4000-8000-000000000001",
+    "operationToken": "screenshot-placeholder-token",
+    "requirements": [
+      {
+        "id": "R1",
+        "text": "Blog with user signups",
+        "type": "functional",
+        "status": "confirmed",
+        "provenance": "ai"
+      },
+      {
+        "id": "R2",
+        "text": "Send a welcome email to new users after signup",
+        "type": "functional",
+        "status": "confirmed",
+        "provenance": "ai"
+      },
+      {
+        "id": "R3",
+        "text": "Authors can upload photos",
+        "type": "functional",
+        "status": "confirmed",
+        "provenance": "ai"
+      },
+      {
+        "id": "R4",
+        "text": "Generate thumbnails for uploaded photos",
+        "type": "functional",
+        "status": "confirmed",
+        "provenance": "ai"
+      },
+      {
+        "id": "R5",
+        "text": "Store uploaded photos and generated thumbnails durably",
+        "type": "non-functional",
+        "status": "inferred",
+        "provenance": "ai"
+      },
+      {
+        "id": "R6",
+        "text": "Serve blog content and images to readers over the web",
+        "type": "functional",
+        "status": "inferred",
+        "provenance": "ai"
+      },
+      {
+        "id": "R7",
+        "text": "Only authenticated users can sign up and authors can upload content",
+        "type": "constraint",
+        "status": "inferred",
+        "provenance": "ai"
+      }
+    ],
+    "assumptions": [
+      "Signup uses email and password managed by a hosted identity service",
+      "Thumbnail generation runs asynchronously after upload",
+      "Traffic is modest and can start on serverless or managed AWS services",
+      "Single region deployment is acceptable initially"
+    ],
+    "questions": [
+      {
+        "topic": "user-scale",
+        "text": "What is the expected number of users and peak traffic (readers and authors)?",
+        "suggestions": [
+          "Under 1,000 users, low traffic",
+          "1,000 to 100,000 users with occasional spikes",
+          "Over 100,000 users with heavy read traffic"
+        ]
+      },
+      {
+        "topic": "media-processing",
+        "text": "What thumbnail sizes and image formats are needed, and is there a maximum upload size?",
+        "suggestions": [
+          "Two fixed sizes (small and medium), JPEG and PNG, max 10 MB per upload",
+          "Multiple responsive sizes plus WebP, max 25 MB per upload",
+          "Single 300px thumbnail only, original images kept as-is"
+        ]
+      }
+    ]
+  },
+  "answers": {
+    "user-scale": "Under 1,000 users, low traffic",
+    "media-processing": "Two fixed sizes (small and medium), JPEG and PNG, max 10 MB per upload"
+  },
+  "result": {
+    "status": "done",
+    "project": {
+      "schemaVersion": "1.4.0",
+      "projectId": "generated",
+      "name": "Author Blog Platform",
+      "revision": 0,
+      "providerContext": ["aws"],
+      "catalogSnapshot": {
+        "aws": "aws-catalog-2026.10.0"
+      },
+      "iconPackSnapshot": {},
+      "requirements": [
+        {
+          "id": "R1",
+          "text": "Blog with user signups",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "ai"
+        },
+        {
+          "id": "R2",
+          "text": "Send a welcome email to new users after signup",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "ai"
+        },
+        {
+          "id": "R3",
+          "text": "Authors can upload photos",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "ai"
+        },
+        {
+          "id": "R4",
+          "text": "Generate thumbnails for uploaded photos",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "ai"
+        },
+        {
+          "id": "R5",
+          "text": "Store uploaded photos and generated thumbnails durably",
+          "type": "non-functional",
+          "status": "inferred",
+          "provenance": "ai"
+        },
+        {
+          "id": "R6",
+          "text": "Serve blog content and images to readers over the web",
+          "type": "functional",
+          "status": "inferred",
+          "provenance": "ai"
+        },
+        {
+          "id": "R7",
+          "text": "Only authenticated users can sign up and authors can upload content",
+          "type": "constraint",
+          "status": "inferred",
+          "provenance": "ai"
+        },
+        {
+          "id": "C-user-scale",
+          "text": "What is the expected number of users and peak traffic (readers and authors)? Under 1,000 users, low traffic",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "clarification"
+        },
+        {
+          "id": "C-media-processing",
+          "text": "What thumbnail sizes and image formats are needed, and is there a maximum upload size? Two fixed sizes (small and medium), JPEG and PNG, max 10 MB per upload",
+          "type": "functional",
+          "status": "confirmed",
+          "provenance": "clarification"
+        },
+        {
+          "id": "T-backups",
+          "text": "Every data store has automated backups or point-in-time recovery; S3 buckets use versioning.",
+          "type": "non-functional",
+          "status": "confirmed",
+          "provenance": "toggle"
+        },
+        {
+          "id": "I1",
+          "text": "Failed thumbnail jobs are retained in a queue for inspection and retry, and alarms fire when failures accumulate",
+          "type": "non-functional",
+          "status": "inferred",
+          "provenance": "ai"
+        },
+        {
+          "id": "I2",
+          "text": "Uploads are validated for allowed type (JPEG or PNG) and maximum size (10 MB) before the object is accepted",
+          "type": "constraint",
+          "status": "inferred",
+          "provenance": "ai"
+        }
+      ],
+      "containers": [
+        {
+          "id": "aws",
+          "kind": "aws-cloud",
+          "label": "AWS Cloud"
+        },
+        {
+          "id": "region",
+          "kind": "region",
+          "parentId": "aws",
+          "label": "Primary Region"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "n-users",
+          "provider": "aws",
+          "label": "Readers and authors (browser)",
+          "purpose": "Read blog posts, sign up, sign in, and upload photos",
+          "rationale": "Clients of the blog over the web",
+          "requirementIds": ["R1", "R3", "R6", "R7"],
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "external": {
+            "kind": "third-party",
+            "name": "Readers and authors (browser)"
+          }
+        },
+        {
+          "id": "n-cloudfront",
+          "provider": "aws",
+          "label": "Blog CDN",
+          "purpose": "Serve the blog front end and thumbnails to readers over HTTPS",
+          "rationale": "Caches static content globally and keeps S3 buckets private through OAC",
+          "requirementIds": ["R6", "R5"],
+          "containerId": "aws",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.cloudfront"
+        },
+        {
+          "id": "n-site-bucket",
+          "provider": "aws",
+          "label": "Blog site bucket",
+          "purpose": "Store static blog front-end assets",
+          "rationale": "Low-cost static hosting behind CloudFront with versioning for recovery",
+          "requirementIds": ["R6", "T-backups"],
+          "configuration": {
+            "backup": "versioning"
+          },
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.s3"
+        },
+        {
+          "id": "n-media-bucket",
+          "provider": "aws",
+          "label": "Photo media bucket",
+          "purpose": "Store original uploads and generated thumbnails durably",
+          "rationale": "Durable object storage with versioning and encryption; the same bucket serves thumbnails through CloudFront",
+          "requirementIds": ["R3", "R4", "R5", "R6", "T-backups", "R7"],
+          "configuration": {
+            "backup": "versioning",
+            "encryption": "AWS-managed"
+          },
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.s3"
+        },
+        {
+          "id": "n-waf",
+          "provider": "aws",
+          "label": "API web firewall",
+          "purpose": "Filter malicious traffic to the public REST API",
+          "rationale": "Public entry point protection; REST APIs support WAF association",
+          "requirementIds": ["R7"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.waf"
+        },
+        {
+          "id": "n-api",
+          "provider": "aws",
+          "label": "Blog REST API",
+          "purpose": "Expose signup-related, post and upload-URL endpoints with Cognito authorization",
+          "rationale": "REST API supports Cognito authorizers and WAF association",
+          "requirementIds": ["R1", "R3", "R7", "I2"],
+          "configuration": {
+            "apiType": "REST",
+            "authorizer": "Cognito user pool"
+          },
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.apigateway"
+        },
+        {
+          "id": "n-api-lambda",
+          "provider": "aws",
+          "label": "Blog API handler",
+          "purpose": "Create and read posts, check author rights, and issue validated presigned upload URLs",
+          "rationale": "Serverless compute suits modest, bursty traffic",
+          "requirementIds": ["R1", "R3", "R7", "I2", "C-user-scale"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.lambda"
+        },
+        {
+          "id": "n-posts-table",
+          "provider": "aws",
+          "label": "Posts and users table",
+          "purpose": "Store blog posts and author profile data",
+          "rationale": "Serverless key-value store with on-demand scaling and point-in-time recovery",
+          "requirementIds": ["R1", "R5", "T-backups"],
+          "configuration": {
+            "backup": "PITR",
+            "encryption": "AWS-managed"
+          },
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.dynamodb"
+        },
+        {
+          "id": "n-cognito",
+          "provider": "aws",
+          "label": "User pool",
+          "purpose": "Handle signup, email verification, and sign-in",
+          "rationale": "Managed identity with hosted signup and token issuance",
+          "requirementIds": ["R1", "R2", "R7"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.cognito"
+        },
+        {
+          "id": "n-welcome-lambda",
+          "provider": "aws",
+          "label": "Welcome email sender",
+          "purpose": "Send the welcome email after a user confirms signup",
+          "rationale": "Runs only on signup events, so serverless cost is minimal",
+          "requirementIds": ["R2"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.lambda"
+        },
+        {
+          "id": "n-ses",
+          "provider": "aws",
+          "label": "Email service",
+          "purpose": "Deliver the welcome email",
+          "rationale": "Managed transactional email from a verified identity",
+          "requirementIds": ["R2"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.ses"
+        },
+        {
+          "id": "n-thumb-lambda",
+          "provider": "aws",
+          "label": "Thumbnail generator",
+          "purpose": "Create small and medium JPEG or PNG thumbnails from uploaded originals",
+          "rationale": "Event-driven image processing that scales with upload volume",
+          "requirementIds": ["R4", "C-media-processing", "I1"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.lambda"
+        },
+        {
+          "id": "n-failure-queue",
+          "provider": "aws",
+          "label": "Thumbnail failure queue",
+          "purpose": "Hold records of failed thumbnail invocations for inspection and retry",
+          "rationale": "Keeps failed work so it is not silently lost",
+          "requirementIds": ["I1", "R4"],
+          "configuration": {
+            "encryption": "AWS-managed"
+          },
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.sqs"
+        },
+        {
+          "id": "n-cloudwatch",
+          "provider": "aws",
+          "label": "Monitoring and alarms",
+          "purpose": "Collect logs and metrics and alarm on failure queue depth and Lambda errors",
+          "rationale": "Observability for the processing pipeline",
+          "requirementIds": ["I1", "C-user-scale"],
+          "containerId": "region",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "serviceId": "aws.cloudwatch"
+        }
+      ],
+      "edges": [
+        {
+          "id": "e-user-cdn",
+          "source": "n-users",
+          "target": "n-cloudfront",
+          "kind": "invoke",
+          "label": "Browse blog over HTTPS",
+          "requirementIds": ["R6"]
+        },
+        {
+          "id": "e-cdn-site",
+          "source": "n-cloudfront",
+          "target": "n-site-bucket",
+          "kind": "origin",
+          "label": "Serve front end",
+          "configuration": {
+            "originAccess": "OAC"
+          },
+          "requirementIds": ["R6"]
+        },
+        {
+          "id": "e-cdn-media",
+          "source": "n-cloudfront",
+          "target": "n-media-bucket",
+          "kind": "origin",
+          "label": "Serve thumbnails",
+          "configuration": {
+            "originAccess": "OAC"
+          },
+          "requirementIds": ["R6", "R5"]
+        },
+        {
+          "id": "e-user-signup",
+          "source": "n-users",
+          "target": "n-cognito",
+          "kind": "invoke",
+          "label": "Sign up and sign in",
+          "requirementIds": ["R1", "R7"]
+        },
+        {
+          "id": "e-user-api",
+          "source": "n-users",
+          "target": "n-api",
+          "kind": "invoke",
+          "label": "Call API with token",
+          "requirementIds": ["R1", "R3", "R7"]
+        },
+        {
+          "id": "e-waf-api",
+          "source": "n-waf",
+          "target": "n-api",
+          "kind": "other",
+          "label": "Filters requests",
+          "requirementIds": ["R7"]
+        },
+        {
+          "id": "e-api-lambda",
+          "source": "n-api",
+          "target": "n-api-lambda",
+          "kind": "invoke",
+          "label": "Forward request",
+          "requirementIds": ["R1", "R3"]
+        },
+        {
+          "id": "e-lambda-posts",
+          "source": "n-api-lambda",
+          "target": "n-posts-table",
+          "kind": "read",
+          "label": "Read and write posts and profiles",
+          "requirementIds": ["R1", "R5"]
+        },
+        {
+          "id": "e-user-upload",
+          "source": "n-users",
+          "target": "n-media-bucket",
+          "kind": "write",
+          "label": "Upload photo with presigned URL",
+          "configuration": {
+            "presignedUrl": "PUT, max 10 MB, 15 min expiry"
+          },
+          "requirementIds": ["R3", "R5", "R7", "I2"]
+        },
+        {
+          "id": "e-cognito-welcome",
+          "source": "n-cognito",
+          "target": "n-welcome-lambda",
+          "kind": "event",
+          "label": "Post-confirmation trigger",
+          "requirementIds": ["R2"]
+        },
+        {
+          "id": "e-welcome-ses",
+          "source": "n-welcome-lambda",
+          "target": "n-ses",
+          "kind": "invoke",
+          "label": "Send welcome email",
+          "requirementIds": ["R2"]
+        },
+        {
+          "id": "e-media-thumb",
+          "source": "n-media-bucket",
+          "target": "n-thumb-lambda",
+          "kind": "event",
+          "label": "Object created in uploads prefix",
+          "configuration": {
+            "eventNotification": "ObjectCreated",
+            "failureDestination": "SQS"
+          },
+          "requirementIds": ["R4", "C-media-processing"]
+        },
+        {
+          "id": "e-thumb-media",
+          "source": "n-thumb-lambda",
+          "target": "n-media-bucket",
+          "kind": "write",
+          "label": "Write thumbnails",
+          "requirementIds": ["R4", "R5"]
+        },
+        {
+          "id": "e-thumb-failure",
+          "source": "n-thumb-lambda",
+          "target": "n-failure-queue",
+          "kind": "event",
+          "label": "Failed invocation record",
+          "configuration": {
+            "failureDestination": "SQS"
+          },
+          "requirementIds": ["I1", "R4"]
+        },
+        {
+          "id": "e-thumb-logs",
+          "source": "n-thumb-lambda",
+          "target": "n-cloudwatch",
+          "kind": "other",
+          "label": "Logs and metrics",
+          "requirementIds": ["I1"]
+        }
+      ],
+      "findings": [],
+      "generation": {
+        "toggles": {
+          "backups": true
+        },
+        "model": "haiku",
+        "generatedAt": "2026-10-27T21:31:42.161Z",
+        "contentHash": "7de761a6"
+      }
+    },
+    "usage": {
+      "costUsd": 0.007365
+    }
+  }
+}

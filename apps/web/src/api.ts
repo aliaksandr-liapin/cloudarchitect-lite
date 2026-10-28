@@ -1,3 +1,6 @@
+import type { IconSet } from '@cloudarchitect/catalog';
+import { DEMO } from './demo';
+import type { IconState } from './icons';
 import type {
   ContinueRequest,
   GenerateRequest,
@@ -23,6 +26,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (DEMO) throw new ApiError(0, 'demo_mode'); // the static demo has no backend
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...init?.headers },
@@ -33,6 +37,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /** The wire body carries the id → SVG map; it is wrapped back into an `IconSet` for `loadIcons`. */
+  icons: async (): Promise<{ state: IconState; icons?: IconSet }> => {
+    const body = await request<{
+      state: IconState;
+      release: string;
+      icons?: IconSet['icons'];
+    }>('/api/icons');
+    return {
+      state: body.state,
+      ...(body.icons
+        ? { icons: { provider: 'aws', release: body.release, icons: body.icons } }
+        : {}),
+    };
+  },
+  retryIcons: () => request<{ state: string }>('/api/icons/retry', { method: 'POST' }),
   setupStatus: () =>
     request<{
       available: boolean;
@@ -71,7 +90,6 @@ export interface SetupRequest {
   apiKey?: string;
   models: ModelChoice[];
   defaultModel: ModelChoice;
-  freeCredits: number;
   dailyBudgetUsd: number;
   monthlyBudgetUsd: number;
   rateLimitPerMinute: number;

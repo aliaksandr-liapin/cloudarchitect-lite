@@ -28,3 +28,5 @@ export const awsCatalog: CatalogSnapshot = {
 
 /** Sample projects for demos, tests and the eval harness (unvalidated JSON; use migrateProject). */
 export const samples = { myblog } as const;
+
+export { AwsIconPack, awsIconPack, requiredIconIds, type IconSet } from './icons.js';

@@ -1,6 +1,6 @@
 # ADR-0004: Cloudflare Workers + D1 for the gateway
 
-**Status:** Proposed — validate during PoC · **Date:** 2026-10-13
+**Status:** Superseded by [ADR-0013](0013-self-hosted-only.md) (dropped 2026-10-26) · **Date:** 2026-10-13
 
 **Context.** The gateway is small, stateless apart from the credit ledger, and must scale to bursts cheaply.
 

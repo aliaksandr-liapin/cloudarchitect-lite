@@ -21,6 +21,7 @@ jobs:
         image: [web, gateway]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -40,6 +41,7 @@ jobs:
           context: .
           file: infra/docker/${{ matrix.image }}.Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
@@ -53,3 +55,68 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  smoke:
+    name: Install smoke test from published images
+    needs: publish
+    # The install pins the version from the tag; a manual run from a branch has no published version.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read # pull the images with GITHUB_TOKEN while the repository is private
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install as documented, from compose.yaml only
+        run: |
+          mkdir "$RUNNER_TEMP/install"
+          cp compose.yaml "$RUNNER_TEMP/install/"
+          cd "$RUNNER_TEMP/install"
+          CLOUDARCHITECT_VERSION=${GITHUB_REF_NAME#v} docker compose up --detach --wait --wait-timeout 300
+      - name: Setup link is printed and the API answers through nginx
+        working-directory: ${{ runner.temp }}/install
+        run: |
+          # Bodies are captured first: `curl | grep -q` can fail under pipefail when grep exits early.
+          logs=$(docker compose logs gateway)
+          grep -qE 'http://localhost:8080/setup\?code=[0-9a-f]{12}' <<<"$logs"
+          page=$(curl -fsS http://127.0.0.1:8080/)
+          grep -q '<div id="root">' <<<"$page"
+          status=$(curl -fsS http://127.0.0.1:8080/api/setup/status)
+          grep -q '"configured":false' <<<"$status"
+          models=$(curl -fsS http://127.0.0.1:8080/api/models)
+          grep -q '"sonnet"' <<<"$models"
+      - name: Icons download on first start
+        working-directory: ${{ runner.temp }}/install
+        run: |
+          for i in $(seq 1 60); do
+            body=$(curl -fsS http://127.0.0.1:8080/api/icons || true)
+            case "$body" in *'"state":"ready"'*) exit 0 ;; esac
+            sleep 2
+          done
+          echo "$body"; exit 1
+      - name: Images carry no icons
+        working-directory: ${{ runner.temp }}/install
+        run: |
+          # Recursive over each image; the exec must succeed and find nothing. The gateway's /data
+          # volume legitimately holds the downloaded cache, so it is excluded.
+          pattern='\( -name "*.svg" -o -name "icons.json" -o -name "aws-*.json" \)'
+          gateway=$(docker compose exec -T gateway sh -c "find / -xdev $pattern -not -path '/proc/*' -not -path '/data/*' 2>/dev/null | head -1")
+          web=$(docker compose exec -T web sh -c "test -d /usr/share/nginx/html && find /usr/share/nginx/html $pattern | head -1")
+          if [ -n "$gateway$web" ]; then
+            echo "Icon files found in an image: $gateway $web"
+            exit 1
+          fi
+      - name: Logs on failure
+        if: failure()
+        working-directory: ${{ runner.temp }}/install
+        run: docker compose logs
+      - name: Clean up
+        if: always()
+        working-directory: ${{ runner.temp }}/install
+        run: docker compose down --volumes

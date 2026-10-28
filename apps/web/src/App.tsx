@@ -31,6 +31,8 @@ import type { StepId } from './GenerationStatus';
 import { edgeTypes } from './edges';
 import {
   applyLayout,
+  type ContainerNodeData,
+  type ServiceNodeData,
   containerMinSize,
   dropRoutes,
   fitsChildren,
@@ -39,8 +41,18 @@ import {
   toFlow,
   type Routes,
 } from './layout';
+import { DEMO, DEMO_BANNER, REPO_URL, demoBootSelection, demoIconSource } from './demo';
 import { AiModelPanel, readModelChoice } from './models';
+import {
+  containerIcon,
+  loadIcons,
+  nextIconStep,
+  serviceIcon,
+  type IconState,
+  type IconUrls,
+} from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
   idbVersionStore,
@@ -72,7 +84,7 @@ type Questions = Extract<GenerateResponse, { status: 'questions' }>;
 
 /** Extraction is quick; after this the request is almost always in the generation step. */
 const DESIGNING_AFTER_MS = 8000;
-const CANCELLED = 'Generation cancelled — no credit used.';
+const CANCELLED = 'Generation cancelled.';
 
 interface DialogSpec {
   message: string;
@@ -127,6 +139,9 @@ export function App() {
   const [cancellable, setCancellable] = useState(false);
   /** A replace flow (generated result, Restore) is running; see `exclusive`. */
   const [replacing, setReplacing] = useState(false);
+  const [iconState, setIconState] = useState<IconState>();
+  const [iconUrls, setIconUrls] = useState<IconUrls>({});
+  const [iconTick, setIconTick] = useState(0);
   const replacingRef = useRef(false);
   const dialogOpenRef = useRef(false);
   const flowRef = useRef<ReactFlowInstance>(undefined);
@@ -195,12 +210,19 @@ export function App() {
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
-      return commit(project, false, { recover: true });
+      return commit(project, false, { recover: true }).then(() => {
+        if (!DEMO) return;
+        const id = demoBootSelection(project);
+        if (!id) return;
+        setSelected(id);
+        setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+      });
     });
   }, [commit]);
 
   useEffect(() => {
     // Self-hosted installs: point to the wizard, but never block the local-first editor.
+    if (DEMO) return;
     api.setupStatus().then(
       (s) => setSetupPending(s.available && !s.configured),
       () => undefined,
@@ -299,7 +321,7 @@ export function App() {
 
   /**
    * Replace step (spec §2.4), before any request: confirm hand edits and keep the current diagram
-   * as a version. False means "do not generate": no request is sent, no credit is used.
+   * as a version. False means "do not generate": no request is sent.
    */
   const prepare = async (): Promise<boolean> => {
     const current = projectRef.current;
@@ -557,6 +579,40 @@ export function App() {
     [commit],
   );
 
+  /** Loads the official icons, polling every 3 s only while a download is plausibly running (see `nextIconStep`). */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stop = false;
+    const run = async (attempts: number) => {
+      try {
+        const { state, urls } = await loadIcons(DEMO ? demoIconSource : () => api.icons());
+        if (stop) return;
+        const step = nextIconStep(state, attempts);
+        if (state === 'ready') setIconUrls(urls);
+        // 'missing' shows no notice; giving up leaves generic tiles without one either.
+        setIconState(step === 'give-up' || state === 'missing' ? undefined : state);
+        if (step === 'retry' && !DEMO) await api.retryIcons().catch(() => undefined);
+        if (step === 'retry' || step === 'poll')
+          timer = setTimeout(() => void run(attempts + 1), 3000);
+      } catch {
+        if (!stop) setIconState(undefined); // gateway unreachable: generic tiles, no notice
+      }
+    };
+    void run(0);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [iconTick]);
+
+  const retryIcons = () => {
+    setIconState('fetching');
+    api.retryIcons().then(
+      () => setIconTick((t) => t + 1),
+      () => setIconState('failed'),
+    );
+  };
+
   /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
   const shownNodes = useMemo(
     () =>
@@ -571,9 +627,15 @@ export function App() {
               }
             : {}),
         };
-        return { ...n, data: { ...n.data, ...editable } };
+        const data = n.data as Partial<ServiceNodeData & ContainerNodeData>;
+        const iconUrl = data.node
+          ? serviceIcon(data.node, iconUrls)
+          : data.container
+            ? containerIcon(data.container, iconUrls)
+            : undefined;
+        return { ...n, data: { ...n.data, ...editable, ...(iconUrl ? { iconUrl } : {}) } };
       }),
-    [nodes, busy, onResized, project],
+    [nodes, busy, onResized, project, iconUrls],
   );
 
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
@@ -585,6 +647,69 @@ export function App() {
     if (!id) return;
     setSelected(id);
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+  };
+
+  const exportMenu = useRef<HTMLDetailsElement>(null);
+  // The Export menu is a <details>; close it on a click outside it and on Escape, like a menu.
+  useEffect(() => {
+    const menu = exportMenu.current;
+    if (!menu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (menu.open && !menu.contains(e.target as globalThis.Node)) menu.open = false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !menu.open) return;
+      menu.open = false;
+      menu.querySelector('summary')?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  const exportAs = async (format: ImageFormat) => {
+    if (exportMenu.current) exportMenu.current.open = false;
+    const viewport = document.querySelector<HTMLElement>('.canvas .react-flow__viewport');
+    const flow = flowRef.current;
+    if (!project || !viewport || !flow) return;
+    // Selection highlighting is editing state, not part of the diagram: drop it for the render and
+    // put it back afterwards (the demo opens with a node selected).
+    const selectedNodes = new Set(
+      flow
+        .getNodes()
+        .filter((n) => n.selected)
+        .map((n) => n.id),
+    );
+    const selectedEdges = new Set(
+      flow
+        .getEdges()
+        .filter((e) => e.selected)
+        .map((e) => e.id),
+    );
+    const detailsFor = selected;
+    const hadSelection = selectedNodes.size > 0 || selectedEdges.size > 0;
+    if (hadSelection) {
+      setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+      setEdges((es) => es.map((e) => (e.selected ? { ...e, selected: false } : e)));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
+    try {
+      await exportImage(format, viewport, flow.getNodes(), {
+        background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+        fileName: project.name,
+      });
+    } catch (err) {
+      setError(`Could not export the image: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      if (hadSelection) {
+        setNodes((ns) => ns.map((n) => (selectedNodes.has(n.id) ? { ...n, selected: true } : n)));
+        setEdges((es) => es.map((e) => (selectedEdges.has(e.id) ? { ...e, selected: true } : e)));
+        setSelected(detailsFor);
+      }
+    }
   };
 
   return (
@@ -599,7 +724,26 @@ export function App() {
         <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
           Auto layout
         </button>
-        <button onClick={() => project && downloadJson(project)}>Export JSON</button>
+        <details className="menu" ref={exportMenu}>
+          <summary>Export</summary>
+          <div className="menu-items">
+            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('png')}>
+              PNG image
+            </button>
+            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('svg')}>
+              SVG image
+            </button>
+            <button
+              disabled={!project}
+              onClick={() => {
+                if (project) downloadJson(project);
+                if (exportMenu.current) exportMenu.current.open = false;
+              }}
+            >
+              JSON project
+            </button>
+          </div>
+        </details>
         <button disabled={busy} onClick={() => fileInput.current?.click()}>
           Import JSON
         </button>
@@ -618,10 +762,31 @@ export function App() {
           }}
         />
       </header>
+      {DEMO && (
+        <div className="notice">
+          {DEMO_BANNER}{' '}
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            View on GitHub
+          </a>
+        </div>
+      )}
       {setupPending && (
         <div className="notice">
           AI features are not set up yet. Open the setup link printed in the server log (
           <code>docker compose logs gateway</code>) to finish setup; manual editing works meanwhile.
+        </div>
+      )}
+      {iconState === 'fetching' && (
+        <div role="status" className="notice">
+          Downloading the official AWS icons (first start only)…
+        </div>
+      )}
+      {iconState === 'failed' && !DEMO && (
+        <div role="alert" className="notice">
+          The official AWS icons could not be downloaded, so diagrams show generic tiles.{' '}
+          <button type="button" className="link" onClick={retryIcons}>
+            Retry
+          </button>
         </div>
       )}
       {storageDown && (
@@ -735,8 +900,10 @@ export function App() {
             />
             <AiModelPanel />
             <p className="muted small">
-              Generated designs require professional review before production use. Icons shown are
-              generic placeholders until the official packs are imported.
+              Generated designs require professional review before production use.{' '}
+              {iconState === 'ready'
+                ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
+                : 'Icons shown are generic placeholders until the official icons are downloaded.'}
             </p>
           </div>
         </aside>

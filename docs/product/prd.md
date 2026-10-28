@@ -20,12 +20,13 @@ Let users, without signing up and without knowing any diagram format, turn a des
 6. Correct the diagram manually or with an available AI command.
 7. Run **Validate** → see rule-based findings on canvas elements and requirement coverage. Optionally run **Review** (AI advisory findings, separate from rule findings; FR-021).
 8. Save the project in the browser or as JSON; export PNG/SVG.
-9. After three free AI operations, continue manually or connect BYOK.
+9. AI runs on the user's own key through their own gateway; without a key, or when a spending limit is reached, continue manually.
+
+> **2026-10-26:** the product is free, open-source and self-hosted ([ADR-0013](../adr/0013-self-hosted-only.md)). Hosted-service requirements below (FR-012, FR-013, FR-024, NFR-009 and NFR-010 as written, §6 credit semantics, §8 BYOK) are marked dropped and kept as history.
 
 ## 3. Roles
 
-- **Anonymous user:** the full local editor; limited free AI operations.
-- **BYOK user:** a user with their own AI key/configuration; their provider determines quotas and cost.
+- **User:** runs the app locally with their own AI key; the full local editor works without one, and their provider determines quotas and cost. (Dropped 2026-10-26: anonymous users with free AI operations.)
 - **Catalog maintainer** (internal role): approves catalog updates, connections and icons.
 - **Independent cloud architect reviewer** (internal role): scores benchmark outputs against the rubric in §14 at decision gates. In the MVP, Claude fills this role in an isolated reviewer session (§15).
 
@@ -44,8 +45,8 @@ Let users, without signing up and without knowing any diagram format, turn a des
 | FR-009 | Basic validation | P0 | Structural checks (schema, IDs, dangling edges, duplicates), catalog checks (unknown/deprecated), coverage, and the rule set in §11. Each finding is attached to a node/edge and carries a ruleId and validator version. |
 | FR-010 | Local save/load | P0 | The project is saved in IndexedDB and opens without login; JSON import/export works; the UI reminds users to keep a JSON backup. |
 | FR-011 | Diagram export | P0 | PNG and SVG for supported graphs; export keeps labels, connections and containers. |
-| FR-012 | Hybrid free AI | P0 | An anonymous user gets a configurable 3 initial AI operations, with anti-abuse controls and a global budget cap in place (NFR-009). |
-| FR-013 | BYOK | P0 | After the limit, the user can continue with their own AI provider (§8); the key never reaches the bundle, logs, analytics or server storage. |
+| FR-012 | Hybrid free AI | Dropped 2026-10-26 | Was: 3 free AI operations per anonymous user with a global budget cap. Replaced by the user's own key and spending limits (NFR-009). |
+| FR-013 | Own AI key | P0 | AI runs with the user's own key, held by their own gateway; the key never reaches the browser, bundle, logs or analytics. (Originally BYOK direct browser calls, dropped 2026-10-26.) |
 | FR-014 | Manual mode | P0 | All core editing, storage and export operations work without an AI connection. |
 | FR-015 | Traceability | P0 | Nodes/edges reference requirements; the UI shows uncovered requirements and nodes without requirements. |
 | FR-016 | AI editing | P1 | Limited add/remove/replace/update operations via preview diff + confirm; manual edits are not lost; stale patches are rejected. |
@@ -53,12 +54,12 @@ Let users, without signing up and without knowing any diagram format, turn a des
 | FR-018 | English interface | P0 | Core interface and error texts in English; the i18n architecture is ready for more languages. |
 | FR-019 | **Containers / groups** | P0 | The model supports nested containers `aws-cloud` → `region` → `vpc` → `availability-zone` → `subnet` (public/private) and logical groups. VPC and subnet are containers, not ordinary nodes. A node belongs to ≤ 1 container; containers are displayed, move together with their contents, and take part in layout and export. Global services (CloudFront, Route 53, IAM) sit outside the region. |
 | FR-020 | **Out-of-catalog services** | P0 | If a requirement needs a service outside the catalog, AI returns it as `unresolved` (name + rationale) instead of substituting the nearest known service. On the canvas it is a generic node labelled *Not in verified catalog*; validation reports an info finding. The user can replace it with a catalog service. |
-| FR-021 | **Architecture review** | P0 | The **Review** button analyzes the *current* graph (generated or manually edited) and returns advisory findings (cost, redundancy, security, resilience). Advisory findings are visually separate from rule findings and never marked verified. Costs 1 credit. |
-| FR-022 | Ask about the design | P1 | A question in the context of the selected node/edge/project (e.g. "OAC vs Transfer Acceleration?") answered from the catalog with documentation links. Costs 1 credit. |
+| FR-021 | **Architecture review** | P0 | The **Review** button analyzes the *current* graph (generated or manually edited) and returns advisory findings (cost, redundancy, security, resilience). Advisory findings are visually separate from rule findings and never marked verified. |
+| FR-022 | Ask about the design | P1 | A question in the context of the selected node/edge/project (e.g. "OAC vs Transfer Acceleration?") answered from the catalog with documentation links. |
 | FR-023 | Mermaid export | P1 | Export the graph as a Mermaid flowchart with a subgraph per container; no icon references required. |
-| FR-024 | Credit & cost transparency | P0 | Before an operation, the UI shows remaining credits and exactly what will be sent to the AI provider, and shows "free AI temporarily unavailable" when the kill switch is active. |
-| FR-025 | Clarification round | P0 | If extraction returns critical open questions, the user answers or skips them; generation uses the answers within the **same** credit. At most one round per operation. |
-| FR-026 | Model choice with measured benchmark | P0 | The user picks Claude Haiku 5.5 or Sonnet 5.5 for AI operations. The UI shows each model's measured blind-review score, automated pass rate, critical-defect rate, cost per generation and latency (ADR-0011). Models the instance key does not serve are marked as needing the user's own key. |
+| FR-024 | Cost transparency | P0 | Before an operation, the UI shows exactly what will be sent to the AI provider, and explains when AI is unavailable (no key configured, or a spending limit reached). (Credits and the kill switch dropped 2026-10-26.) |
+| FR-025 | Clarification round | P0 | If extraction returns critical open questions, the user answers or skips them; generation uses the answers within the **same** operation. At most one round per operation. |
+| FR-026 | Model choice with measured benchmark | P0 | The user picks Claude Haiku 5.5 or Sonnet 5.5 for AI operations. The UI shows each model's measured blind-review score, automated pass rate, critical-defect rate, cost per generation and latency (ADR-0011). Models the instance does not enable (`AI_MODELS`) are marked as not enabled; requesting one returns `403 model_not_enabled`, and the user enables it by re-running setup. |
 | FR-027 | Self-hosted setup wizard | P0 | `docker compose up` on Windows, macOS or Linux prints a one-time setup link. A five-step browser wizard (code, API key check, models, limits with budget estimate, review) configures the instance without editing files (ADR-0012). |
 
 ## 5. Non-functional requirements
@@ -66,28 +67,26 @@ Let users, without signing up and without knowing any diagram format, turn a des
 | ID | Description | Priority |
 |---|---|---|
 | NFR-001 | Privacy: local data by default, explicit notice before sending requirements to an LLM | P0 |
-| NFR-002 | Security: server-side secrets, rate limiting, abuse protection, safe key handling, bounded request size | P0 |
+| NFR-002 | Security: the AI key only in the gateway, rate limiting, safe key handling, bounded request size | P0 |
 | NFR-003 | Resilience: editor usable offline after assets are cached; AI outages do not block the canvas | P1 |
 | NFR-004 | Backward-compatible project schema; migrations on import | P0 |
 | NFR-005 | Accessibility basics: keyboard navigation, labels, contrast, scalable UI | P1 |
 | NFR-006 | Observability without logging private project content or keys by default | P0 |
 | NFR-007 | Multi-cloud-ready architecture domain model | P0 |
 | NFR-008 | Provenance: catalog version, verification time, documentation links | P0 |
-| NFR-009 | **Cost ceiling:** global daily and monthly budget cap for free AI; automatic kill switch when exceeded; per-request input/output token limits | P0 |
-| NFR-010 | **Legal/privacy:** Privacy Policy and Terms of Use before public beta; a documented legal basis (GDPR) for sending text to an AI provider; only provider settings with no training on data and minimal retention; disclaimer "generated designs require professional review" | P0 |
+| NFR-009 | **Cost ceiling:** daily and monthly spending limits on the user's own key; AI routes return `ai_unavailable` when one is reached; per-request input/output token limits. (Free-AI budget cap and manual kill switch dropped 2026-10-26.) | P0 |
+| NFR-010 | **Legal/privacy:** no hosted service, accounts or telemetry; the README says what is sent to the AI provider (hosted Privacy Policy and Terms dropped 2026-10-26); only provider settings with no training on data and minimal retention; disclaimer "generated designs require professional review" | P0 |
 | NFR-011 | **Icon compliance:** icons used only within the source's terms (§12); no changes to shape or color; provenance and hash for each pack | P0 |
 | NFR-012 | **Performance:** canvas interaction (drag, select) without noticeable lag at ≤ 150 nodes and ≤ 10 nesting levels; auto-layout ≤ 2 s for a 50-node graph on a typical laptop | P1 |
 | NFR-013 | **Automated AI evaluation:** the §13 benchmark runs automatically whenever the prompt, model or catalog changes; a metric regression blocks release | P0 |
 
-## 6. Credit semantics
+## 6. Credit semantics (dropped 2026-10-26)
 
-- **1 credit = one user operation** (Generate, AI Edit, Review, Ask), regardless of how many LLM calls the pipeline makes internally.
-- The clarification round (FR-025) is included in the original Generate credit.
-- Operations that fail because of the server or provider are **not charged**; operations the user cancels before a response arrives are not charged.
-- **3** is a starting configuration, not a guaranteed lifetime quota: without accounts, protection against re-obtaining credits is probabilistic. The main budget protection is the global cap (NFR-009), not precise per-user accounting.
-- Manual mode and offline edits do not use credits.
-- The interface shows remaining credits and explains that with BYOK the user pays the provider directly.
-- The server is the authoritative ledger (atomic changes); localStorage is not a trusted ledger.
+Free AI credits were dropped with the hosted plan ([ADR-0013](../adr/0013-self-hosted-only.md)); there is no per-operation accounting. What remains:
+
+- An **operation** is one user action (Generate, AI Edit, Review, Ask), however many LLM calls the pipeline makes. The clarification round (FR-025) belongs to the Generate operation.
+- Every completed model call is added to the daily and monthly spend counters; the spending limits (NFR-009) are the protection, and manual mode never depends on them.
+- The setup wizard estimates how many generations a limit covers.
 
 ## 7. AI cost model
 
@@ -97,20 +96,16 @@ The cost model is set by measurement in Phase 0, not by assumption. Required val
 |---|---|
 | Average input/output tokens per operation of each type | Measured on the §13 benchmark |
 | Cost per operation = Σ (tokens × model price) over all pipeline calls | Calculated from the provider's current price list on the measurement date |
-| Cost per free user = 3 × average cost per operation | Calculated |
-| Monthly budget cap | Product owner decision |
-| Supportable free users per month = cap / cost per user | Calculated; recalculated after beta |
+| Operations covered by a spending limit = limit / average cost per operation | Calculated; shown in the setup wizard |
 
-Recommendation: use an economical model for the free tier and a stronger one as the BYOK default; check both on the same benchmark. Send only the part of the catalog relevant to the request in the prompt, to bound input tokens.
+Recommendation: offer an economical model and a stronger one; check both on the same benchmark. Send only the part of the catalog relevant to the request in the prompt, to bound input tokens.
 
-## 8. BYOK — product decision
+## 8. AI key — product decision (BYOK dropped 2026-10-26)
 
-- **Preferred: direct calls from the browser** to providers that officially support it (Anthropic and OpenAI as of v0.2). The user's key never passes through our server, which reduces our liability and increases trust.
-- By default the key is held **only in tab memory**; saving it in the browser is an explicit opt-in with a warning.
-- With BYOK, prompt templates and the catalog snapshot are loaded by the client; validation runs on the client (shared TypeScript schema).
-- **Fallback:** an ephemeral proxy for providers without browser access; the key is neither stored nor logged (a detailed threat model is required before release).
-- **Optional (P1):** OpenRouter via OAuth PKCE — the user obtains a key without copying it manually.
-- This reverses v0.1 (proxy as the primary option); TECHNICAL_ARCHITECTURE §7 has been updated to match.
+The v0.2 decision was BYOK with direct browser calls (key in tab memory, ephemeral proxy fallback, OpenRouter OAuth P1). It is dropped with the hosted plan ([ADR-0013](../adr/0013-self-hosted-only.md), [ADR-0006](../adr/0006-byok-direct-browser-calls.md)).
+
+- Each user runs their own gateway with their own key; the gateway makes every AI call. The key never reaches the browser.
+- Prompt templates and the catalog are used by the gateway; validation runs on both sides (shared TypeScript schema), and the client always re-validates.
 
 ## 9. AWS catalog scope (MVP)
 
@@ -185,7 +180,7 @@ Use **only** the official packages from the sources below, never redrawn, AI-gen
 - Provider icons are not used in the CloudArchitect Lite logo, branding or marketing.
 - The service name is always shown next to its icon (Azure's recommendation, applied to all providers).
 - The interface and repository give attribution and a source link for each pack; trademarks belong to their owners.
-- Residual risk: the AWS and GCP terms do not explicitly cover embedding the package in a third-party tool. Mitigation: in Phase 0, record the terms text from the downloaded archives (README/LICENSE, if any) and, if anything is ambiguous, serve icons lazily from a versioned asset store rather than a public Git repository. Gate B keeps its "license review" item.
+- Residual risk: the AWS and GCP terms do not explicitly cover embedding the package in a third-party tool. Mitigation: in Phase 0, record the terms text from the downloaded archives (README/LICENSE, if any) and, if anything is ambiguous, keep icons out of the repository and the published images (decision 2026-10-27, release 0.2 design Goal 1): the pack is pinned by SHA-256 in `packages/catalog/data/icon-packs.json`, and the gateway downloads it from the official source on first start, verifies it and keeps only the mapped SVGs in its data volume. The GitHub Pages demo includes icons fetched by its build workflow. Gate B keeps its "license review" item.
 
 ## 13. Quality benchmark and evaluation harness
 
@@ -255,14 +250,14 @@ No single topology is mandatory; the reviewer scores against the §14 rubric.
 - US-04: As a user I can move/add/delete nodes, edges and containers.
 - US-05: As a user I can see validation findings attached to canvas elements.
 - US-06: As a user I can save locally and export without creating an account.
-- US-07: As a user I can switch from free credits to my own AI key.
+- US-07: As a user I can run AI with my own key (originally "switch from free credits", dropped 2026-10-26).
 - US-08: As a maintainer I can update provider data without breaking projects.
 - US-09: As a user I can ask the tool to review my (edited) architecture.
 - US-10: As a user I can see which parts of my design use services outside the verified catalog.
 
 **Team & delivery assumptions**
 
-- Implementation: Claude as implementer, plus the product owner, who makes decisions and provides access (AI provider, Cloudflare, hosting, domain).
+- Implementation: Claude as implementer, plus the product owner, who makes decisions and provides access (AI provider, hosting for the demo, domain).
 - The ROADMAP schedule (9–10 weeks) is realistic under this model if scope is held; pulling any P1 into the MVP moves dates.
 - **Risk order:** Phases 0–1 include an AI quality spike in parallel with the canvas — generation quality is the main hypothesis; the canvas is the low-risk part.
 
@@ -272,8 +267,7 @@ No IaC deployment, deep price engine, multi-user cloud storage, enterprise compl
 
 **Decisions requiring product validation**
 
-- Monthly free-AI budget cap and final quota after measurement (§7). Models are decided in ADR-0011.
-- Accountless anti-abuse UX; whether an email magic link is needed as an optional way to get more credits.
+- Models are decided in ADR-0011. (Dropped 2026-10-26: free-AI budget cap and quota, accountless anti-abuse UX, magic link for extra credits.)
 - Depth of requirement extraction in the first public beta.
 - Branding, trademark and pricing of an eventual Pro plan.
 - Availability of a human expert for spot checks before public beta (§15).
@@ -284,7 +278,7 @@ No IaC deployment, deep price engine, multi-user cloud storage, enterprise compl
 
 - Added FR-019 (containers), FR-020 (out-of-catalog), FR-021 (review), FR-022 (ask, P1), FR-023 (Mermaid, P1), FR-024 (cost transparency), FR-025 (clarification round); refined FR-001…FR-011.
 - Added NFR-009…NFR-013 (cost ceiling, legal/privacy, icon compliance, performance, automated eval).
-- Credit semantics: 1 credit = 1 user operation; budget cap as the main protection.
+- Credit semantics: 1 credit = 1 user operation; budget cap as the main protection (dropped 2026-10-26).
 - New sections: AI cost model, BYOK decision (direct browser calls), catalog scope of ~40 services, containers, 15 validation rules, icon sources and terms, eval harness, rubric, expert review process.
 - MyBlog scenario aligned with scope: DAX → via Review/VR-006; OAC vs Transfer Acceleration → via details and Ask; "options" → one justified architecture (alternatives remain P2).
 - Positioning refined against competitors.

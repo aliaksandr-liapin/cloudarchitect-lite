@@ -9,6 +9,15 @@ export function routedPath(points: readonly { x: number; y: number }[]): string 
 }
 
 /**
+ * Stroke set inline (theme variable; the accent colour while the edge is selected, as the React Flow class would): an exported image carries no stylesheet, so a stroke that only
+ * came from the React Flow CSS class would vanish from PNG/SVG exports.
+ */
+const edgeStroke = (selected?: boolean) => ({
+  stroke: selected ? 'var(--accent)' : 'var(--muted)',
+  strokeWidth: selected ? 2 : 1.5,
+});
+
+/**
  * Draws the ELK route (bend points and label box) while it is valid; once it was dropped (hand move,
  * resize, reload) falls back to a smoothstep path with the label at its midpoint.
  */
@@ -27,7 +36,7 @@ export function RoutedEdge(props: EdgeProps) {
         path={path}
         markerStart={props.markerStart}
         markerEnd={props.markerEnd}
-        style={props.style}
+        style={{ ...edgeStroke(props.selected), ...props.style }}
         interactionWidth={props.interactionWidth}
       />
       {label && (

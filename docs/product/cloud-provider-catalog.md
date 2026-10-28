@@ -26,7 +26,7 @@ Icons come **only** from these three sources.
 | Azure | Use is permitted in architectural diagrams, training materials and documentation; copying and distribution only for those purposes. Don't crop, flip, rotate or distort; don't use them to represent your own product. | V24 (July 2026) | SVG (ZIP) |
 | GCP | No explicit terms on the page; the Google Cloud Site Terms and brand guidelines apply. | core product, category and legacy console icons | SVG + PNG (ZIP) |
 
-**Brand/legal:** use the original images without distortion; never use provider icons in CloudArchitect Lite branding. When importing a pack, keep its README/LICENSE (if any) in the manifest. Until the AWS/GCP terms explicitly confirm embedding in a third-party tool, icons are served lazily from a versioned asset store rather than from a public Git repository. Never present look-alike icons as official.
+**Brand/legal:** use the original images without distortion; never use provider icons in CloudArchitect Lite branding. When importing a pack, keep its README/LICENSE (if any) in the manifest. Until the AWS/GCP terms explicitly confirm embedding in a third-party tool, icons are never committed to the repository or shipped in published images (decision 2026-10-27, release 0.2 design Goal 1). The repository holds only the pack record `packages/catalog/data/icon-packs.json` (release, official URL, SHA-256, terms, serviceId → file mapping); the gateway downloads the pack from aws.amazon.com on first start, verifies the hash, keeps only the mapped SVGs in its data volume and serves them. On failure the app shows generic tiles with a Retry. The GitHub Pages demo includes the icons, fetched by its build workflow. Never present look-alike icons as official.
 
 ## 3. Provider-agnostic types
 
@@ -90,14 +90,14 @@ catalog/
     validation-rules.json    # VR-001…VR-018 metadata (logic lives in shared package)
     facts.json               # verified integration facts with evidence (given to the generator)
     lifecycle.json
-    icon-pack.json           # release id, source URL, terms text, SHA-256
+    icon-packs.json          # release id, source URL, terms text, SHA-256
   azure/
     manifest.json
     services.json
   gcp/
     manifest.json
     services.json
-assets/                      # versioned icon store, served lazily; not in public Git
+assets/                      # not in Git: icons are fetched on first start into the gateway data volume
   aws/<release-id>/…
 ```
 
@@ -162,8 +162,8 @@ A project records `projectSchemaVersion`, `catalogVersion` per provider, `iconPa
 - Original colors, aspect ratios, silhouettes; no cropping, flipping, rotating or distortion.
 - Service name always shown next to the icon.
 - Attribution and source link for each pack in the app's About/Legal page.
-- Lazy-load per service; never load the entire vendor library up front.
-- Sanitize SVG on import (no scripts, external references).
+- Downloaded once per install, not per service, and kept as one JSON file in the gateway data volume. `GET /api/icons` serves it with an `ETag` (the release id) and `Cache-Control: private, max-age=86400` once ready, answers `If-None-Match` with 304, and sends `no-store` while the download runs or has failed.
+- Integrity and safety instead of SVG sanitizing: the official ZIP is verified against its pinned SHA-256 before anything is used, only the mapped entries are kept (each capped at 1 MiB decompressed), and icons are rendered only via `<img>` with `data:` URLs, so scripts in an SVG never run. SVG markup is never inlined into the page.
 - Test light and dark canvas contrast without recoloring protected brand assets (use a neutral tile behind the icon if needed).
 
 ## 10. Validation and quality gates

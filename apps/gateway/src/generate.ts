@@ -30,14 +30,14 @@ import {
   type OperationState,
 } from './operation-token.js';
 import type { SetupService } from './setup.js';
-import type { CreditStore } from './store.js';
+import type { SpendStore } from './store.js';
 
 export interface GenerateDeps {
   cfg: () => Config;
   setup?: SetupService;
-  store: CreditStore;
+  store: SpendStore;
   log: (event: Record<string, unknown>) => void;
-  freeAiAvailable: () => Promise<boolean>;
+  aiAvailable: () => Promise<boolean>;
   llm: (apiKey: string) => LlmClient;
   now: () => number;
 }
@@ -167,22 +167,18 @@ export function mergeRequirements(
 }
 
 export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
-  const { cfg, setup, store } = deps;
+  const { cfg, setup } = deps;
   const secret = () => `operation-token:${cfg().CLIENT_KEY_SALT}`;
 
-  /** Setup, model, kill switch and credit checks shared by both routes; returns a response to stop. */
+  /** Model, key and spending-limit checks shared by both routes; returns a response to stop. */
   async function precheck(c: Ctx, op: Operation, model: ModelChoice) {
     const stop = (outcome: string, res: Response) => (op.finish(outcome), res);
-    // Models outside AI_MODELS are only available with the user's own key (ADR-0011).
     if (!cfg().AI_MODELS.includes(model))
-      return stop(
-        'model_not_enabled',
-        c.json({ error: 'model_not_enabled', model, byok: true }, 403),
-      );
-    if (!(await deps.freeAiAvailable()))
-      return stop('free_ai_unavailable', c.json({ error: 'free_ai_unavailable' }, 503));
-    if ((await store.remaining(c.get('clientKey'))) <= 0)
-      return stop('no_credits', c.json({ error: 'no_credits', byok: true }, 402));
+      return stop('model_not_enabled', c.json({ error: 'model_not_enabled', model }, 403));
+    if (!cfg().ANTHROPIC_API_KEY)
+      return stop('setup_required', c.json({ error: 'setup_required' }, 503));
+    if (!(await deps.aiAvailable()))
+      return stop('ai_unavailable', c.json({ error: 'ai_unavailable' }, 503));
     return null;
   }
 
@@ -197,7 +193,7 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     return c.json({ error: 'client_closed' }, 499 as UnofficialStatusCode);
   };
 
-  /** Model failures are never charged; their spend is already counted by the tracked client. */
+  /** A failed model call returns an error; its spend is already counted by the tracked client. */
   const failure = (c: Ctx, op: Operation, err: unknown) => {
     if (err instanceof ClientClosed) return clientClosed(c, op);
     const error = err instanceof GenerationError ? 'generation_failed' : 'provider_error';
@@ -205,14 +201,10 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     return c.json({ error }, 502);
   };
 
-  /** Charges one credit for a schema-valid project, unless the client has gone away. */
+  /** Delivers a schema-valid project, unless the client has gone away. */
   function deliver(c: Ctx, op: Operation, project: Project) {
     return op.keep(async () => {
       if (op.aborted) return clientClosed(c, op);
-      if (!(await store.consume(c.get('clientKey')))) {
-        op.finish('no_credits');
-        return c.json({ error: 'no_credits', byok: true }, 402);
-      }
       op.finish('done');
       const body: GenerateResponse = {
         status: 'done',
@@ -240,7 +232,7 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     }
 
     // The client's disconnect signal is deliberately not forwarded: a started call finishes so it is
-    // priced and counted, no new call starts after a disconnect, and `deliver` skips the credit.
+    // priced and counted, no new call starts after a disconnect, and `deliver` reports the client as closed.
     const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
     let project: Project;
     try {

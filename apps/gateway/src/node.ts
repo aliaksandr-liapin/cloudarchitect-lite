@@ -1,10 +1,12 @@
 import { serve } from '@hono/node-server';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import { awsIconPack } from '@cloudarchitect/catalog';
 import { createApp } from './app.js';
 import { FileSettings } from './settings-file.js';
+import { IconStore } from './icons.js';
 import { SetupService } from './setup.js';
-import { MemoryCreditStore } from './store.js';
+import { MemorySpendStore } from './store.js';
 
 // Node runtime for local development and self-hosted containers. The in-memory store is per-process:
 // run a single replica, or replace it with a shared transactional store before scaling out.
@@ -25,18 +27,24 @@ if (process.argv[2] === 'reset-setup') {
   process.exit(0);
 }
 
+const log = (e: Record<string, unknown>) => {
+  // Container health checks run every 30 s; logging them would bury real traffic.
+  if (e.path !== '/health') console.log(JSON.stringify(e));
+};
+const icons = new IconStore({ dir: join(dataDir, 'icons'), pack: awsIconPack, log });
+
 const app = createApp({
   config: () => setup.config(),
   ...(wizard ? { setup } : {}),
-  store: new MemoryCreditStore(() => setup.config().FREE_CREDITS),
-  // Container health checks run every 30 s; logging them would bury real traffic.
-  log: (e) => {
-    if (e.path !== '/health') console.log(JSON.stringify(e));
-  },
+  store: new MemorySpendStore(),
+  icons,
+  log,
 });
 const port = Number(process.env.PORT ?? 8787);
 const server = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, () => {
   console.log(JSON.stringify({ event: 'listening', port }));
+  // Startup never waits on the icon download; the web app polls /api/icons.
+  void icons.ensure();
   if (wizard && !setup.status().configured) {
     const url = `${process.env.PUBLIC_URL ?? 'http://localhost:8080'}/setup?code=${setupCode}`;
     console.log(

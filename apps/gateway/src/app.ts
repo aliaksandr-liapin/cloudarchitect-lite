@@ -1,4 +1,4 @@
-import { awsCatalog } from '@cloudarchitect/catalog';
+import { awsCatalog, awsIconPack, type IconSet } from '@cloudarchitect/catalog';
 import { MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
 import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
@@ -9,15 +9,18 @@ import { secureHeaders } from 'hono/secure-headers';
 import { z } from 'zod';
 import type { Config } from './config.js';
 import { registerGenerateRoutes } from './generate.js';
+import type { IconStore } from './icons.js';
 import { SetupError, SetupInput, type SetupService } from './setup.js';
-import type { CreditStore } from './store.js';
+import type { SpendStore } from './store.js';
 
 export interface Deps {
   /** A getter lets the setup wizard change settings without a restart. */
   config: Config | (() => Config);
   /** First-run wizard; present only on self-hosted Node installs (ADR-0012). */
   setup?: SetupService;
-  store: CreditStore;
+  store: SpendStore;
+  /** Official icons fetched on first start; absent in tests and edge runtimes. */
+  icons?: IconStore;
   /** Structured logger. Must never receive prompts, graphs or keys (NFR-006). */
   log?: (event: Record<string, unknown>) => void;
   /** Provider client factory; tests inject a fake. */
@@ -33,7 +36,7 @@ async function sha256(text: string) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Fixed-window limiter per client key. Per-instance only; production Workers use the Rate Limiting binding. */
+/** Fixed-window limiter per client key. Per-instance only. */
 function rateLimiter(limitPerMinute: () => number) {
   const windows = new Map<string, { start: number; count: number }>();
   return (key: string, now = Date.now()) => {
@@ -51,6 +54,7 @@ export function createApp({
   config: configSource,
   setup,
   store,
+  icons,
   log = () => {},
   llm = anthropicClient,
   now = Date.now,
@@ -77,12 +81,12 @@ export function createApp({
 
   // Anonymous client key: salted hash of the connecting IP. Raw IPs are never stored or logged.
   app.use('/api/*', async (c, next) => {
-    const ip =
-      c.req.header('cf-connecting-ip') ??
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-      'unknown';
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     c.set('clientKey', await sha256(`${cfg().CLIENT_KEY_SALT}:${ip}`));
-    if (!allow(c.get('clientKey'))) return c.json({ error: 'rate_limited' }, 429);
+    // The web app polls GET /api/icons every 3 s while the first download runs; that is ~20 calls/min
+    // and would exhaust the default budget. The route is cheap and serves a fixed in-memory object.
+    const exempt = c.req.method === 'GET' && c.req.path === '/api/icons';
+    if (!exempt && !allow(c.get('clientKey'))) return c.json({ error: 'rate_limited' }, 429);
     await next();
   });
 
@@ -98,10 +102,10 @@ export function createApp({
     });
   });
 
-  /** Kill switch: manual flag or either budget cap reached (NFR-009). */
-  async function freeAiAvailable() {
+  /** True when a key is configured and neither the daily nor the monthly limit is reached (NFR-009). */
+  async function aiAvailable() {
     const config = cfg();
-    if (config.FREE_AI_DISABLED || !config.ANTHROPIC_API_KEY) return false;
+    if (!config.ANTHROPIC_API_KEY) return false;
     const { dayMicroUsd, monthMicroUsd } = await store.spend();
     return (
       dayMicroUsd < config.DAILY_BUDGET_MICRO_USD && monthMicroUsd < config.MONTHLY_BUDGET_MICRO_USD
@@ -120,6 +124,39 @@ export function createApp({
       options: MODEL_OPTIONS,
     }),
   );
+
+  const iconState = () => icons?.state() ?? 'missing';
+  // The ready body (~150 KB) never changes for a release, so it is serialized once and served with an
+  // ETag; browsers cache it for a day and revalidate with If-None-Match. While the download runs or
+  // has failed, the small status body must not be cached.
+  let readyBody: { set: IconSet; etag: string; body: string } | undefined;
+  app.get('/api/icons', (c) => {
+    const set = icons?.iconSet();
+    if (!set) {
+      c.header('Cache-Control', 'no-store');
+      return c.json({ state: iconState(), release: awsIconPack.release });
+    }
+    if (readyBody?.set !== set) {
+      readyBody = {
+        set,
+        etag: `"aws-${set.release}"`,
+        body: JSON.stringify({ state: 'ready', release: set.release, icons: set.icons }),
+      };
+    }
+    c.header('ETag', readyBody.etag);
+    c.header('Cache-Control', 'private, max-age=86400');
+    const match = c.req.header('if-none-match');
+    if (match?.split(',').some((t) => t.trim().replace(/^W\//, '') === readyBody?.etag)) {
+      return c.body(null, 304);
+    }
+    c.header('Content-Type', 'application/json; charset=UTF-8');
+    return c.body(readyBody.body);
+  });
+  app.post('/api/icons/retry', (c) => {
+    const state = iconState();
+    if (icons && (state === 'missing' || state === 'failed')) void icons.ensure();
+    return c.json({ state: icons?.state() ?? state }, 202);
+  });
 
   const setupFailure = (c: Context<Env>, err: unknown) => {
     if (err instanceof SetupError) return c.json({ error: err.code }, err.status);
@@ -158,18 +195,11 @@ export function createApp({
     }
   });
 
-  app.get('/api/credits/status', async (c) =>
-    c.json({
-      remaining: await store.remaining(c.get('clientKey')),
-      freeAiAvailable: await freeAiAvailable(),
-    }),
-  );
-
-  registerGenerateRoutes(app, { cfg, setup, store, log, freeAiAvailable, llm, now });
+  registerGenerateRoutes(app, { cfg, setup, store, log, aiAvailable, llm, now });
 
   /**
-   * Edit, Review and Ask are Phase 3. Request validation, kill switch and credit checks are live; a
-   * valid request returns 501 without charging a credit.
+   * Edit, Review and Ask are Phase 3. Request validation and the key and spending-limit checks are live; a
+   * valid request returns 501.
    */
   const aiOperation = (schema: z.ZodType) => async (c: Context<Env>) => {
     const raw: unknown = await c.req.json().catch(() => null);
@@ -186,13 +216,11 @@ export function createApp({
         400,
       );
     if (setup && !setup.status().configured) return c.json({ error: 'setup_required' }, 503);
-    // Models outside AI_MODELS are only available with the user's own key (ADR-0011).
     const chosen = model.data.model ?? cfg().DEFAULT_MODEL;
     if (!cfg().AI_MODELS.includes(chosen))
-      return c.json({ error: 'model_not_enabled', model: chosen, byok: true }, 403);
-    if (!(await freeAiAvailable())) return c.json({ error: 'free_ai_unavailable' }, 503);
-    if ((await store.remaining(c.get('clientKey'))) <= 0)
-      return c.json({ error: 'no_credits', byok: true }, 402);
+      return c.json({ error: 'model_not_enabled', model: chosen }, 403);
+    if (!cfg().ANTHROPIC_API_KEY) return c.json({ error: 'setup_required' }, 503);
+    if (!(await aiAvailable())) return c.json({ error: 'ai_unavailable' }, 503);
     return c.json({ error: 'not_implemented' }, 501);
   };
 

@@ -87,13 +87,11 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
 
 export const modelOption = (id: ModelChoice) => MODEL_OPTIONS.find((m) => m.id === id)!;
 
-/** Defaults: the instance's own key serves Haiku (free tier); Sonnet is the own-key default. */
+/** Defaults: Haiku is enabled and the default model until the setup wizard changes it. */
 export const MODEL_POLICY = {
-  freeTierModels: ['haiku'],
+  defaultEnabledModels: ['haiku'],
   defaultModel: 'haiku',
-  byokDefault: 'sonnet',
 } as const satisfies {
-  freeTierModels: readonly ModelChoice[];
+  defaultEnabledModels: readonly ModelChoice[];
   defaultModel: ModelChoice;
-  byokDefault: ModelChoice;
 };
