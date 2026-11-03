@@ -19,6 +19,9 @@ COPY apps/web apps/web
 RUN pnpm --filter @cloudarchitect/web build
 
 FROM nginxinc/nginx-unprivileged:stable-alpine AS runtime
+# Apply Alpine security fixes released after the base image was built (the Trivy gate fails on fixable CVEs).
+USER root
+RUN apk upgrade --no-cache
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 USER 101
