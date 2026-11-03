@@ -24,6 +24,8 @@ FROM node:26-alpine AS runtime
 # NODE_USE_ENV_PROXY: fetch() honours HTTPS_PROXY / NO_PROXY from .env (icon download, Anthropic API).
 ENV NODE_ENV=production PORT=8787 DATA_DIR=/data NODE_USE_ENV_PROXY=1
 WORKDIR /app
+# Apply Alpine security fixes released after the base image was built (the Trivy gate fails on fixable CVEs).
+RUN apk upgrade --no-cache
 # Wizard settings (incl. the API key, mode 0600) live on a volume mounted here.
 RUN mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /repo/apps/gateway/dist/node.js ./node.js
