@@ -15,7 +15,7 @@ _Replay of a real recorded generation with Claude Haiku, shortened: a real gener
 
 ## Install
 
-You need [Docker](https://docs.docker.com/get-docker/) and an [Anthropic API key](https://console.anthropic.com/). Then run one command.
+You need [Docker](https://docs.docker.com/get-docker/) and an [Anthropic API key](https://platform.claude.com/settings/keys). Then run one command.
 
 macOS and Linux:
 
@@ -67,7 +67,7 @@ Details, upgrading and troubleshooting: [installation guide](docs/operations/ins
 
 ## Contributing and support
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md) and the [code of conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
+Found a bug or have an idea? [Report a bug](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=bug.yml) or [suggest an improvement](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=feature.yml). See [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md) and the [code of conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

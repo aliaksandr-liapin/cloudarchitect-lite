@@ -1,6 +1,6 @@
 # Roadmap & Implementation Backlog — CloudArchitect Lite
 
-**Version:** 0.3 · **Date:** 2026-10-27 · **Dates:** estimates, not commitments · **Aligned with:** PRD v0.2
+**Version:** 0.4 · **Date:** 2026-11-04 · **Dates:** estimates, not commitments · **Aligned with:** PRD v0.2
 
 ## 1. Delivery model
 
@@ -17,14 +17,41 @@ four weeks, each with its own hook, a LinkedIn post and a dev.to article
 ([dev.to/aliaksandrliapin](https://dev.to/aliaksandrliapin)). Building-in-public posts (design
 decisions, ADRs, eval numbers, bug stories) fill the weeks between releases.
 
+**Now:** 0.2.1 is out (released 2026-11-04). Next: 0.3, Claude vs GPT vs Gemini.
+
+```mermaid
+gantt
+    title Public releases (targets, not commitments)
+    dateFormat YYYY-MM-DD
+    axisFormat %b %Y
+    tickInterval 1month
+    section Done
+    Prototype and AI, Gate A passed      :done,   p02, 2026-10-13, 2026-10-26
+    0.2 Public MVP, released 2026-11-04  :done,   r02, 2026-10-27, 2026-11-04
+    section Next
+    0.3 Claude vs GPT vs Gemini          :active, r03, 2026-11-05, 2026-12-15
+    0.4 Second opinion                   :        r04, 2026-12-16, 2027-01-20
+    0.5 Edit with AI                     :        r05, 2027-01-21, 2027-02-17
+    0.6 Cost estimate                    :        r06, 2027-02-18, 2027-03-17
+    section Later
+    0.7 Diagram to code                  :        r07, 2027-03-18, 2027-04-14
+    0.8 Fully offline                    :        r08, 2027-04-15, 2027-05-19
+    0.9 Multi-cloud                      :        r09, 2027-05-20, 2027-07-21
+    0.10 Bring your infrastructure       :        r10, 2027-07-22, 2027-08-18
+    0.11 Share                           :        r11, 2027-08-19, 2027-10-13
+    1.0                                  :        r1,  2027-10-14, 2027-11-10
+```
+
+Each bar is one release: a design, a plan, a pull request, a GitHub release and an announcement. Details per release are in the table below.
+
 This replaces stages 3–5 below (MVP engineering, private beta, public beta). The hosted-service work
 they assumed is dropped (anonymous free credits, an owner budget cap and kill switch, BYOK direct browser calls,
 hosted Privacy Policy and Terms).
 
 | Release | Target | Theme | Scope | Announcement hook / article |
 |---|---|---|---|---|
-| 0.2 | mid-Nov 2026 | **Public MVP** (in release) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install tested on Windows, macOS and Linux; PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 25 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
-| 0.3 | mid-Dec 2026 | **Claude vs GPT vs Gemini** | Claude, OpenAI and Gemini, two models each; public blind benchmark with a three-provider review panel ([design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
+| 0.2 | ✅ 2026-11-04 | **Public MVP** (released: 0.2.0, 0.2.1) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install (tested on macOS and Linux; Windows expected to work, not hand-tested yet); PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 25 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
+| 0.3 | mid-Dec 2026 | **Claude vs GPT vs Gemini** (next) | Claude, OpenAI and Gemini, two models each; public blind benchmark with a three-provider review panel ([design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
 | 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
 | 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo | Diff-based AI editing of a graph |
 | 0.6 | Mar 2027 | **Cost estimate** | Monthly AWS cost estimate per diagram from traffic assumptions | "What will this architecture cost?" |
@@ -59,7 +86,7 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 **E3 — AI Generation:** requirements extraction, clarification round (FR-025), catalog retrieval, structured generation with service enum, unresolved nodes (FR-020), error handling, **eval harness (NFR-013)**.
 
-**E4 — Knowledge & Validation UX:** node/edge/container details, requirement traceability, docs links, rule engine VR-001…018, finding display, **Review (FR-021)**.
+**E4 — Knowledge & Validation UX:** node/edge/container details, requirement traceability, docs links, rule engine VR-001…025, finding display, **Review (FR-021)**.
 
 **E5 — AI gateway:** gateway/secrets, provider adapters, spending limits (NFR-009), rate limits. dropped 2026-10-26: 3 anonymous free operations, kill switch, credit transparency, BYOK direct browser with proxy fallback, anti-abuse.
 
@@ -116,7 +143,7 @@ P2: Cost estimate, architecture alternatives, ADR/report export, IaC, Azure/GCP 
 | Scope creep to multi-cloud | AWS feature complete first; generic adapters now, provider content later |
 | Crowded market | Focus on validation/traceability differentiation; measure against competitors at Gate C |
 
-## 9. Future vision (not committed)
+## 10. Future vision (not committed)
 
 - V1.5: architecture alternatives, cost assumptions/estimates, ADR.
 - V2: architecture-to-backlog, controlled Terraform/CDK template generation.

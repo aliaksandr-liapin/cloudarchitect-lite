@@ -1,18 +1,49 @@
 name: Bug report
-description: Something does not work as expected
+description: Something does not work as expected (install, setup, editor, generation, export, demo)
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never paste API keys, setup codes (`/setup?code=…`) or private architecture details.**
+        Security problems: do not open an issue; report them privately as described in SECURITY.md.
   - type: textarea
     id: what
-    attributes: { label: What happened, description: Include steps to reproduce. }
+    attributes:
+      label: What happened
+      description: The steps to reproduce, from a fresh start if you can.
+      placeholder: |
+        1. Ran `docker compose up`
+        2. Opened the setup link, pressed Check key
+        3. …
     validations: { required: true }
   - type: textarea
     id: expected
     attributes: { label: What did you expect }
     validations: { required: true }
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Installed with Docker (compose.yaml)
+        - Built from source
+        - Online demo (GitHub Pages)
+    validations: { required: true }
   - type: input
     id: version
-    attributes: { label: Version or commit }
-  - type: markdown
     attributes:
-      value: Do not paste API keys or private architecture details. Report security issues per SECURITY.md.
+      label: Version or commit
+      description: The image tag in compose.yaml (for example 0.2.1), a commit, or "demo".
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Docker version (`docker compose version`), browser.
+      placeholder: macOS 26 on Apple silicon, Docker 28.3, Chrome 142
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Relevant lines of `docker compose logs gateway` or the browser console. Remove keys and setup codes first.
+      render: text

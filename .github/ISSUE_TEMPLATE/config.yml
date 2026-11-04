@@ -3,3 +3,6 @@ contact_links:
   - name: Report a security vulnerability
     url: https://github.com/aliaksandr-liapin/cloudarchitect-lite/security/advisories/new
     about: Please report security issues privately.
+  - name: Installation help
+    url: https://github.com/aliaksandr-liapin/cloudarchitect-lite/blob/main/docs/operations/installation.md#troubleshooting
+    about: Common install and setup problems and their fixes.
