@@ -249,8 +249,8 @@ export function SetupWizard() {
           <section>
             <h1>Models</h1>
             <p>
-              Choose which models this installation&apos;s key serves. Users can still pick a model
-              you do not enable by bringing their own key.
+              Choose which models the editor can use with your key. Models you leave off are shown
+              in the editor but cannot be selected.
             </p>
             <Locked status={status} keys={['AI_MODELS', 'DEFAULT_MODEL']} />
             <div className="choices">
@@ -284,7 +284,7 @@ export function SetupWizard() {
             />
             <div className="grid2">
               <NumberField
-                label="Requests per minute per visitor"
+                label="AI requests per minute"
                 disabled={isLocked('RATE_LIMIT_PER_MINUTE')}
                 value={rateLimitPerMinute}
                 min={1}
@@ -336,7 +336,7 @@ export function SetupWizard() {
                 ${dailyBudgetUsd} per day, ${monthlyBudgetUsd} per month
               </dd>
               <dt>Rate limit</dt>
-              <dd>{rateLimitPerMinute} requests per minute per visitor</dd>
+              <dd>{rateLimitPerMinute} AI requests per minute</dd>
             </dl>
           </section>
         )}

@@ -20,13 +20,13 @@ You need [Docker](https://docs.docker.com/get-docker/) and an [Anthropic API key
 macOS and Linux:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml && docker compose up
 ```
 
 Windows (PowerShell):
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml; docker compose up
 ```
 
 Open the setup link printed in the terminal. A short wizard checks your key, lets you pick a model and sets your daily and monthly spending limits. Then the editor is at <http://localhost:8080>.

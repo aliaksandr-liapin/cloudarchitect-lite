@@ -78,7 +78,7 @@ Read those numbers with care:
 You need Docker and your own Anthropic API key. Your keys and projects stay on your machine, and prompts go only to Anthropic.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml && docker compose up
 ```
 
 A short setup wizard checks the key, lets you choose Haiku or Sonnet and sets daily and monthly spending limits. On Windows, use PowerShell with `curl.exe` as shown in the README. I have tested macOS on Apple Silicon and Linux in CI; Windows is covered by the README but has had less testing.
