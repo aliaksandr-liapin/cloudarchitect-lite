@@ -1,6 +1,6 @@
 {
   "name": "cloudarchitect-lite",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Local-first AI cloud architecture designer — AWS first, Azure/GCP ready.",
   "license": "Apache-2.0",

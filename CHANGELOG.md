@@ -4,6 +4,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-04
+
+### Fixed
+
+- Setup wizard: the Models step no longer mentions bringing your own key (removed in 0.2.0) and says that models left off cannot be selected in the editor; the rate limit is labelled "AI requests per minute" instead of "per visitor".
+
 ## [0.2.0] - 2026-11-04
 
 First public release. Includes the Phase 2 work below and a self-hosted install anyone can run.
@@ -65,6 +71,7 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/releases/tag/v0.1.0

@@ -21,13 +21,13 @@ Run one command in an empty folder. It downloads `compose.yaml` and starts the p
 **macOS and Linux**
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml && docker compose up
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.0/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml; docker compose up
 ```
 
 The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI). Windows 11 on Arm: hand test by the maintainer before the public release. Windows on Intel/AMD is expected to work but has not been tested by hand.
@@ -92,7 +92,7 @@ Run these commands **in the same folder** as the original install. Docker names 
 
 ```bash
 cd path/to/your/install/folder
-VERSION=0.2.0   # the version you upgrade to
+VERSION=0.2.1   # the version you upgrade to
 curl -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$VERSION/compose.yaml"
 docker compose pull && docker compose up -d
 ```
@@ -101,7 +101,7 @@ docker compose pull && docker compose up -d
 
 ```powershell
 cd path\to\your\install\folder
-$Version = '0.2.0'   # the version you upgrade to
+$Version = '0.2.1'   # the version you upgrade to
 curl.exe -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$Version/compose.yaml"
 docker compose pull; docker compose up -d
 ```

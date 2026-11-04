@@ -7,7 +7,7 @@
 # Optional: copy .env.example to .env to preset values; environment variables override the wizard.
 services:
   web:
-    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/web:${CLOUDARCHITECT_VERSION:-0.2.0}
+    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/web:${CLOUDARCHITECT_VERSION:-0.2.1}
     # Bound to this machine only: the app has no login, so it must not be reachable from the network.
     ports: ['127.0.0.1:${WEB_PORT:-8080}:8080']
     read_only: true
@@ -19,7 +19,7 @@ services:
       gateway: { condition: service_healthy }
 
   gateway:
-    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/gateway:${CLOUDARCHITECT_VERSION:-0.2.0}
+    image: ghcr.io/aliaksandr-liapin/cloudarchitect-lite/gateway:${CLOUDARCHITECT_VERSION:-0.2.1}
     # Not published: the web container proxies /api to it.
     env_file:
       - path: .env
