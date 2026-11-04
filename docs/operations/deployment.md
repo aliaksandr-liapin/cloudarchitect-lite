@@ -13,10 +13,10 @@ The Cloudflare Workers + D1 and Cloudflare Pages deployment (staging and product
 
 ## Environments
 
-| Environment         | How                                                                               |
-| ------------------- | --------------------------------------------------------------------------------- |
-| Local / self-hosted | `docker compose up --build` ([installation guide](installation.md)) or `pnpm dev` |
-| Demo                | Static editor on GitHub Pages, built by a GitHub Actions workflow on each release |
+| Environment         | How                                                                                                                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local / self-hosted | `docker compose up` with the published images ([installation guide](installation.md)); from source: `docker compose -f compose.yaml -f compose.build.yaml up --build` or `pnpm dev` |
+| Demo                | Static editor on GitHub Pages, built by a GitHub Actions workflow on each release                                                                                                   |
 
 The demo has no gateway and no AI. It is planned for release 0.2 (see the roadmap).
 
