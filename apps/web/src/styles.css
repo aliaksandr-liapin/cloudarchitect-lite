@@ -476,6 +476,28 @@ table.models caption {
   border-radius: 6px;
   background: var(--ctr);
 }
+/* Generate panel: the replace hint, and the demo's "no AI" callout. */
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--text);
+  font-size: 13px;
+}
+.callout p {
+  margin: 0;
+}
 .notice-inline {
   padding: 8px 12px;
   border-left: 3px solid var(--warning);

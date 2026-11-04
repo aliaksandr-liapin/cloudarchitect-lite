@@ -9,8 +9,9 @@ export const REPO_URL = 'https://github.com/aliaksandr-liapin/cloudarchitect-lit
 export const INSTALL_URL = `${REPO_URL}#install`;
 
 export const DEMO_BANNER = 'Demo: runs entirely in your browser, nothing is sent anywhere.';
+export const DEMO_GENERATE_TITLE = 'This demo has no AI.';
 export const DEMO_GENERATE_MESSAGE =
-  'This demo has no AI. Install CloudArchitect Lite with your own key to generate designs.';
+  'Install CloudArchitect Lite with your own key to generate designs.';
 
 /** What the first validation finding points at (node, else container, else the consuming node of its edge), selected on boot. */
 export function demoBootSelection(project: Project): string | undefined {
