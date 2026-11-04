@@ -1,6 +1,7 @@
 import { modelOption, type ModelChoice } from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
 import { ApiError, api } from './api';
+import { REPO_URL } from './demo';
 import { ModelComparison } from './models';
 
 const STEPS = ['Welcome', 'API key', 'Models', 'Limits', 'Review'] as const;
@@ -150,7 +151,11 @@ export function SetupWizard() {
             <h1>You are all set</h1>
             <p>
               Settings are saved on the server&apos;s data volume and apply immediately. To change
-              them later, see <em>Re-running setup</em> in the installation guide.
+              them later, see{' '}
+              <a href={`${REPO_URL}/blob/main/docs/operations/installation.md#re-running-setup`}>
+                Re-running setup
+              </a>{' '}
+              in the installation guide.
             </p>
             <a className="button primary" href="/">
               Open the editor
@@ -209,11 +214,11 @@ export function SetupWizard() {
                 <p>
                   Create a key at{' '}
                   <a
-                    href="https://console.anthropic.com/settings/keys"
+                    href="https://platform.claude.com/settings/keys"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    console.anthropic.com → API keys
+                    platform.claude.com → API keys
                   </a>
                   . Set a monthly spend limit there as well.
                 </p>

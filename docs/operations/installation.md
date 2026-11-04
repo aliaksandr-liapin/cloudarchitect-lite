@@ -12,11 +12,11 @@ Run CloudArchitect Lite on your own computer or server with Docker. It works the
 
 Check it works: `docker compose version` should print version 2.24 or newer.
 
-You also need an **Anthropic API key** for AI features: [console.anthropic.com → API keys](https://console.anthropic.com/settings/keys). Set a monthly spend limit there. Manual editing, validation and export work without a key.
+You also need an **Anthropic API key** for AI features: [platform.claude.com → API keys](https://platform.claude.com/settings/keys). Set a monthly spend limit there. Manual editing, validation and export work without a key.
 
 ## 2. Install and start
 
-Run one command in an empty folder. It downloads `compose.yaml` and starts the published images; nothing is cloned or built.
+Run one command in an empty folder. It downloads `compose.yaml` and starts the published images; nothing is cloned or built. The terminal stays attached to the app's log; press Ctrl+C to stop, or add `-d` to run it in the background.
 
 **macOS and Linux**
 
@@ -30,7 +30,7 @@ curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-l
 curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml; docker compose up
 ```
 
-The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI). Windows 11 on Arm: hand test by the maintainer before the public release. Windows on Intel/AMD is expected to work but has not been tested by hand.
+The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI, on every release). Windows (Intel/AMD or Arm) runs the same Linux images through Docker Desktop and is expected to work, but has not been tested by hand yet; please [report](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=bug.yml) what you find. Docker Desktop on Windows needs WSL 2 and virtualization; inside a virtual machine (Parallels, VMware, Hyper-V) nested virtualization must be turned on.
 
 ## 3. What you see on first start
 
@@ -56,15 +56,15 @@ Open that link. The wizard has five steps.
 
 <img src="../images/setup-1-welcome.png" alt="Setup step 1: welcome page listing the five steps, with the setup code filled in" width="720">
 
-**2. API key.** Paste your key and press **Check key**; Anthropic confirms it before you can continue.
+**2. API key.** Paste your key and press **Check key**; Anthropic confirms it before you can continue. If the key comes from a `.env` file, this step only shows that it is set.
 
 <img src="../images/setup-2-key.png" alt="Setup step 2: masked API key field with the confirmation 'Key works'" width="720">
 
-**3. Models.** Choose which models your key serves (Claude Haiku 5.5, Claude Sonnet 5.5) and the default. The table shows the measured quality, cost and speed of each.
+**3. Models.** Choose which models the editor can use with your key (Claude Haiku 5.5, Claude Sonnet 5.5) and the default. The table shows the measured quality, cost and speed of each. Models you leave off are shown in the editor but cannot be selected.
 
 <img src="../images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
 
-**4. Limits.** Requests per minute, daily and monthly spending limits. The wizard estimates how many generations the budget covers.
+**4. Limits.** AI requests per minute, daily and monthly spending limits (defaults: 20 per minute, $5 a day, $50 a month). AI stops when a limit is reached; manual editing keeps working. The wizard estimates how many generations the budget covers.
 
 <img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of the generations the monthly budget covers" width="720">
 
@@ -72,7 +72,23 @@ Open that link. The wizard has five steps.
 
 <img src="../images/setup-5-review.png" alt="Setup step 5: summary of key, models, budget and rate limit" width="720">
 
-Settings apply immediately and survive restarts. Then use the editor at <http://localhost:8080>.
+Settings apply immediately and survive restarts. Then press **Open the editor**, or go to <http://localhost:8080>.
+
+## 5. Design your first architecture
+
+The editor opens with a sample diagram, so you can try dragging, resizing, **Auto layout**, the findings list and **Export** right away.
+
+<img src="../images/editor-light.png" alt="Editor with the sample blog architecture: AWS icons in nested cloud and region groups, the Generate panel and three findings on the right" width="720">
+
+1. Describe your application in **Generate from a description**, for example who uses it, how much traffic you expect and what matters most. Optionally switch on design priorities such as **Serverless-first** or **High availability**.
+2. Press **Generate**. The AI asks up to three short questions; pick an answer, type your own, or choose **You decide**. You can also edit the list of requirements before it draws.
+
+   <img src="../images/generate-clarify.png" alt="Clarification card with suggested answers for traffic and thumbnail sizes, and an editable list of requirements" width="720">
+
+3. The design appears after about a minute with Claude Haiku (faster with Sonnet). The 25 built-in rules check it; click a finding's rule id (for example VR-008) to select the component it is about. The previous diagram is kept: use **Restore previous** or **Versions**.
+4. Edit names and layout by hand, then **Export** a PNG or SVG image, or a JSON project you can **Import** later.
+
+Projects are saved in your browser on this computer. Export JSON to back them up or move them to another machine. **Dark mode** is in the top bar.
 
 ## Everyday use
 
@@ -124,14 +140,15 @@ Values in a `.env` file override the wizard; the wizard shows which ones are loc
 
 ## Troubleshooting
 
-| Problem                     | Fix                                                                                                                                                                                                |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Port 8080 is in use         | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                                                                                                            |
-| Lost the setup link         | `docker compose logs gateway`; the code changes on every gateway restart                                                                                                                           |
-| "The setup code is wrong"   | Use the link from the latest log; restarting creates a new code                                                                                                                                    |
-| "Could not reach Anthropic" | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
-| Behind an HTTP(S) proxy     | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
-| AWS icons do not appear     | They need internet on first start; restart the stack with `docker compose restart gateway` once online                                                                                             |
+| Problem                          | Fix                                                                                                                                                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Port 8080 is in use              | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                                                                                                            |
+| Lost the setup link              | `docker compose logs gateway`; the code changes on every gateway restart                                                                                                                           |
+| "The setup code is wrong"        | Use the link from the latest log; restarting creates a new code                                                                                                                                    |
+| "Could not reach Anthropic"      | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
+| Behind an HTTP(S) proxy          | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
+| AWS icons do not appear          | They need internet on first start. Once online, press **Retry** in the editor's icon notice, or run `docker compose restart gateway`                                                               |
+| Docker does not start on Windows | Turn on WSL 2 (`wsl --install` in an administrator PowerShell, then restart). In a virtual machine, turn on nested virtualization in its settings first                                            |
 
 ## Security notes
 

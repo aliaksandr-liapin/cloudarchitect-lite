@@ -1,14 +1,25 @@
-name: Feature request
-description: Propose a new capability
+name: Feature request or improvement
+description: Suggest a new capability, an improvement, or a recommendation (docs, wording, setup flow)
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: Check the [roadmap](https://github.com/aliaksandr-liapin/cloudarchitect-lite/blob/main/docs/product/roadmap.md) and open issues first; if your idea is already there, add a 👍 or a comment instead.
   - type: textarea
     id: problem
-    attributes: { label: Problem, description: Which user need does this address? }
+    attributes:
+      label: Problem
+      description: Who needs this and what are they trying to do? What gets in the way today?
     validations: { required: true }
   - type: textarea
     id: proposal
-    attributes: { label: Proposal }
+    attributes:
+      label: Proposal
+      description: What you would like to happen. A short example helps (a prompt, a diagram, a tool that does it well).
+  - type: textarea
+    id: alternatives
+    attributes: { label: Alternatives you considered }
   - type: input
     id: prd
-    attributes: { label: Related PRD item, description: 'e.g. FR-016, NFR-009, ROADMAP E4' }
+    attributes:
+      { label: Related PRD item or roadmap release (optional), description: 'e.g. FR-021, 0.4' }
