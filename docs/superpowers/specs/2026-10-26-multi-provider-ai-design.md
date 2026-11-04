@@ -9,8 +9,8 @@ Phase 3 was re-scoped on 2026-10-26 by the product owner:
 
 - CloudArchitect Lite is a **free, open-source, self-hosted** tool. Each user brings their own AI key
   and pays their provider directly; the maintainer pays nothing to run it.
-- The goal is a public showcase for the maintainer's personal brand (LinkedIn launch, GitHub stars
-  and forks, visibility to engineers and recruiters). The repository itself is part of the product.
+- The project is built in the open: the repository, its docs, tests and benchmarks are part of
+  the product.
 - On 2026-10-27 delivery moved to small public releases (`docs/product/roadmap.md` §2). This design
   is release **0.3** ("Claude vs GPT vs Gemini"), after the 0.2 public MVP (launch polish and
   PNG/SVG/JSON export). Review and Mermaid export follow in 0.4.

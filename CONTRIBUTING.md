@@ -106,6 +106,10 @@ need your own key to contribute.
 Significant decisions get an ADR in [`docs/adr/`](docs/adr/) (copy the format of an existing one).
 Update the product docs when behavior changes.
 
+## Releases
+
+Maintainers ship versions as described in [Releasing](docs/operations/releasing.md).
+
 ## License
 
 CloudArchitect Lite is licensed under [Apache-2.0](LICENSE). By opening a pull request you agree
