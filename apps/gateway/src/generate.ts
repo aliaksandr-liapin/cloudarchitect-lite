@@ -4,14 +4,17 @@ import {
   DesignToggles,
   GenerateRequest,
   ModelChoice,
+  modelOption,
   Question,
   Requirement,
   type GenerateResponse,
   type Project,
+  type Provider,
 } from '@cloudarchitect/domain';
 import {
   callUsage,
   extract,
+  extractionModel,
   generateArchitecture,
   GenerationError,
   type CallUsage,
@@ -21,7 +24,7 @@ import type { Context, Hono } from 'hono';
 import type { UnofficialStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import type { Env } from './app.js';
-import type { Config } from './config.js';
+import { effectiveModels, providerKey, type Config } from './config.js';
 import {
   OPERATION_TTL_MS,
   OperationTokenError,
@@ -38,7 +41,7 @@ export interface GenerateDeps {
   store: SpendStore;
   log: (event: Record<string, unknown>) => void;
   aiAvailable: () => Promise<boolean>;
-  llm: (apiKey: string) => LlmClient;
+  llm: (provider: Provider, apiKey: string) => LlmClient;
   now: () => number;
 }
 
@@ -170,16 +173,24 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
   const { cfg, setup } = deps;
   const secret = () => `operation-token:${cfg().CLIENT_KEY_SALT}`;
 
-  /** Model, key and spending-limit checks shared by both routes; returns a response to stop. */
-  async function precheck(c: Ctx, op: Operation, model: ModelChoice) {
-    const stop = (outcome: string, res: Response) => (op.finish(outcome), res);
+  /**
+   * Model, key and spending-limit checks shared by both routes. Returns a response to stop, or the
+   * client for the model's provider, tracked so every call counts against the shared limits.
+   */
+  async function precheck(
+    c: Ctx,
+    op: Operation,
+    model: ModelChoice,
+  ): Promise<{ stop: Response } | { llm: LlmClient; provider: Provider }> {
+    const stop = (outcome: string, res: Response) => (op.finish(outcome), { stop: res });
     if (!cfg().AI_MODELS.includes(model))
       return stop('model_not_enabled', c.json({ error: 'model_not_enabled', model }, 403));
-    if (!cfg().ANTHROPIC_API_KEY)
-      return stop('setup_required', c.json({ error: 'setup_required' }, 503));
+    const provider = modelOption(model).provider;
+    const key = providerKey(cfg(), provider);
+    if (!key) return stop('setup_required', c.json({ error: 'setup_required' }, 503));
     if (!(await deps.aiAvailable()))
       return stop('ai_unavailable', c.json({ error: 'ai_unavailable' }, 503));
-    return null;
+    return { llm: op.tracked(deps.llm(provider, key)), provider };
   }
 
   const setupRequired = (c: Ctx, op: Operation) => {
@@ -222,10 +233,15 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     const body = parsed.data;
     const stopped = setupRequired(c, op);
     if (stopped) return stopped;
-    const model = body.model ?? cfg().DEFAULT_MODEL;
+    // Without a requested model, the default; none when no enabled model has a provider key.
+    const model = body.model ?? effectiveModels(cfg()).defaultModel;
+    if (!model) {
+      op.finish('setup_required');
+      return c.json({ error: 'setup_required' }, 503);
+    }
     op.model = model;
-    const blocked = await precheck(c, op, model);
-    if (blocked) return blocked;
+    const checked = await precheck(c, op, model);
+    if ('stop' in checked) return checked.stop;
     if (body.catalogVersion !== awsCatalog.manifest.catalogVersion) {
       op.finish('catalog_mismatch');
       return c.json({ error: 'catalog_mismatch' }, 409);
@@ -233,10 +249,14 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
 
     // The client's disconnect signal is deliberately not forwarded: a started call finishes so it is
     // priced and counted, no new call starts after a disconnect, and `deliver` reports the client as closed.
-    const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
+    const { llm, provider } = checked;
     let project: Project;
     try {
-      const extracted = await extract(llm, { prompt: body.prompt, toggles: body.toggles });
+      const extracted = await extract(
+        llm,
+        { prompt: body.prompt, toggles: body.toggles },
+        extractionModel(provider),
+      );
       if (extracted.questions.length || body.reviewRequirements) {
         const operationId = crypto.randomUUID();
         const state: OperationState = {
@@ -306,10 +326,10 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     if (!state.success) return rejectOperation();
     const { model, toggles, prompt, name, assumptions, questions } = state.data;
     op.model = model;
-    const blocked = await precheck(c, op, model);
-    if (blocked) return blocked;
+    const checked = await precheck(c, op, model);
+    if ('stop' in checked) return checked.stop;
 
-    const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
+    const { llm } = checked;
     let project: Project;
     try {
       ({ project } = await generateArchitecture(llm, awsCatalog, {

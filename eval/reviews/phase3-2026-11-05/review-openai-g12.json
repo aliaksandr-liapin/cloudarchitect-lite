@@ -1,0 +1,258 @@
+{
+  "reviews": [
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Private CloudFront access is stated but not specified: identify an S3 REST origin, Origin Access Control, a distribution-scoped bucket policy, and S3 Block Public Access.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The content recovery and operational response paths are unspecified; S3 versioning, a simple rollback procedure, and an alarm notification destination would improve maintainability without introducing servers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A suitable, inexpensive serverless architecture covers the bakery's requirements, with a few private-origin and operational details left to specify."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The inferred short publication-delay requirement is not implemented by any stated cache policy: uploading a replacement S3 object does not itself invalidate an existing CloudFront cache entry. Specify suitable HTML cache lifetimes or an invalidation workflow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms are included, but their notification destination and the person responsible for responding are not identified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-matched low-cost design adds explicit private-origin access, scoped content updates, and versioning, but needs a cache-refresh policy and actionable notifications."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Private worker nodes have no specified outbound path or VPC endpoints for image pulls, telemetry delivery, and AWS API calls, including STS for IRSA. Add an appropriate NAT or endpoint design; private subnet placement alone does not provide these connections.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the Kubernetes ingress integration, normally the AWS Load Balancer Controller, and whether ALB target groups use pod IPs or worker-node NodePorts; the worker-node arrows alone leave this implementation ambiguous.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "MySQL transport encryption, database credential handling, and database/cache security-group restrictions are not specified, despite the otherwise useful IRSA and at-rest encryption controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "HPA and node expansion are requirements but lack a concrete metrics and node-autoscaling implementation; identify the required metrics source and a node-capacity mechanism such as Karpenter or Cluster Autoscaler.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Confirm that the existing services already emit distributed traces and propagate trace context, or identify the required instrumentation changes; deploying an OpenTelemetry collector alone does not establish end-to-end application tracing.",
+          "evidence": ""
+        }
+      ],
+      "summary": "EKS, managed data services, workload identity, and AWS-native telemetry fit the migration well, but private-node connectivity and several deployment controls remain incomplete."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Mandatory Cognito authentication is introduced without a user requirement or a marked assumption. An ALB authenticate action changes unauthenticated request behavior and can require application or client changes, undermining the minimal-change migration goal; preserve existing authentication unless this change is explicitly accepted.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "RDS and Redis encryption at rest is not specified. Explicitly configure encryption for both data services rather than treating private subnet placement as sufficient data protection.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html ; https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB-to-EKS-cluster edge is an ambiguous workload abstraction, not an implementable target-group definition. Show the frontend Kubernetes Service/Ingress, controller, target type, backend port, and actual pod or node targets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Workload AWS permissions, database/cache credential delivery, security-group restrictions, and TLS for database/cache connections are not defined.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch and X-Ray are selected, but collection agents or collectors, their permissions, alarm actions, and retention settings are unspecified; instrumented services still need an explicit telemetry delivery path.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The EKS, RDS, Redis, and per-AZ NAT foundation is appropriate, but unrequested authentication and incomplete security and workload integration details weaken the minimal-change migration."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Customer-managed encryption is established for RDS and the archive bucket, but not for every other data-bearing component, including CloudWatch logs, secrets, images, and task storage. Additionally, Cognito user-pool data encryption uses service-controlled keys, so the absolute customer-controlled-key requirement needs an explicit scope exception or a different identity approach.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html ; https://docs.aws.amazon.com/cognito/latest/developerguide/data-protection.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The archive rationale incorrectly presents KMS encryption and S3 versioning as establishing audit-log tamper evidence. Those controls are not a substitute for CloudTrail log-file integrity validation and verification; relying on that assurance could leave administrative log modification or deletion undetected.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+        },
+        {
+          "severity": "major",
+          "description": "The account-wide audit requirement needs explicit trail scope: a multi-Region trail covering read and write management events and global service events, with defined retention. A regionally placed CloudTrail node and an S3 delivery edge do not establish this coverage.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html"
+        },
+        {
+          "severity": "major",
+          "description": "The stated Availability Zone failure tolerance is not reflected in the app and egress topology: tasks and the only NAT gateway are shown in AZ A. Specify ECS service placement across both private subnets, both ALB subnet associations, and resilient egress or suitable endpoints.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html ; https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that signed/scanned ECR images require configured supply-chain controls and do not themselves guarantee the absence of embedded credentials; the secure secret-injection design should be supported by build-time checks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Route 53 resolution edge is incorrectly labelled HTTPS. Show ordinary DNS separately, and clarify whether encrypted client DNS is actually included in the bank's TLS-everywhere requirement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The private Fargate, HTTPS backend, secrets, database, and audit-storage foundation is strong, but CMK coverage and audit scope are incomplete and the tamper-evidence assurance is unsafe."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 0,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The ALB-to-container connection is explicitly HTTP, directly violating TLS everywhere and leaving an application-data hop unencrypted. Use an HTTPS target group and configure TLS termination in the container workload.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudFront is connected to an ALB in private subnets without specifying a CloudFront VPC origin. Private ALBs are supported through VPC origins, but a conventional public/custom-origin configuration cannot reach this private endpoint; explicitly configure the VPC-origin integration and the ALB's required multi-AZ subnet associations.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html ; https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "An isolated KMS node does not implement encryption at rest: no customer-managed-key associations are specified for application storage, task storage, or logs. Cognito user-pool encryption also uses service-controlled keys, which conflicts with the unqualified customer-controlled-key requirement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html ; https://docs.aws.amazon.com/cognito/latest/developerguide/data-protection.html"
+        },
+        {
+          "severity": "major",
+          "description": "Customer-to-Cognito sign-in is shown, but no ALB authentication action or application/API token-validation path binds that identity to portal access. Merely providing a user pool with MFA does not enforce authentication on web or API requests.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html ; https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudTrail has no configured durable trail or event-data-store destination, retention policy, or account-wide event scope. The service node alone does not establish the requested full administrative audit trail; default event history is limited to 90 days of management events.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html ; https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the ECS execution capacity, task/service configuration, placement across both private subnets, image-pull and telemetry connectivity, and actual log/metric delivery to CloudWatch; the current ECS and CloudWatch nodes leave these operational paths undefined.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DNS query is labelled HTTPS without an encrypted-DNS design; distinguish DNS resolution from HTTPS application traffic.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design names relevant security services but leaves key enforcement and audit integrations undefined, and its explicit HTTP backend violates a mandatory security requirement."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Both satisfy the simple serverless hosting need, but B more explicitly establishes private S3 access, scoped staff updates, and versioned content recovery without materially increasing infrastructure cost."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A better preserves existing application behavior and specifies workload identity, encryption, recovery, and scaling; B has useful explicit egress but adds unrequested authentication and leaves more security controls undefined."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "A provides HTTPS to actual private container tasks and the database, secrets management, and a durable audit destination, whereas B explicitly uses HTTP internally and omits authentication enforcement and private-origin integration; A still requires correction of its audit assurance and CMK coverage."
+    }
+  ]
+}

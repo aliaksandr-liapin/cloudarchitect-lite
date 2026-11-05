@@ -33,7 +33,7 @@ describe('extract', () => {
         q('notifications'),
       ],
     });
-    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-haiku-5-5');
     expect(r.questions.map((x) => x.topic)).toEqual(['auth-methods', 'user-scale', 'compliance']);
     expect(r.requirements[0]?.provenance).toBe('ai');
     expect(r.usage).toHaveLength(1);
@@ -45,17 +45,27 @@ describe('extract', () => {
     expect(allowedTopics({ disasterRecovery: 'multi-az' })).not.toContain('availability-target');
     expect(allowedTopics({})).toContain('availability-target');
     const { llm } = fake({ ...base, questions: [q('availability-target'), q('user-scale')] });
-    const r = await extract(llm, { prompt: 'a shop', toggles: { highAvailability: true } });
+    const r = await extract(
+      llm,
+      { prompt: 'a shop', toggles: { highAvailability: true } },
+      'claude-haiku-5-5',
+    );
     expect(r.questions.map((x) => x.topic)).toEqual(['user-scale']);
   });
 
-  it('always uses Haiku', async () => {
+  it('sends the request to the given extraction model', async () => {
     const { llm, requests } = fake({ ...base, questions: [] });
-    await extract(llm, { prompt: 'a shop', toggles: { backups: true } });
+    await extract(llm, { prompt: 'a shop', toggles: { backups: true } }, 'claude-haiku-5-5');
     expect(requests[0]?.model).toBe('claude-haiku-5-5');
     expect(requests[0]?.maxTokens).toBe(4000);
     expect(requests[0]?.effort).toBe('low');
     expect(requests[0]?.system).toContain('Backups');
+  });
+
+  it('uses the model argument, not a fixed model', async () => {
+    const { llm, requests } = fake({ ...base, questions: [] });
+    await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-sonnet-5-5');
+    expect(requests[0]?.model).toBe('claude-sonnet-5-5');
   });
 
   it('drops questions with fewer than 2 suggestions and keeps at most 4', async () => {
@@ -67,7 +77,7 @@ describe('extract', () => {
         { topic: 'compliance', text: 'Which?', suggestions: ['', '  ', 'GDPR'] },
       ],
     });
-    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-haiku-5-5');
     expect(r.questions.map((x) => x.topic)).toEqual(['user-scale']);
     expect(r.questions[0]?.suggestions).toEqual(['1', '2', '3', '4']);
   });
@@ -79,7 +89,7 @@ describe('extract', () => {
         { topic: 'user-scale', text: 'q'.repeat(600), suggestions: ['s'.repeat(150), 'b'] },
       ],
     });
-    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-haiku-5-5');
     expect(r.questions[0]?.text).toHaveLength(500);
     expect(r.questions[0]?.suggestions[0]).toHaveLength(120);
     expect(() => Question.array().parse(r.questions)).not.toThrow();
@@ -97,7 +107,7 @@ describe('extract', () => {
       requirements: [req('R1', 'Sell things'), req('R2', '   '), req('R3', 'x'.repeat(2500))],
       questions: [],
     });
-    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-haiku-5-5');
     expect(r.requirements.map((x) => x.id)).toEqual(['R1', 'R3']);
     expect(r.requirements[1]?.text).toHaveLength(2000);
   });
@@ -109,7 +119,7 @@ describe('extract', () => {
       requirements: [req('R1'), req('R1'), req('C-auth'), req('T-backups'), req('R2'), req('')],
       questions: [],
     });
-    const r = await extract(llm, { prompt: 'a shop', toggles: {} });
+    const r = await extract(llm, { prompt: 'a shop', toggles: {} }, 'claude-haiku-5-5');
     expect(r.requirements.map((x) => x.id)).toEqual(['R1', 'R3', 'R4', 'R5', 'R2', 'R6']);
     expect(r.requirements[1]?.text).toBe('Req R1');
     expect(() => Requirement.array().parse(r.requirements)).not.toThrow();
@@ -117,15 +127,17 @@ describe('extract', () => {
 
   it('throws GenerationError on invalid JSON and carries usage', async () => {
     const { llm } = fake(null, 'not json');
-    const err = await extract(llm, { prompt: 'x', toggles: {} }).catch((e: unknown) => e);
+    const err = await extract(llm, { prompt: 'x', toggles: {} }, 'claude-haiku-5-5').catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(GenerationError);
     expect((err as GenerationError).usage[0]?.usage).toEqual(usage);
   });
 
   it('throws GenerationError on schema-invalid JSON', async () => {
     const { llm } = fake({ name: 'x' });
-    await expect(extract(llm, { prompt: 'x', toggles: {} })).rejects.toBeInstanceOf(
-      GenerationError,
-    );
+    await expect(
+      extract(llm, { prompt: 'x', toggles: {} }, 'claude-haiku-5-5'),
+    ).rejects.toBeInstanceOf(GenerationError);
   });
 });

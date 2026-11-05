@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The audit trail is weaker than the stated 7-year, tamper-evident requirement. The per-step history lives only in Step Functions execution history, which is kept for a limited time (90 days). CloudTrail records API calls, not business transitions. The audit bucket has versioning only, with no S3 Object Lock/WORM retention, and claim status in DynamoDB is overwritten in place with no append-only business audit record.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Claim creation in DynamoDB and the Step Functions start are separate writes from one Lambda with no outbox or reconciler. A crash between them can leave a claim with no workflow, and only a client retry would repair it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DLQ is only a target for failed-execution events, so there is no replay or redrive path. The task token is stored in the claims table with no stated protection. Customer and adjuster sign-in edges to Cognito are not drawn.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The EventBridge rule delivers to an SQS queue encrypted with a customer managed key. The key policy must allow events.amazonaws.com, and this is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound Step Functions task-token design with auth, WAF, CMK encryption and failure alarms, but its audit and tamper-evidence story rests on CloudTrail and a limited-retention execution history."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design is heavier than an MVP needs, with an outbox, stream dispatcher, reconciler, schedule and archive. This adds operational surface and cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "One Lambda codebase and role handles the API, checks, decisions and email, which weakens least-privilege separation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Object Lock compliance mode on claim documents is irreversible and may conflict with deletion obligations. No retention period is given.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong, defensible design that handles resume-after-failure and durable audit well: transactional outbox, deterministic execution names, reconciliation, an Object Lock audit archive and MFA for adjusters. The cost is some over-engineering."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no edge for the author upload, only the Lambda-to-S3 presign edge, and no author sign-in edge to Cognito. The photo upload path is therefore not fully drawn.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Originals, thumbnails and site assets share one bucket served via CloudFront OAC, so the uploads/ prefix may be publicly readable through CloudFront. The S3 notification prefix filter is stated, which avoids recursion.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DynamoDB stream relay has no failure destination or DLQ. The design uses three Lambdas and four queues, which is somewhat elaborate for a low-cost blog.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Complete and well-connected serverless blog. CloudFront serves the site, photos and cached reads, with SQS buffering and DLQs for both email and thumbnails. Minor gaps in the drawn upload path and the shared bucket."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The photo bucket has no read path. CloudFront only fronts the static site bucket and the API, and the photo bucket is private, so readers cannot fetch photos or thumbnails.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The S3-to-Thumbnail Lambda trigger writes thumbnails back to the same bucket. No prefix filter is stated, so a recursive invocation loop is possible.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito authorizer is described for the whole API and subscribers are in the same pool, so public read and subscribe routes are ambiguous. Stream retries could send duplicate welcome emails because no idempotency is described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single shared failed-events queue holds both email and thumbnail failures. The claim that REST is the only API type WAF can protect holds only among API Gateway types.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Lean and cheap, but it omits the delivery path for photos and thumbnails, and idempotency, recursion guards and auth scoping are unclear."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The scoring Lambda runs in a private subnet in one AZ, yet it must reach DynamoDB, CloudWatch and the SageMaker runtime. Only the SageMaker edge mentions a VPC endpoint, and there is no DynamoDB gateway endpoint, CloudWatch Logs endpoint or NAT. The store-score step would fail as drawn.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Lambda sits in AZ1 only, which undermines the stated two-AZ high-availability goal.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The endpoint is shown placed in a single AZ2 subnet although it is described as multi-AZ.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Retraining rolls out the new model with no evaluation or approval gate. There is no failure capture for the monthly schedule and no workflow-to-CloudWatch edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong on encryption, backups, model-version traceability and private networking intent, but the VPC networking is incomplete and single-AZ, so the checkout path would not work as drawn."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no PITR or backup configured on the transactions table. S3 versioning is not enabled for model artifacts and encryption is AWS-managed only. Multi-AZ endpoint instance counts and a model registry are not stated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "HTTP API with IAM authorization requires SigV4 credentials for the caller, which suits a server-side payment app but is awkward for browser clients. HTTP APIs cannot use WAF.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Lambda starter between EventBridge and SageMaker Pipelines is optional, since the pipeline could be the direct rule target.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, working design with idempotent conditional writes, retry-safe scoring, an evaluation-gated retraining pipeline, failure capture and monitoring. Its data-protection settings are lighter than A's."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "B provides a durable, tamper-resistant business audit trail (outbox, Object Lock archive) and explicit reconciliation for resume-after-failure. A relies on execution history and CloudTrail alone for the 7-year audit requirement."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A has a complete read path for the site, photos and thumbnails via CloudFront, plus buffered, retryable email and thumbnail pipelines with DLQs. B omits photo delivery."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "B's checkout path works as drawn and handles retries idempotently. It also adds a gated retraining pipeline with failure capture. A's VPC-attached Lambda lacks the endpoints to reach DynamoDB and sits in a single AZ, though A has better encryption and backups."
+    }
+  ]
+}

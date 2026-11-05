@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Running all 12 existing microservices on EKS with AWS Fargate conflicts with the requirement for minimal tooling and Helm chart changes and with the stated observability approach: Fargate does not support DaemonSets (so standard Fluent Bit, CloudWatch Container Insights, and OpenTelemetry node agents cannot run as DaemonSets and must be injected as sidecars in every pod), and ALB Ingress on Fargate requires IP-mode target annotations.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Enforcing Amazon Cognito OIDC authentication directly on the public ALB listener rules was not requested and would block unauthenticated public web frontend visitors unless carefully scoped.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Public ALB is placed only inside Public subnet A in the container tree rather than spanning both public subnets, and no container registry (such as ECR) is included.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers all functional and security requirements well (including WAF, KMS, Secrets Manager, and Multi-AZ data stores), but choosing EKS on Fargate instead of managed EC2 nodes breaks DaemonSet-based logging/metrics agents and requires modifying existing Helm charts."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Shared Redis cache (ElastiCache) is deployed as a single-zone node without a cross-AZ replica or automatic failover; while the rationale explicitly notes this trade-off, an AZ A outage would cause a total cache loss and potential overload on MySQL across all 12 services.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database and cache credential management (such as AWS Secrets Manager or Parameter Store) is not included in the architecture.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Public HTTPS ALB is placed only in Public subnet A in the container hierarchy despite its rationale stating it spans both zones, and no container image registry (ECR) is shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a pragmatic, highly compatible lift-and-shift architecture using EKS Managed Node Groups that preserves existing Helm charts and DaemonSet telemetry collectors without modification, though it opts for a single-AZ Redis cache and omits managed secrets storage."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design uses ALB built-in Cognito authentication (`Application Load Balancer -> Cognito user pool`) for B2B REST API clients; ALB `authenticate-cognito` relies on interactive browser HTTP 302 redirects to a login UI and session cookies (`AWSELBAuthSessionCookie`), which does not work for programmatic B2B REST API clients sending Bearer tokens.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design injects rotated database credentials from Secrets Manager into Fargate tasks (`Secrets Manager -> API tasks (Fargate): Inject database and payments credentials`); ECS secret injection only resolves secrets at container startup, so automatic rotation in Secrets Manager will cause running tasks to fail authentication when the old password expires unless the application fetches secrets dynamically via the AWS SDK.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/specifying-sensitive-data-secrets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Container image registry (ECR) is marked as an UNRESOLVED service node, the Amazon ECS service/cluster orchestrating the Fargate tasks is omitted, and ACM is omitted for the HTTPS ALB.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API tasks (Fargate) B has no edge to CloudWatch for logs and metrics, and the edges from Fargate tasks A and B to Aurora and ElastiCache inconsistently use `read` for AZ A and `write` for AZ B.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A uses a clean Multi-AZ VPC topology with Fargate, Aurora, and ElastiCache, but fails on B2B API authentication by using interactive browser-based ALB Cognito redirects and breaks during credential rotation by relying on static container-startup secret injection."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "API Gateway is configured as a REST API (`apiType: REST`) and connected directly to an internal Application Load Balancer via a VPC Link (`API Gateway REST API -> Internal Application Load Balancer (invoke, VPC Link)`); API Gateway REST API private integrations (VPC Link v1) only support Network Load Balancers as targets, whereas direct ALB VPC Links (v2) are only supported by HTTP APIs.",
+          "evidence": "https://docs.aws.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "The `Database credential rotation function` (AWS Lambda) is placed in the Region container outside the VPC rather than in the private subnets, so it has no network path to connect to the private `Aurora PostgreSQL` cluster in `Private data subnet A` to perform credential rotation.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Both NAT Gateway nodes (`NAT Gateway — AZ A` and `NAT Gateway — AZ B`) have zero edges connected to them; the Fargate tasks connect directly to the external `Payments provider` node.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Edges from the Fargate tasks to Aurora PostgreSQL and ElastiCache are labeled only as `read` even though their descriptions state `Read and write`, and no ECR image registry is included.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B models three-tier subnet isolation, SDK-based secret retrieval, and rotation monitoring well, but specifies an unsupported API Gateway REST API VPC Link directly to an internal ALB, places the DB rotation Lambda outside the VPC where it cannot reach private Aurora, and leaves both NAT Gateway nodes disconnected."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "CloudWatch only has a single edge pointing to `OrderPlaced Topic` to represent metrics and DLQ depth alarms rather than connecting to the four SQS dead-letter queues being monitored.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SNS subscriptions to the three SQS queues do not mention an SNS subscription dead-letter queue (redrive policy) in case fan-out delivery from SNS to SQS fails.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A is a thorough, production-grade serverless event-driven architecture that pairs a DynamoDB Streams transactional outbox and SNS-to-SQS fan-out with a dedicated Inventory table for atomic stock reservation, Secrets Manager for payment credentials, and complete DLQ coverage."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "`Inventory handler` writes directly to the `Orders table` (which is keyed by `orderId`) to reserve stock without a dedicated inventory/stock table keyed by product ID or an explanation of a single-table design.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No secrets store (such as AWS Secrets Manager or Systems Manager Parameter Store) is included to hold the third-party payment provider API credentials used by `Payment handler`.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No edge is shown between `Shop client` and `Cognito user pool` for obtaining authentication tokens.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a clean, reliable serverless architecture using DynamoDB Streams, SNS fan-out, independent SQS queues with DLQs, WAF protection, and explicit CloudWatch DLQ alarms, missing only a dedicated inventory store and secrets management for payment credentials."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "B",
+      "why": "Design B uses EKS Managed Node Groups (EC2), which supports existing Helm charts and DaemonSet-based logging/metrics/tracing collectors with minimal tooling change, whereas Design A's choice of EKS Fargate prohibits DaemonSets and forces pod/ingress modifications."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "B",
+      "why": "Both designs contain critical flaws (Design A uses browser-redirect ALB Cognito auth for a B2B API and static startup secret injection that breaks on rotation; Design B connects a REST API VPC Link directly to an ALB instead of an NLB and places the rotation Lambda outside the VPC), but Design B's token authentication flow, SDK secret retrieval, and three-tier VPC architecture are closer to a working B2B SaaS design once the API Gateway integration type and Lambda VPC attachment are fixed."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "Both designs implement the transactional outbox (DynamoDB Streams) and SNS-to-SQS fan-out pattern with DLQs well, but Design A also includes a dedicated DynamoDB Inventory Table for atomic stock reservation and Secrets Manager for external payment gateway credentials."
+    }
+  ]
+}

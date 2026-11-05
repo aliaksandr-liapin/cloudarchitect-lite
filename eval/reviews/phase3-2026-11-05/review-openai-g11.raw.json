@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Creating a claim and starting its workflow, or recording a decision and delivering its callback, are separate writes without a durable dispatch record or reconciliation mechanism. A crash between these operations can strand a claim; deterministic execution names prevent some duplicates but do not repair missing dispatches.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "The seven-year, per-step business audit is not sufficiently defined. Step Functions execution history expires, while CloudTrail resource-access records and mutable claim records do not establish a retained business-transition archive; execution-log contents and retention are also unspecified.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify an upload-finalization operation that verifies completed documents and binds their object versions before starting automated checks; the combined create/upload-URL/start handler leaves this sequencing ambiguous.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make per-route customer-versus-adjuster authorization and claim-ownership checks explicit; separate user pools and valid JWTs alone do not describe these application permissions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document the email send/acknowledgment ambiguity: a notification-sent flag suppresses known repeats but cannot make SES acceptance and the DynamoDB update atomic.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The service choices are appropriate, but crash-consistent workflow dispatch and a retained business audit need substantial strengthening."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Specify actual document and audit retention durations, deletion policies, and the assumed regulatory baseline rather than leaving the retention clarification answered only by storage mechanisms.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define the business disposition and customer-notification policy when the 14-day approval window expires; timeout handling is present, but its outcome is not stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the workflow with durable dispatch, reconciliation, authorization, and archived business events, leaving mainly policy decisions to finalize."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The subscriber-stream relay has no specified stream failure destination or reconciliation process. DynamoDB Streams retention is finite, so the downstream SQS queue protects only successfully enqueued jobs; the claim that the stream-based outbox avoids losing events is too strong.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify cache behaviors and keys that cache only public content, bypass authenticated and presigned-URL operations, and define acceptable post-update staleness.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned URL is not an S3 object write by the API handler; show the author's direct HTTPS upload to S3 and distinguish URL signing from object access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design meets the global, low-cost serverless blog requirements well, but the stream-to-email relay still needs durable failure recovery."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "No reader delivery path is defined for originals or thumbnails: CloudFront has only the static-site and API origins, and the photo bucket has neither a CloudFront origin nor another authorized download mechanism. Add a private media origin and corresponding cache behavior.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes into its triggering bucket without a specified input-prefix filter or separate output bucket. Generated thumbnails can retrigger processing, creating an invocation loop and uncontrolled cost.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The shared DLQ description does not distinguish asynchronous S3 invocation failures from DynamoDB Streams event-source-mapping failures. Streams require their own failure configuration, and an SQS on-failure destination contains invocation metadata rather than a durable copy of the original stream records, so replay after stream expiry is not established.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authors and subscribers share a user pool, but no author-specific scopes, group checks, or application authorization are specified for post writes and upload authorization. A valid user-pool token alone does not distinguish an author from a subscriber.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Define public-read cache keys and TTLs, forward authorization where needed, and explicitly disable caching for authenticated or presigned-URL operations.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core services fit, but media delivery, author authorization, thumbnail loop prevention, and stream failure recovery are insufficiently specified."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The checkout Lambda is placed in a private subnet but must write to DynamoDB, with no DynamoDB VPC endpoint or NAT/egress path provided. Only the SageMaker call mentions a VPC endpoint; as drawn, the required transaction-and-score persistence cannot complete.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The claimed VPC-only inference access is not established by placing the model in a private subnet. Specify the SageMaker Runtime interface endpoint and access policies that restrict invocation through it; model-container VPC connectivity and private access to the inference API are distinct configurations.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/interface-vpc-endpoint.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design claims two-AZ checkout availability but attaches the scoring Lambda only to the AZ1 subnet. Configure the function with private subnets in both Availability Zones rather than relying on the endpoint's stated availability.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Using the transaction ID as a DynamoDB key does not by itself make checkout retries idempotent: an ordinary PutItem replaces the existing item. Specify conditional persistence, retry-payload validation, and returning the committed score so retries cannot overwrite an earlier result after a model change.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Add explicit candidate evaluation and a guarded endpoint rollout with rollback criteria before monthly retraining changes the payment-time model.",
+          "evidence": ""
+        }
+      ],
+      "summary": "SageMaker is the right hosting choice, but the depicted persistence network path is blocking and the HA, private-access, and idempotency claims need correction."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Enable and define transaction-table recovery, such as DynamoDB point-in-time recovery, to protect persisted payment scores against accidental modification or deletion.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the checkout latency budget, bounded inference timeouts and retries, and autoscaling minimum/maximum capacity and targets so scaling delays do not exhaust the synchronous request budget.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Extend the evaluation gate with an explicit production rollout and rollback policy for endpoint updates.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design directly satisfies managed real-time PyTorch serving and monthly retraining with sound persistence and access controls, needing modest recovery and rollout hardening."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "Its transactional outbox, scheduled reconciliation, explicit authorization, and durable business audit better satisfy resumability and per-step auditability."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "It provides a complete cached media-delivery path, separates author authentication, and explicitly prevents thumbnail recursion while buffering asynchronous work."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "It avoids the incomplete private-network topology, defines safe transaction retries and persistence-before-success, and provides evaluated monthly releases with trigger failure capture."
+    }
+  ]
+}

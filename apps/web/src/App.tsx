@@ -42,7 +42,7 @@ import {
   type Routes,
 } from './layout';
 import { DEMO, DEMO_BANNER, REPO_URL, demoBootSelection, demoIconSource } from './demo';
-import { AiModelPanel, readModelChoice } from './models';
+import { AiModelPanel, useModelChoice } from './models';
 import {
   containerIcon,
   loadIcons,
@@ -121,6 +121,7 @@ export function App() {
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
+  const modelState = useModelChoice();
   const [step, setStep] = useState<StepId>();
   const [startedAt, setStartedAt] = useState<number>();
   /** Startup could not read browser storage: edit in memory only, never save over the stored project. */
@@ -446,7 +447,7 @@ export function App() {
               toggles: input.toggles,
               reviewRequirements: input.reviewRequirements,
               catalogVersion: awsCatalog.manifest.catalogVersion,
-              model: readModelChoice(),
+              model: modelState.choice,
             },
             signal,
           ),
@@ -499,8 +500,8 @@ export function App() {
 
   // Typical wait for the chosen model (benchmark median), shown next to the timer.
   const typicalSeconds = Math.round(
-    MODEL_OPTIONS.find((m) => m.id === (readModelChoice() ?? 'haiku'))?.benchmark
-      .medianLatencySeconds ?? 0,
+    MODEL_OPTIONS.find((m) => m.id === (modelState.choice ?? 'haiku'))?.benchmark
+      ?.medianLatencySeconds ?? 0,
   );
 
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
@@ -898,7 +899,7 @@ export function App() {
               disabled={busy}
               openSignal={versionsAdded}
             />
-            <AiModelPanel />
+            <AiModelPanel state={modelState} />
             <p className="muted small">
               Generated designs require professional review before production use.{' '}
               {iconState === 'ready'

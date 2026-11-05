@@ -34,7 +34,7 @@ body:
     id: version
     attributes:
       label: Version or commit
-      description: The image tag in compose.yaml (for example 0.2.1), a commit, or "demo".
+      description: The image tag in compose.yaml (for example 0.3.0), a commit, or "demo".
   - type: input
     id: environment
     attributes:

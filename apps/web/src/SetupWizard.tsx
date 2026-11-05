@@ -1,18 +1,27 @@
-import { modelOption, type ModelChoice } from '@cloudarchitect/domain';
+import {
+  listedModels,
+  modelOption,
+  PROVIDER_LABEL,
+  PROVIDERS,
+  type ModelChoice,
+  type ModelOption,
+  type Provider,
+} from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
-import { ApiError, api } from './api';
+import { ApiError, api, type KeySource } from './api';
 import { REPO_URL } from './demo';
-import { ModelComparison } from './models';
+import { ModelGroups } from './models';
 
-const STEPS = ['Welcome', 'API key', 'Models', 'Limits', 'Review'] as const;
+const STEPS = ['Welcome', 'AI providers', 'Models', 'Limits', 'Review'] as const;
 
 const MESSAGES: Record<string, string> = {
   invalid_code:
     'The setup code is wrong. Copy the link printed in the terminal where the server runs.',
   invalid_api_key:
-    'Anthropic rejected this API key. Check that it is active and copied completely.',
+    'A provider rejected its API key, or no key was given. Check that each key is active and copied completely.',
   key_check_failed:
-    'Could not reach Anthropic to check the key. Check the internet connection and retry.',
+    'Could not reach a provider to check its key. Check the internet connection and retry.',
+  invalid_settings: 'These settings do not match the available keys. Go back and review them.',
   already_configured: 'Setup was already completed.',
   rate_limited: 'Too many attempts. Wait a minute and try again.',
 };
@@ -20,6 +29,206 @@ const message = (err: unknown) =>
   err instanceof ApiError
     ? (MESSAGES[err.code] ?? `Request failed (${err.code}).`)
     : 'The server is not reachable. Is `docker compose up` still running?';
+
+type CheckState = 'unchecked' | 'checking' | 'valid' | 'invalid' | 'unreachable';
+type Sources = Record<Provider, KeySource>;
+type Checks = Record<Provider, CheckState>;
+type Removed = Record<Provider, boolean>;
+
+const KEY_PAGES: Record<Provider, { href: string; text: string; placeholder: string }> = {
+  anthropic: {
+    href: 'https://platform.claude.com/settings/keys',
+    text: 'platform.claude.com → API keys',
+    placeholder: 'sk-ant-api03-…',
+  },
+  openai: {
+    href: 'https://platform.openai.com/api-keys',
+    text: 'platform.openai.com → API keys',
+    placeholder: 'sk-…',
+  },
+  google: {
+    href: 'https://aistudio.google.com/apikey',
+    text: 'aistudio.google.com → Get API key',
+    placeholder: 'AIza…',
+  },
+};
+
+/** Where each key comes from; a 0.2 server only reports whether the Anthropic key is in the environment. */
+export function keySources(status?: {
+  providers?: Sources;
+  keyFromEnvironment?: boolean;
+}): Sources {
+  return (
+    status?.providers ?? {
+      anthropic: status?.keyFromEnvironment ? 'environment' : 'none',
+      openai: 'none',
+      google: 'none',
+    }
+  );
+}
+
+/** Key sources once the saved keys marked for removal are gone; environment keys cannot be removed. */
+export const afterRemovals = (sources: Sources, removed: Removed): Sources =>
+  Object.fromEntries(
+    PROVIDERS.map((p) => [p, sources[p] === 'saved' && removed[p] ? 'none' : sources[p]]),
+  ) as Sources;
+
+/** Providers whose saved key the server deletes on finish (`removeKeys`). */
+export const removedKeys = (sources: Sources, removed: Removed) =>
+  PROVIDERS.filter((p) => sources[p] === 'saved' && removed[p]);
+
+/** Review line: saved keys removed and not replaced by a new checked key. */
+export const removalSummary = (sources: Sources, removed: Removed, checks: Checks) =>
+  names(
+    removedKeys(sources, removed).filter((p) => checks[p] !== 'valid'),
+    'and',
+  );
+
+/** A provider counts when its key is from the environment, saved, or checked as working in this session. */
+export const hasKey = (sources: Sources, checks: Checks, p: Provider) =>
+  sources[p] !== 'none' || checks[p] === 'valid';
+
+export const keyedProviders = (sources: Sources, checks: Checks) =>
+  PROVIDERS.filter((p) => hasKey(sources, checks, p));
+
+const names = (ps: readonly Provider[], joiner: string) => {
+  const labels = ps.map((p) => PROVIDER_LABEL[p]);
+  return labels.length > 1
+    ? `${labels.slice(0, -1).join(', ')} ${joiner} ${labels.at(-1)}`
+    : (labels[0] ?? '');
+};
+
+export const welcomeKeyLine = (keyed: readonly Provider[]) =>
+  keyed.length
+    ? `Keys found for ${names(keyed, 'and')}. Add keys for other AI providers, or continue.`
+    : `Add an API key for ${names(PROVIDERS, 'or')} (one is enough).`;
+
+/** Review line: which providers are connected and how. */
+export const providerSummary = (sources: Sources, checks: Checks) =>
+  keyedProviders(sources, checks)
+    .map((p) => {
+      const how =
+        sources[p] === 'environment'
+          ? 'from environment'
+          : checks[p] === 'valid'
+            ? 'checked ✓, stored on the server'
+            : 'saved key kept';
+      return `${PROVIDER_LABEL[p]} (${how})`;
+    })
+    .join(', ');
+
+/** Models of providers with a key and a benchmark, the only ones the Models step offers. */
+export const offeredModels = (keyed: readonly Provider[]): ModelOption[] =>
+  listedModels().filter((o) => keyed.includes(o.provider));
+
+/** The configured selection restricted to offered models; the default falls back to the first one left. */
+export function effectiveSelection(
+  models: readonly ModelChoice[],
+  defaultModel: ModelChoice,
+  offered: readonly ModelOption[],
+) {
+  const kept = models.filter((m) => offered.some((o) => o.id === m));
+  return {
+    models: kept,
+    defaultModel: kept.includes(defaultModel) ? defaultModel : kept[0],
+  };
+}
+
+/** Step 2: one card per provider with key field, check button, key page link and result. */
+export function ProvidersStep({
+  sources,
+  keys,
+  checks,
+  removed,
+  onKey,
+  onCheck,
+  onRemove,
+}: {
+  sources: Sources;
+  keys: Record<Provider, string>;
+  checks: Checks;
+  /** Saved keys marked for removal on finish. */
+  removed: Removed;
+  onKey: (p: Provider, value: string) => void;
+  onCheck: (p: Provider) => void;
+  onRemove: (p: Provider, remove: boolean) => void;
+}) {
+  return (
+    <section>
+      <h1>AI providers</h1>
+      <p>
+        Add a key for at least one provider. Each key is used only for that provider&apos;s models,
+        and you can add, replace or remove keys later by re-running setup.
+      </p>
+      <div className="provider-cards">
+        {PROVIDERS.map((p) => {
+          const label = PROVIDER_LABEL[p];
+          const page = KEY_PAGES[p];
+          const check = checks[p];
+          return (
+            <div key={p} className="provider-card">
+              <h2>{label}</h2>
+              {sources[p] === 'environment' ? (
+                <p className="ok">✓ Set by environment (.env). Nothing to enter here.</p>
+              ) : (
+                <>
+                  {sources[p] === 'saved' &&
+                    check !== 'valid' &&
+                    (removed[p] ? (
+                      <p className="notice-inline">
+                        Will be removed when you finish setup.{' '}
+                        <button className="link" onClick={() => onRemove(p, false)}>
+                          Undo
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="ok">
+                        ✓ Saved key. Enter a new one only to replace it.{' '}
+                        <button onClick={() => onRemove(p, true)}>Remove saved key</button>
+                      </p>
+                    ))}
+                  <p className="small">
+                    Create a key at{' '}
+                    <a href={page.href} target="_blank" rel="noreferrer">
+                      {page.text}
+                    </a>
+                    . Set a spend limit there as well.
+                  </p>
+                  <label className="field">
+                    {label} API key
+                    <input
+                      type="password"
+                      value={keys[p]}
+                      onChange={(e) => onKey(p, e.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={page.placeholder}
+                    />
+                  </label>
+                  <button
+                    onClick={() => onCheck(p)}
+                    disabled={keys[p].trim().length < 20 || check === 'checking'}
+                  >
+                    {check === 'checking' ? 'Checking…' : 'Check key'}
+                  </button>{' '}
+                  {check === 'valid' && <span className="ok">✓ Key works</span>}
+                  {check === 'invalid' && <span className="alert-text">Key rejected</span>}
+                  {check === 'unreachable' && (
+                    <span className="alert-text">Could not reach {label}</span>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="muted small">
+        Keys are stored only on this server&apos;s data volume (owner-only file) and are never sent
+        to the browser again or written to logs.
+      </p>
+    </section>
+  );
+}
 
 /**
  * First-run setup for self-hosted installs (ADR-0012). The one-time code from the server log proves
@@ -30,8 +239,21 @@ export function SetupWizard() {
   const [status, setStatus] = useState<Awaited<ReturnType<typeof api.setupStatus>>>();
   const [unreachable, setUnreachable] = useState(false);
   const [code, setCode] = useState(() => new URLSearchParams(location.search).get('code') ?? '');
-  const [apiKey, setApiKey] = useState('');
-  const [keyState, setKeyState] = useState<'unchecked' | 'checking' | 'valid'>('unchecked');
+  const [keys, setKeys] = useState<Record<Provider, string>>({
+    anthropic: '',
+    openai: '',
+    google: '',
+  });
+  const [checks, setChecks] = useState<Checks>({
+    anthropic: 'unchecked',
+    openai: 'unchecked',
+    google: 'unchecked',
+  });
+  const [removed, setRemoved] = useState<Removed>({
+    anthropic: false,
+    openai: false,
+    google: false,
+  });
   const [models, setModels] = useState<ModelChoice[]>(['haiku']);
   const [defaultModel, setDefaultModel] = useState<ModelChoice>('haiku');
   const [dailyBudgetUsd, setDaily] = useState(5);
@@ -58,43 +280,63 @@ export function SetupWizard() {
     );
   }, []);
 
-  const keyReady = status?.keyFromEnvironment || keyState === 'valid';
+  const sources = keySources(status);
+  // Models, "Next" and the review use the keys left after the removals marked in step 2.
+  const remaining = afterRemovals(sources, removed);
+  const keyed = keyedProviders(remaining, checks);
+  const offered = offeredModels(keyed);
+  // The configured models may name providers without a key (raw settings); only offered ones count.
+  const selection = effectiveSelection(models, defaultModel, offered);
+  const chosenDefault = selection.defaultModel;
   const canNext = [
     Boolean(status?.available && !status.configured && code.trim()),
-    keyReady,
-    models.length > 0 && models.includes(defaultModel),
+    keyed.length > 0,
+    selection.models.length > 0 && chosenDefault !== undefined,
     monthlyBudgetUsd >= dailyBudgetUsd && rateLimitPerMinute >= 1,
     true,
   ][step];
 
-  const checkKey = async () => {
+  const setKey = (p: Provider, value: string) => {
+    setKeys((k) => ({ ...k, [p]: value }));
+    setChecks((c) => ({ ...c, [p]: 'unchecked' }));
+  };
+
+  const checkKey = async (p: Provider) => {
     setError(undefined);
-    setKeyState('checking');
+    setChecks((c) => ({ ...c, [p]: 'checking' }));
     try {
-      const { result } = await api.verifyKey(code.trim(), apiKey.trim());
-      setKeyState(result === 'valid' ? 'valid' : 'unchecked');
-      if (result !== 'valid')
-        setError(MESSAGES[result === 'invalid' ? 'invalid_api_key' : 'key_check_failed']);
+      const { result } = await api.verifyKey(code.trim(), p, keys[p].trim());
+      setChecks((c) => ({ ...c, [p]: result }));
     } catch (err) {
-      setKeyState('unchecked');
+      setChecks((c) => ({ ...c, [p]: 'unchecked' }));
       setError(message(err));
     }
   };
 
   const finish = async () => {
+    if (!chosenDefault) return;
     setBusy(true);
     setError(undefined);
     try {
+      // Only keys checked in this session are sent; saved and environment keys stay where they are.
+      const apiKeys = Object.fromEntries(
+        PROVIDERS.filter((p) => sources[p] !== 'environment' && checks[p] === 'valid').map((p) => [
+          p,
+          keys[p].trim(),
+        ]),
+      );
+      const removeKeys = removedKeys(sources, removed);
       await api.completeSetup({
         code: code.trim(),
-        ...(status?.keyFromEnvironment ? {} : { apiKey: apiKey.trim() }),
-        models,
-        defaultModel,
+        ...(Object.keys(apiKeys).length ? { apiKeys } : {}),
+        ...(removeKeys.length ? { removeKeys } : {}),
+        models: selection.models,
+        defaultModel: chosenDefault,
         dailyBudgetUsd,
         monthlyBudgetUsd,
         rateLimitPerMinute,
       });
-      setApiKey('');
+      setKeys({ anthropic: '', openai: '', google: '' });
       setDone(true);
     } catch (err) {
       setError(message(err));
@@ -106,13 +348,15 @@ export function SetupWizard() {
   const isLocked = (key: string) => Boolean(status?.lockedByEnvironment?.includes(key));
 
   const toggleModel = (id: ModelChoice) => {
-    const next = models.includes(id) ? models.filter((m) => m !== id) : [...models, id];
+    const current = selection.models;
+    const next = current.includes(id) ? current.filter((m) => m !== id) : [...current, id];
     setModels(next);
-    if (!next.includes(defaultModel) && next[0]) setDefaultModel(next[0]);
+    const keep = chosenDefault && next.includes(chosenDefault) ? chosenDefault : next[0];
+    if (keep) setDefaultModel(keep);
   };
 
-  const cost = modelOption(defaultModel).benchmark.costPerOperationUsd;
-  const generationsPerMonth = Math.floor(monthlyBudgetUsd / cost);
+  const cost = chosenDefault && modelOption(chosenDefault).benchmark?.costPerOperationUsd;
+  const generationsPerMonth = cost === undefined ? undefined : Math.floor(monthlyBudgetUsd / cost);
 
   return (
     <div className="wizard">
@@ -175,10 +419,12 @@ export function SetupWizard() {
               <p>This deployment is configured by its operator; there is nothing to set up here.</p>
             ) : (
               <>
-                <p>Five short steps connect this installation to Claude and set usage limits:</p>
+                <p>
+                  Five short steps connect this installation to an AI provider and set usage limits:
+                </p>
                 <ol>
                   <li>Confirm you can see the server log (setup code).</li>
-                  <li>Add your Anthropic API key.</li>
+                  <li>{welcomeKeyLine(keyed)}</li>
                   <li>Choose which models to offer, based on measured quality and cost.</li>
                   <li>Set limits so usage never exceeds your budget.</li>
                   <li>Review and finish.</li>
@@ -203,77 +449,40 @@ export function SetupWizard() {
             )}
           </section>
         ) : step === 1 ? (
-          <section>
-            <h1>Anthropic API key</h1>
-            {status?.keyFromEnvironment ? (
-              <p className="ok">
-                ✓ A key is provided by the environment (.env). Nothing to enter here.
-              </p>
-            ) : (
-              <>
-                <p>
-                  Create a key at{' '}
-                  <a
-                    href="https://platform.claude.com/settings/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    platform.claude.com → API keys
-                  </a>
-                  . Set a monthly spend limit there as well.
-                </p>
-                <label className="field">
-                  API key
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => {
-                      setApiKey(e.target.value);
-                      setKeyState('unchecked');
-                    }}
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder="sk-ant-api03-…"
-                  />
-                </label>
-                <button
-                  onClick={checkKey}
-                  disabled={apiKey.trim().length < 20 || keyState === 'checking'}
-                >
-                  {keyState === 'checking' ? 'Checking…' : 'Check key'}
-                </button>{' '}
-                {keyState === 'valid' && <span className="ok">✓ Key works</span>}
-                <p className="muted small">
-                  The key is stored only on this server&apos;s data volume (owner-only file) and is
-                  never sent to the browser again or written to logs.
-                </p>
-              </>
-            )}
-          </section>
+          <ProvidersStep
+            sources={sources}
+            keys={keys}
+            checks={checks}
+            removed={removed}
+            onKey={setKey}
+            onCheck={checkKey}
+            onRemove={(p, remove) => setRemoved((r) => ({ ...r, [p]: remove }))}
+          />
         ) : step === 2 ? (
           <section>
             <h1>Models</h1>
             <p>
-              Choose which models the editor can use with your key. Models you leave off are shown
-              in the editor but cannot be selected.
+              Choose which models the editor can use with your keys. Only providers with a key are
+              listed. Models you leave off are shown in the editor but cannot be selected.
             </p>
             <Locked status={status} keys={['AI_MODELS', 'DEFAULT_MODEL']} />
             <div className="choices">
-              {(['haiku', 'sonnet'] as const).map((id) => (
-                <label key={id} className="choice">
+              {offered.map((o) => (
+                <label key={o.id} className="choice">
                   <input
                     type="checkbox"
-                    checked={models.includes(id)}
+                    checked={selection.models.includes(o.id)}
                     disabled={isLocked('AI_MODELS')}
-                    onChange={() => toggleModel(id)}
+                    onChange={() => toggleModel(o.id)}
                   />
-                  {modelOption(id).label}
+                  {o.label}
                 </label>
               ))}
             </div>
-            <ModelComparison
-              selected={defaultModel}
-              enabled={models}
+            <ModelGroups
+              options={offered}
+              selected={chosenDefault}
+              enabled={selection.models}
               onSelect={isLocked('DEFAULT_MODEL') ? undefined : setDefaultModel}
               selectLabel="Make default"
               disabledLabel="Enable first"
@@ -316,9 +525,18 @@ export function SetupWizard() {
               <p className="alert">The monthly budget must be at least the daily budget.</p>
             )}
             <p className="estimate">
-              With {modelOption(defaultModel).label} at about ${cost} per generation, $
-              {monthlyBudgetUsd} a month covers about{' '}
-              <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
+              {generationsPerMonth === undefined ? (
+                <>
+                  Cost per generation with {chosenDefault && modelOption(chosenDefault).label}: Not
+                  yet measured.
+                </>
+              ) : (
+                <>
+                  With {chosenDefault && modelOption(chosenDefault).label} at about ${cost} per
+                  generation, ${monthlyBudgetUsd} a month covers about{' '}
+                  <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
+                </>
+              )}
             </p>
           </section>
         ) : (
@@ -326,16 +544,18 @@ export function SetupWizard() {
             <h1>Review</h1>
             <Locked status={status} keys={status?.lockedByEnvironment ?? []} />
             <dl className="detail">
-              <dt>API key</dt>
-              <dd>
-                {status?.keyFromEnvironment
-                  ? 'From environment'
-                  : 'Checked ✓ (stored on the server)'}
-              </dd>
+              <dt>AI providers</dt>
+              <dd>{providerSummary(remaining, checks)}</dd>
+              {removalSummary(sources, removed, checks) && (
+                <>
+                  <dt>Saved keys removed</dt>
+                  <dd>{removalSummary(sources, removed, checks)}</dd>
+                </>
+              )}
               <dt>Models served</dt>
-              <dd>{models.map((m) => modelOption(m).label).join(', ')}</dd>
+              <dd>{selection.models.map((m) => modelOption(m).label).join(', ')}</dd>
               <dt>Default model</dt>
-              <dd>{modelOption(defaultModel).label}</dd>
+              <dd>{chosenDefault && modelOption(chosenDefault).label}</dd>
               <dt>Budget</dt>
               <dd>
                 ${dailyBudgetUsd} per day, ${monthlyBudgetUsd} per month

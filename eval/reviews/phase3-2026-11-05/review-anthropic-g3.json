@@ -1,0 +1,203 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "A single ALB is modelled as two separate ALB nodes (one per AZ), with duplicated user and certificate edges. This suggests two load balancers, two DNS targets and double the cost. A single ALB spans both public subnets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Worker-node edges to Aurora and ElastiCache are labelled 'read', but the services read and write. The Route 53 to ALB link is not drawn as an edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Aurora and ElastiCache are placed in Private subnet A only, although the configuration says 2 AZ. Security groups, DB subnet groups and the OpenTelemetry collector deployment are not shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Complete and well reasoned EKS design with Aurora, ElastiCache, KMS, IRSA, Container Insights and X-Ray tracing. The main flaw is the duplicated ALB node."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Distributed tracing is folded into 'CloudWatch' with no X-Ray or OpenTelemetry collector, so the tracing requirement is not realised. The rationale that CloudWatch provides 'logs, metrics and tracing' is vague and misleading.",
+          "evidence": "https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ALB, the EKS cluster and the ElastiCache cluster are each placed in a single subnet or AZ, and ElastiCache has no multi-AZ or failover configuration. This conflicts with the stated multi-AZ ingress and gives no resilience for the cache. An ALB needs subnets in at least two AZs.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no ACM certificate for the HTTPS listener, no IAM roles for service accounts, no in-transit encryption for Redis and no ElastiCache backup. There are no worker-node details and no customer-managed keys.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal skeleton that names the right core services but leaves out tracing, certificates, pod identity and data-tier HA. It is under-specified for the stated observability requirement."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "SNS-to-SQS queue policies, DLQ retention (default 4 days for standard queues) and SQS encryption are not specified. There is also no order status table for tracking.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DynamoDB stream outbox plus a publisher Lambda and a failure queue adds moving parts. It also relies on stream filtering to publish only on insert.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong, idiomatic design: DynamoDB outbox, SNS fan-out to per-step SQS queues with DLQs, partial batch responses, idempotency and DLQ alarms. Independence and retries are natural."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design claims one-year retention of failure details 'through queue retention' on the step failure queue and its DLQ. SQS maximum retention is 14 days, so failure records would be dropped silently after that. This breaks the 'never lost' goal for this path and the 1-year requirement.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-parameters.html"
+        },
+        {
+          "severity": "major",
+          "description": "A Step Functions Parallel state fails and stops all branches if any branch fails. Independence of payment, inventory and email holds only if each branch catches its own errors internally, which is not stated. The failure queue 'redrive' also has no consumer, so the failure-record DLQ never receives messages and is redundant.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/state-parallel.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The order record is created asynchronously by the intake worker, so a GET right after POST may not find it. No order ID generation is described, and the payment provider is not modelled.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A durable intake queue with a Step Functions workflow and Cognito. It has a factually wrong SQS one-year retention claim, an unclear parallel-branch isolation and a redundant failure-record DLQ."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The thumbnail Lambda writes back to the same bucket that triggers it. Prefix or suffix filters are needed to avoid recursive invocation. There is also no CloudFront path for serving photos or thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "WAF adds fixed cost against a 'keep cost low' goal. The Cognito authorizer on the whole API may block anonymous subscriber sign-up. The Lambda to Photo bucket presign step is not drawn as an edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "CloudFront with OAC, a WAF-protected REST API, an asynchronous DynamoDB-stream welcome email and S3-triggered thumbnails, with failure queues, alarms and encryption. It is a robust and low-cost serverless design."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The welcome email is sent synchronously from the API handler Lambda, with no retry, DLQ or decoupling. An SES failure either delays or fails the sign-up call, or the email is silently lost.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/a-reliability.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Thumbnail Failure DLQ has no edge from the thumbnail Lambda. S3 events invoke Lambda asynchronously, so an on-failure destination or DLQ must be configured. As drawn the DLQ is orphaned and failures are not captured. CloudWatch has no edges or alarms.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The API is called directly rather than through CloudFront, so API caching depends on API Gateway's paid cache. No OAC is mentioned for the static bucket, thumbnails and raw photos share one bucket without event filters, and the Cognito node has no edges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A basic serverless blog layout with the core services, but the failure handling is not wired up and the welcome email is synchronous. Observability is only nominal."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A covers tracing with X-Ray and OpenTelemetry, TLS via ACM, IRSA, KMS and multi-AZ data tiers. B is a thin skeleton with single-subnet placements and no real tracing."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "SNS fan-out to per-step SQS queues with DLQs and alarms gives natural independence, retries and no silent loss. B has a wrong SQS one-year retention claim, unclear parallel-branch isolation and a redundant failure-record DLQ."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A decouples the welcome email and thumbnails with wired failure queues and alarms, and it caches at the CloudFront edge. B sends the email synchronously and leaves the DLQ unconnected."
+    }
+  ]
+}

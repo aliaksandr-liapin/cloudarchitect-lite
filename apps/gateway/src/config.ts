@@ -1,4 +1,4 @@
-import { MODEL_POLICY, ModelChoice } from '@cloudarchitect/domain';
+import { MODEL_POLICY, ModelChoice, modelOption, type Provider } from '@cloudarchitect/domain';
 import { z } from 'zod';
 
 const modelList = z
@@ -28,6 +28,7 @@ export const Config = z
     CLIENT_KEY_SALT: z.string().min(16),
     ANTHROPIC_API_KEY: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
+    GEMINI_API_KEY: z.string().optional(),
   })
   .refine((c) => c.AI_MODELS.includes(c.DEFAULT_MODEL), {
     path: ['DEFAULT_MODEL'],
@@ -44,10 +45,37 @@ export const SETTING_KEYS = [
   'DEFAULT_MODEL',
   'CLIENT_KEY_SALT',
   'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
 ] as const;
 export type Settings = Partial<Record<(typeof SETTING_KEYS)[number], string>> & {
   setupCompletedAt?: string;
 };
+
+/** Env var and setting name holding each provider's API key. */
+export const KEY_SETTING = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GEMINI_API_KEY',
+} as const satisfies Record<Provider, (typeof SETTING_KEYS)[number]>;
+
+/** The provider's key, or undefined when none is configured (an empty value counts as none). */
+export function providerKey(config: Config, provider: Provider): string | undefined {
+  return config[KEY_SETTING[provider]] || undefined;
+}
+
+/**
+ * Models that can actually run: `AI_MODELS` without those whose provider has no key. A missing key
+ * drops its models instead of failing the config, so removing a key never stops the gateway.
+ */
+export function effectiveModels(config: Config): {
+  enabled: ModelChoice[];
+  defaultModel: ModelChoice | undefined;
+} {
+  const enabled = config.AI_MODELS.filter((m) => providerKey(config, modelOption(m).provider));
+  const defaultModel = enabled.includes(config.DEFAULT_MODEL) ? config.DEFAULT_MODEL : enabled[0];
+  return { enabled, defaultModel };
+}
 
 export function loadConfig(env: Record<string, unknown>): Config {
   const parsed = Config.safeParse(env);

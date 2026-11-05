@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Index updater Lambda function (N15) is placed at the Region level outside the VPC, but has a direct write edge to the ElastiCache (Valkey) cluster (N10) inside Private subnet A. Because ElastiCache runs inside a VPC, a Lambda function must be configured with VPC access to connect to private ElastiCache nodes.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Route 53 (N2) is modeled inline in the HTTPS request path between Shoppers and CloudFront (Shoppers -> Route 53 -> CloudFront with protocol HTTPS). Route 53 is an authoritative DNS service (UDP/TCP port 53) and does not proxy HTTPS traffic to CloudFront.",
+          "evidence": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/welcome-dns-service.html"
+        },
+        {
+          "severity": "minor",
+          "description": "NAT Gateway (N7) is deployed only in Public subnet A (single Availability Zone) and has no edges connected to it, creating a single-AZ dependency for outbound internet/service traffic from private subnets if VPC endpoints are not used.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Web API tasks (N8, N9) only have read edges to ElastiCache (N10) with no write edge to populate the cache on a cache miss, and Application Load Balancer is modeled as two separate per-AZ nodes rather than one multi-AZ load balancer.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A is a comprehensive, well-reasoned architecture that covers CDC via DMS and Kinesis, initial full load, cache invalidation, and edge caching, marred only by the Lambda-to-VPC ElastiCache placement mismatch and inline HTTPS modeling of Route 53."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The architecture connects Product Database (Amazon Aurora, N5) directly to Update Queue (Amazon SQS, N8) via an event edge to capture row-level price updates. Amazon Aurora cannot natively publish row-level change events directly to Amazon SQS; capturing row changes requires AWS DMS or invoking AWS Lambda via database procedures/extensions.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.html"
+        },
+        {
+          "severity": "major",
+          "description": "Application Load Balancer AZ2 (N3), Update Queue DLQ (N9), and CloudWatch (N11) are completely disconnected orphan nodes with no edges, leaving multi-AZ traffic distribution and SQS dead-letter queue redrive unconfigured in the graph.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Web API Services on Amazon ECS (N4) and Index Sync Lambda (N10) are placed only in Private Subnet 1 (a single Availability Zone), and the VPC has neither a NAT Gateway nor VPC endpoints to allow private subnet resources to communicate with regional AWS services like SQS.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "When product prices change, Index Sync Lambda (N10) updates OpenSearch (N6) but never invalidates or updates Page Cache (ElastiCache, N7), allowing stale product prices to remain cached.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not provide a mechanism for the initial load of the existing 2 million products into OpenSearch, and raw clarifying questions (R9, R10) are left verbatim in the requirements list.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B identifies the core storage and search services but relies on a non-existent direct CDC integration from Aurora to SQS, leaves multiple nodes disconnected, places compute in a single AZ without VPC egress, and fails to invalidate the page cache on price updates."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The photo upload flow models API handler Lambda (N8) writing to the S3 bucket (N4) to issue presigned upload URLs, and omits the actual upload edge from Authors (N2) to S3. Generating a presigned URL is a local SDK signing operation in Lambda, after which the client browser uploads the object directly to S3 over HTTPS.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome email pipeline places a Subscriber stream relay Lambda (N10) and an extra Welcome email SQS queue (N11) between DynamoDB Streams (N9) and Welcome email sender Lambda (N13), even though DynamoDB Streams natively supports event filtering, retries, partial batch responses, and failure destinations directly to a single consumer Lambda.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Authors (N2) have no sign-in edge to the Cognito Author user pool (N7) to obtain the JWT validated by API Gateway, and raw clarifying questions (R16, R17, R18) remain in the requirements list.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers all functional and non-functional requirements for the serverless blog with good resilience and security controls, but mismodels the presigned S3 upload data flow and adds unnecessary extra hops to the DynamoDB Streams email pipeline."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Point-in-time recovery (PITR) on the DynamoDB table (N7) and object versioning on the S3 buckets (N3, N8) are not explicitly enabled in the node configuration fields to protect against accidental deletion or corruption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Raw clarifying question text is retained in requirements R10, R11, and R12.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B is a clean, cost-effective, production-ready serverless architecture that properly models presigned S3 uploads, isolates raw uploads in a separate S3 bucket to prevent recursive triggers, and uses DynamoDB Streams filtering with shared failure handling."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Checkout scoring function (AWS Lambda, N5) is placed inside Private subnet AZ1 (C6) in Checkout VPC without a NAT Gateway or VPC endpoints for DynamoDB (N7), SageMaker Runtime (N6), or CloudWatch (N13). A VPC-attached Lambda function in an isolated private subnet cannot reach regional AWS services or VPC interface endpoints unless those endpoints or a NAT Gateway are provisioned.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Checkout scoring function (N5) is deployed in only a single Availability Zone (Private subnet AZ1) while Fraud model endpoint (N6) is placed only in Private subnet AZ2, violating multi-AZ high availability best practices for synchronous checkout processing and contradicting requirement R12.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS WAF (N2) is modeled inline between Checkout client (N1) and Checkout API (N4) as an invoke target rather than as a Web ACL associated with API Gateway.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no data export path from Transactions table (DynamoDB, N7) to ML artifacts and training data bucket (S3, N9) to supply newly scored historical transactions for the monthly retraining workflow, and raw clarifying questions (R9, R10) remain in the requirements list.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A includes strong ML lifecycle orchestration with Step Functions, S3 versioning, and KMS encryption, but places the checkout Lambda in a single private subnet without VPC endpoints or NAT egress, which would prevent it from reaching DynamoDB and the model endpoint."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Checkout API (N3) specifies a Lambda authorizer in its configuration, but the authorizer Lambda function is not represented as a node in the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No data export edge is shown from the Transactions with fraud score table (DynamoDB, N6) to the Training data and model artifacts bucket (S3, N7) to feed historical transactions into the monthly retraining job.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Monthly training, model registration, and endpoint deployment are combined into a single unresolved node (N10) without explicit workflow orchestration such as SageMaker Pipelines or Step Functions, and clarifying questions (R10, R11) remain in the requirements list.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a resilient, well-connected real-time fraud scoring architecture that protects checkout availability with a 200 ms timeout and rules-based fallback while meeting all hosting, autoscaling, storage, and monthly retraining requirements."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "Design A provides a working CDC pipeline (Aurora -> DMS -> Kinesis -> Lambda -> OpenSearch/ElastiCache), handles the initial 2M product load, and includes CloudFront and RDS Proxy, whereas Design B relies on a non-existent direct Aurora-to-SQS CDC edge and leaves multiple nodes disconnected."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "Design B accurately models the browser-to-S3 presigned upload flow, separates the raw upload bucket from the static site/thumbnail bucket to prevent recursive triggers, and uses native DynamoDB Streams filtering instead of Design A's redundant relay Lambda and extra SQS queue."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "Design B avoids Design A's broken VPC networking (where the checkout Lambda is placed in a single private subnet without VPC endpoints or NAT to reach DynamoDB) and adds a 200 ms timeout with a rules-based fallback so endpoint degradation never blocks payments."
+    }
+  ]
+}

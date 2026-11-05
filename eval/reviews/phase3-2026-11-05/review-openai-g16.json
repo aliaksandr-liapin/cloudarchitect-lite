@@ -1,0 +1,303 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Autoscaling is attributed to SageMaker's capabilities, but no scalable target, scaling policy, capacity bounds, or initial endpoint fleet is specified; these must be configured to deliver the requested autoscaling and support the chosen availability target.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-auto-scaling-add-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "The synchronous checkout path has no explicit inference deadline or defined behavior for inference and persistence failures. Define bounded calls and whether a failed payment-scoring request is rejected, held, or retried without creating inconsistent transaction records.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_runtime_InvokeEndpoint.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The diagram shows the launcher reading training data but omits SageMaker's own reads of training inputs and inference model artifacts from S3; add those connections and their execution-role permissions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The failure queue covers launcher invocation failures, not failures occurring after a training job starts; make training-completion monitoring and operational recovery explicit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Authentication is identified, but resource-scoped IAM permissions, S3 public-access restrictions, and protection of payment data in application logs are not described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Monthly retraining produces artifacts, but model evaluation, version selection, endpoint promotion, and rollback are unspecified; clarify whether deployment is deliberately manual.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core managed services fit the request, but endpoint scaling and checkout failure handling need concrete configuration before this is a dependable scoring system."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The endpoint is described as autoscaling, but the design does not specify the scalable target, scaling policy, or minimum and maximum capacity; managed real-time hosting does not by itself configure invocation-based autoscaling.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-auto-scaling-add-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "The combined training-jobs and Model Registry node does not identify the automation that sequences training completion, registration, approval, and deployment. Specify a pipeline, state machine, or completion handlers and the endpoint-update action rather than leaving that workflow implicit.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/model-registry-deploy.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify how the rules-based fallback satisfies the requirement to score every payment with the custom model; persist the score source and model version, distinguish fallback decisions from model scores, and decide whether later rescoring is required.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The 200 ms inference timeout is an architect-selected assumption without a model-latency or load measurement; validate it against representative payloads and endpoint capacity to avoid an excessive fallback rate.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Lambda authorizer's implementation and trust model are unspecified, as are resource-scoped handler, training, deployment, and KMS permissions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Scheduled-trigger delivery failures, training failures, deployment rollback, and endpoint availability capacity need explicit recovery arrangements beyond the general monitoring node.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design adds useful latency controls, recovery features, and model-versioning intent, but still needs explicit autoscaling and an implemented retraining-to-deployment workflow."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "All depicted API tasks and the only NAT gateway are in AZ1. Losing that zone removes the application and its payments egress, despite the stated multi-AZ resilience; distribute an ECS service across both private subnets and provide independent per-AZ egress.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ALB is shown only in Public Subnet 1, with no second subnet association. A standard regional Application Load Balancer requires subnets in at least two Availability Zones; explicitly associate the single ALB with both public subnets.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "No client-authentication or tenant-authorization mechanism is selected, even though authentication was raised as a clarification. HTTPS and an ALB alone do not authenticate B2B API callers; specify application token validation or an appropriate supported authentication mechanism.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The rotation relationship does not identify RDS-managed credentials versus a Secrets Manager rotation workflow, and the tasks have no shown secret-retrieval or credential-refresh path.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Security-group rules restricting task ingress to the ALB and database/cache access to the tasks, along with task IAM permissions and data-connection encryption, are not specified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ECS cluster is present, but the service, desired task count, health checks, replacement behavior, and scaling assumptions are not defined.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed service choices are appropriate, but the depicted single-AZ application and egress fail the explicit AZ-loss requirement."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design identifies Fargate tasks but not the ECS service that maintains healthy task counts, replaces failed tasks, and integrates them with the load balancer. Specify that service, its minimum capacity and multi-AZ placement, and its target-group integration.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html"
+        },
+        {
+          "severity": "major",
+          "description": "API authentication and tenant authorization remain unanswered despite the inferred authentication requirement. WAF and TLS do not validate caller identity or tenant access; select and describe the application or ingress authentication mechanism.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the security-group and IAM boundaries explicit: ALB-only ingress to tasks, application-only database/cache access, and task-role access limited to the required secret and supporting services.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the supported credential-rotation implementation and how running containers refresh credentials and recover their database connections after rotation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cache rationale overstates session preservation: Redis replication and automatic failover improve availability but do not guarantee that every recently acknowledged session write survives an AZ failure.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The client-to-WAF edge suggests a separate network endpoint; depict clients addressing the ALB and WAF as an associated web ACL rather than an independently addressable proxy.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design covers the required private, serverless, multi-AZ topology well, with remaining gaps in continuous ECS operation, authentication, and detailed access controls."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 0,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 0,
+        "costAwareness": 2,
+        "explanationAccuracy": 0
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "A single Lambda invocation cannot run the approximately 25-minute report job because Lambda's maximum timeout is 900 seconds. Use a scheduled Fargate task or explicitly partition the work into shorter invocations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html"
+        },
+        {
+          "severity": "major",
+          "description": "The existing Aurora database and the generator's database-read connection are absent from the architecture. Identify the database network placement, read-only credentials, and permitted connectivity rather than merely listing database access as a satisfied requirement.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-rds.html"
+        },
+        {
+          "severity": "major",
+          "description": "The generator is placed in a private subnet, but no NAT path or suitable service endpoints are specified for its S3 and SES calls. VPC-connected Lambda functions do not retain automatic public-internet access.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The secure download-link mechanism is unspecified; define private bucket access, presigned URL generation and expiry, and the source of the 40 recipient addresses.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Logs and metrics alone do not define recovery: add failure alarms, delivery-failure handling, and a rerun policy that avoids unnecessarily regenerating reports or resending emails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The intended time zone for 02:00 and daylight-saving behavior are not stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Although inexpensive managed services are selected, the Lambda runtime limit makes the proposed 25-minute reporting job non-working."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Public-subnet placement alone does not give a Fargate task internet access. Explicitly enable a public IP with an internet-gateway route and no inbound task access, or provide suitable alternative egress, so image pulls and calls to S3, SES, Secrets Manager, DynamoDB, and logging services can succeed.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Overwriting date-based S3 keys does not prevent duplicate emails. The design promises duplicate-free reruns but shows no durable notification state or idempotency mechanism; define per-run/per-recipient progress and retry behavior, including the uncertainty after an SES send succeeds but status recording fails.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify the presigned-link wording: access belongs to whoever possesses the URL, not specifically to the named manager. This can fit the chosen no-sign-in assumption, but forwarding risk and the effective URL expiry should be documented.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the ECS cluster/task definition and Scheduler RunTask target, execution role, task role, container image, and read-only database security-group rules.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Ensure failure monitoring covers tasks that fail before emitting application metrics and jobs that never finish; Scheduler successfully invoking RunTask is not evidence that report generation completed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The architecture mentions time-zone support but does not choose the actual zone or daylight-saving policy for the nightly 02:00 schedule.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A scheduled Fargate task is a simple, appropriately priced fit for the 25-minute job, provided networking, notification idempotency, and execution monitoring are completed."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "B provides a clearer latency and failure strategy, stronger data-recovery provisions, and model-versioning intent, although both need explicit autoscaling and B still needs deployment orchestration and a clarified fallback-score contract."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B explicitly distributes application tasks, ingress, and outbound connectivity across two AZs, whereas A's depicted application and NAT remain concentrated in one AZ."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "B uses pay-per-run serverless compute that supports the 25-minute duration and includes the database, credential, retention, and email paths; A exceeds Lambda's hard runtime limit."
+    }
+  ]
+}

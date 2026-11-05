@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Adjuster node has no edges to the CloudFront distribution (to load an adjuster web UI) or to the Cognito user pool (to sign in).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudTrail is modeled with an incoming edge from API Gateway instead of capturing events passively and delivering them to an S3 bucket for long-term retention.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The SQS dead-letter queue only captures failed S3 file-validation Lambda events; Step Functions execution failures rely solely on CloudWatch alarms without a failure queue.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A delivers a complete, serverless claims workflow using Step Functions task tokens for the 14-day approval wait, S3 presigned uploads with automated validation and Textract analysis, and dual audit trails in DynamoDB and CloudTrail."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Customer and Adjuster sign-in flows to the Cognito user pools are omitted from the edges, and Cognito is shown pushing JWTs directly to API Gateway.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No outbound edge is shown from SES to the Customer node to represent delivery of the decision email.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Automated checks on uploaded PDFs and photos are handled by a generic Lambda function without a document analysis service such as Amazon Textract.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a well-architected serverless claims pipeline featuring separate Cognito user pools for customers and adjusters, Step Functions callback orchestration, EventBridge-to-SQS failure routing, and KMS-encrypted CloudTrail audit logs in S3."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The single logical Application Load Balancer is modeled as two separate service nodes (one per Availability Zone) rather than one multi-AZ load balancer resource.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only the AZ-B EKS node group has a read edge to the ElastiCache Redis replica; the AZ-A node group only connects to the Redis primary.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A accurately fulfills all migration and observability requirements using EKS Managed Node Groups across two Availability Zones to preserve 100% compatibility with existing Helm charts and DaemonSet agents."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Choosing AWS Fargate for all EKS pods conflicts with the requirement for minimal changes to existing Helm charts and the stated observability rationale, because EKS Fargate does not support DaemonSets (typically used by Container Insights and Fluent Bit), privileged containers, HostPort/HostNetwork, or EBS volumes.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Public ALB node is placed only in Public subnet A in the container hierarchy, though its rationale notes that it spans subnets in two Availability Zones.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Amazon Route 53 DNS is omitted for the public HTTPS frontend domain.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B covers the core functional, security, and Multi-AZ data store requirements well, but relies on EKS Fargate compute which disallows DaemonSets and often forces modifications to existing Helm charts and observability agents."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 1,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The VPC contains only private subnets with no public subnets, NAT Gateways, or VPC endpoints, and API Gateway has no VPC Link load balancer; ECS tasks in private subnets cannot pull container images, reach Cognito or CloudWatch, or receive traffic.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The edges from API Gateway to the ECS App Tier in AZ1 and AZ2 explicitly use unencrypted HTTP, violating the confirmed requirement for TLS everywhere.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vpc-links.html"
+        },
+        {
+          "severity": "major",
+          "description": "API Gateway is configured as an HTTP API rather than a REST API; HTTP APIs do not support AWS WAF associations or private endpoints/resource policies, leaving the default execute-api endpoint exposed to direct access bypassing CloudFront and WAF.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudTrail has no S3 bucket configured to store and encrypt trail logs; default CloudTrail Event History cannot be encrypted with a customer-managed KMS key and expires after 90 days.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Five nodes (Shield, TLS Certificates, KMS, CloudTrail, and CloudWatch) have no edges connecting them to the rest of the architecture.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A fails to meet critical networking and security requirements because it sends plaintext HTTP between API Gateway and ECS, uses an API Gateway HTTP API that cannot attach WAF or restrict public bypass, and lacks any NAT Gateway, VPC endpoints, or public subnets for private container connectivity."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only a single NAT Gateway is deployed in Public subnet A, and the web app tasks (AZ A only) and API tasks (AZ B only) are each confined to a single Availability Zone, so an outage in either AZ will take down part of the portal and break outbound connectivity to Cognito.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Portal API tasks call the Cognito user pool over HTTPS to validate tokens, but have no edge to the NAT Gateway for outbound internet egress from their private subnet.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Shield, AWS KMS, and the AZ-B Application Load Balancer node have no edges connecting them to the rest of the graph.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a strong, compliant regional banking architecture with end-to-end TLS, WAF on the ALB, KMS customer-managed encryption, and an S3 Object Lock audit trail, though it needs redundant NAT Gateways and multi-AZ task placement for both container services to survive an AZ outage."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "Both designs are production-grade and well-suited to the workflow, but Design B edges ahead by isolating customers and internal adjusters into separate Cognito user pools, explicitly modeling the customer-managed KMS key and S3 CloudTrail audit bucket, and capturing Step Functions execution failures via EventBridge and SQS."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "Design A uses EKS Managed Node Groups (EC2), which preserves full compatibility with existing Helm charts and DaemonSet-based observability agents, whereas Design B uses EKS Fargate which does not support DaemonSets."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "Design B satisfies TLS everywhere, proper public/private VPC subnetting, WAF protection at the entry point, and KMS-encrypted CloudTrail logs in S3, while Design A uses unencrypted HTTP to the containers, lacks NAT/VPC endpoints for private subnets, and uses an API Gateway HTTP API that cannot attach WAF."
+    }
+  ]
+}

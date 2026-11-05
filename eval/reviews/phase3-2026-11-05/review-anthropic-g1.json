@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Two separate ALBs are modelled, each in a single public subnet in one AZ, and clients are wired to both with no DNS or failover mechanism. An ALB needs subnets in at least two AZs, and the design's own rationale says so. A single ALB spanning both public subnets is the correct model, and the two-ALB form contradicts itself and could not be created as drawn.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The HTTPS listener has no ACM certificate node. There is no WAF at the only public entry point and no ECR image source. Encryption in transit for the DB and cache is not stated, and the encryption is AWS-managed rather than customer-managed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB-to-Cognito edge ('validate JWT') is misleading. ALB's authenticate-cognito action is a browser redirect flow and is not a per-request bearer-token validator for B2B and machine-to-machine clients. The rotation Lambda needed for Secrets Manager rotation inside the VPC is not shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the main requirements with Fargate, Multi-AZ RDS, ElastiCache, per-AZ NAT and Secrets Manager. The duplicated per-AZ ALB is a structural error, and the edge hardening is thin."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ECR edge points from ECR to the ECS service, although the task execution role pulls from ECR. The Cognito JWKS edge exists only for the AZ A tasks. KMS edges are drawn as key-to-service links.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Secrets Manager rotation Lambda inside the VPC is not shown. RDS and ElastiCache are placed in a single data subnet each, which is a modelling shorthand for Multi-AZ. The CMK, CloudTrail and two NAT gateways add some cost for an MVP.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A single ALB with WAF, ACM and Route 53, Fargate across two AZs, Multi-AZ RDS and cache, per-AZ NAT with stable IPs, Secrets Manager rotation, KMS and CloudTrail form a coherent, secure baseline with only minor modelling nits."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The index sync is a dual write: the API writes to Aurora and then publishes to SQS. A crash between the two, or any change made outside the API (for example batch price feeds), is never queued. Price changes can then miss the one-minute window until the periodic reconciliation runs, and its interval is not stated. A transactional outbox or CDC would close this gap.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Lambdas that read Aurora are placed in the Region with no VPC attachment. The single NAT gateway sits in AZ2 only. The 'NAT Gateway -> OpenSearch' edge is odd. The OpenSearch domain has no stated VPC or Multi-AZ setup. Only the AZ1 tasks have a Secrets Manager edge, and the Lambdas have none.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no cache invalidation or TTL strategy for product pages, so cached prices could be stale. A 2M-row bulk load in a single Lambda needs chunking because of the 15-minute limit.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cost-effective SQS-and-Lambda index sync with a DLQ, reconciliation and bulk load, and correct use of OpenSearch and a cache. The dual-write sync and unclear VPC placement weaken it."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Two zonal ALBs are modelled, each in one public subnet, with CloudFront wired to both as origins and no origin group. An ALB must span at least two AZs, so a one-AZ ALB cannot be created. The rationale 'second zonal load balancer so the entry tier survives an AZ failure' is technically wrong, because a single ALB across two AZs provides that.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "RDS Proxy requires a Secrets Manager secret, but there is no secrets or credentials node, and R13 does not cover credentials. RDS Proxy is placed in a single subnet.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DMS replication instance is placed in a single AZ, with no Multi-AZ setting. DMS plus Kinesis plus RDS Proxy plus CloudFront add notable cost and moving parts for a 2M-product catalog. The Lambda needs VPC placement to reach ElastiCache.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "WAF for CloudFront must be global scope but is placed in the Region. CloudWatch has no inbound edges. The Lambda on-failure destination holds event metadata rather than the records. CloudFront and cache TTLs are unspecified, so stale prices are possible.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Its DMS CDC to Kinesis to Lambda pipeline is a robust, ordered sync with full-load and reindex paths and edge caching. The invalid two-ALB design, missing DB secrets and heavy cost count against it."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The audit table is described as tamper-evident because IAM denies update and delete. That gives restricted writes but not tamper evidence, since administrators can change policies. Immutable storage such as S3 Object Lock or CloudTrail log validation would be stronger.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "File validation runs after upload and appears not to gate the workflow. It does not mention quarantine or deletion of invalid files. Presigned POST size limits would enforce limits at upload.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The task-token storage step is implicit. Standard versus Express workflow type is not stated. The 'API Gateway -> CloudTrail' edge is oddly directed. SES sandbox and identity verification are not mentioned. Textract is not in the verified catalog.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete serverless design: Cognito, WAF and API Gateway, presigned S3 uploads with validation and a DLQ, Step Functions with a task-token wait and timeout path, DynamoDB claims and audit tables, KMS, CloudTrail and SES. Only minor gaps remain."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The 14-day adjuster wait is not wired to resume the workflow. The adjuster edge goes only to the API, and the only API-to-workflow edge is 'start workflow'. There is no callback or task-token path, and no store holding claim state or the token.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token"
+        },
+        {
+          "severity": "major",
+          "description": "There is no component that creates the S3 presigned upload URLs, and API Gateway does not generate them by itself. There is no Lambda or database between the API and the storage or workflow. The customer upload and linking of documents to a claim is therefore not realisable as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "major",
+          "description": "Auditability is thin. CloudWatch is the only audit store, and no edge writes to it from the workflow, API or S3. There is no CloudTrail, no immutable or append-only audit store and no DLQ or alarms. The auditable-steps and resume-after-failure requirements are therefore only asserted.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The API authorizer is an adjuster-only Cognito pool, so customer submission is unauthenticated or blocked. There is no WAF, S3 uses AWS-managed keys only, and the notification path has no retry or error handling.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal skeleton with the right core services (Step Functions, Lambda, SES, S3, Cognito) but missing the glue: no decision callback, no claim state, no upload-URL generation and no real audit trail."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B uses a single correct multi-AZ ALB and adds WAF, ACM, ECR, KMS and CloudTrail. A's duplicated per-AZ ALBs are structurally invalid and its edge security is thinner."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "Both designs have the two-AZ ALB flaw only in B. A is deployable, simpler and cheaper, and its idempotent read-current-row sync with DLQ and reconciliation meets the requirements, despite the dual-write weakness. B's CDC pipeline is stronger on sync but has the invalid two-ALB entry, missing DB secrets and higher cost."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A wires the full flow, including task-token resume, idempotent state, audit table, CloudTrail, DLQ, KMS and auth for both user types. B omits the decision callback, claim store, upload-URL generation and a real audit trail."
+    }
+  ]
+}

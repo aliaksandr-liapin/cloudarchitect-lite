@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only a single NAT Gateway is provisioned (in Public subnet AZ2), creating a single-AZ point of failure for private subnet egress that contradicts requirement R14 (remaining available if one Availability Zone fails).",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Reconcile and bulk load Lambda function is tasked with scanning and diffing all 2 million products from Aurora against OpenSearch, which risks exceeding the 15-minute maximum execution timeout of a single AWS Lambda invocation.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Product page cache (ElastiCache) only has read edges from the Web API tasks and no cache invalidation or update path from the Index sync Lambda or API tasks when product prices change, risking stale cached product pages.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Web API tasks write to Aurora and then publish to SQS without a transactional outbox or CDC stream, meaning a process crash between the DB commit and SQS publish could delay an update until the periodic reconciliation runs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from NAT Gateway to OpenSearch domain is a network routing path rather than a logical service-to-service call, and the Lambda functions reading from Aurora are not placed in private subnets or connected to Secrets Manager.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A is a well-reasoned architecture using Aurora PostgreSQL, ElastiCache, OpenSearch, and SQS/Lambda with reconciliation, weakened mainly by a single-AZ NAT Gateway, missing cache invalidation edges on price updates, and running a 2M-row full scan in a single Lambda function."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Node N10 conflates an Amazon RDS Multi-AZ synchronous standby instance with a readable replica and directs initial bulk-load read queries to it; in a standard RDS Multi-AZ DB instance deployment with synchronous replication, the standby instance is passive and cannot serve read traffic.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html"
+        },
+        {
+          "severity": "major",
+          "description": "Web API Fargate tasks are placed in private subnets (Private App Subnet A and B) with no NAT Gateways or VPC Endpoints in the VPC, leaving the containers unable to pull container images or reach regional AWS services such as SQS and OpenSearch.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Using a single Lambda invocation (Search Indexer & Cache Invalidator Lambda) to perform the initial bulk load of 2 million products from RDS into OpenSearch risks hitting the 15-minute Lambda execution timeout.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8 and R9 retain the raw clarifying question text rather than stating resolved architectural requirements.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Search Indexer & Cache Invalidator Lambda is placed at the region level outside the VPC while connecting directly to private RDS and ElastiCache subnets, and no secrets manager is modeled for database credentials.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B thoughtfully addresses cache invalidation and the transactional outbox pattern, but suffers from a critical misconception that a synchronous RDS Multi-AZ standby instance can serve read queries, and omits NAT Gateways or VPC endpoints for private Fargate tasks."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ACM certificate node is placed in a generic Primary Region without noting that CloudFront requires ACM certificates to be provisioned in us-east-1 (US East, N. Virginia).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design models Bakery staff uploading updated files directly to S3 but does not mention CloudFront cache invalidation or TTL configuration so updated menus and hours appear promptly.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A delivers a clean, low-cost serverless static site architecture with Route 53, CloudFront, ACM, private S3 storage, and CloudWatch monitoring that fits all user constraints."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Does not explicitly model the content update path for how bakery staff upload changes to the menu or opening hours in S3.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B is an exemplary, right-sized static website architecture that accurately specifies us-east-1 for the CloudFront ACM certificate, Origin Access Control (OAC) with S3 Block Public Access, and cost-free standard CloudWatch metrics."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Subscribers table (DynamoDB) has a direct event edge to Welcome email queue (SQS) labeled as a DynamoDB Streams consumer, but DynamoDB Streams cannot natively push records directly to Amazon SQS without a compute intermediary such as AWS Lambda or Amazon EventBridge Pipes.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "critical",
+          "description": "Blog REST API (API Gateway) has no backend compute (Lambda) and claims to directly issue S3 presigned PUT URLs via an edge to the Original photo bucket; API Gateway cannot generate and return S3 presigned URLs without a backend compute function signing the URL via the AWS SDK.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Photo processing dead-letter queue and Welcome email dead-letter queue have no incoming redrive edges from their respective source SQS queues.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R9, R10, and R11 leave the raw clarifying questions in the requirements list alongside the resolved answers in R12-R14.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A properly separates original and thumbnail S3 buckets and uses SQS decoupling, but omits backend Lambda compute for API Gateway—making presigned URL generation impossible as drawn—and models an unsupported direct integration from DynamoDB Streams to SQS."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail Lambda is triggered by uploads to Photo bucket and writes generated thumbnails back to the same Photo bucket without specifying key prefix/suffix filtering or separate buckets, which AWS warns can cause an infinite recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront distribution has origin edges to Static site bucket and REST API, but no origin edge to Photo bucket to serve photos and generated thumbnails to readers.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no edge connecting REST API to Cognito user pool despite REST API configuring a Cognito user pool authorizer, and requiring readers to sign up in Cognito just to receive a newsletter welcome email adds unnecessary friction.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses valid native serverless integrations across CloudFront, API Gateway, WAF, Lambda, DynamoDB Streams, S3, and SES, though it risks an S3-to-Lambda recursive trigger loop by writing thumbnails back to the same bucket and omits a CloudFront origin edge for serving thumbnails."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "Design A uses Aurora PostgreSQL (which supports readable replicas) and includes a NAT Gateway, Secrets Manager, and scheduled reconciliation, whereas Design B conflates a passive synchronous RDS Multi-AZ standby with a readable replica and omits NAT Gateways or VPC Endpoints for private Fargate tasks."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Both designs are excellent and right-sized for a few-dollars-a-month static site, but Design B is slightly more accurate in explicitly placing the CloudFront ACM certificate in US East (N. Virginia), specifying S3 Origin Access Control (OAC) with Block Public Access, and avoiding paid CloudWatch features."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "Design B uses valid native AWS integrations with a Lambda backend behind API Gateway, whereas Design A omits backend compute for API Gateway (claiming API Gateway directly issues S3 presigned URLs) and connects DynamoDB Streams directly to SQS without Lambda or EventBridge Pipes."
+    }
+  ]
+}

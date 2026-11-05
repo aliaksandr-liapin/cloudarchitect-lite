@@ -1,0 +1,268 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The B2B authentication decision remains unanswered: R16 is still a question, and no application authentication or authorization mechanism is described. WAF request filtering does not establish client identity or tenant authorization.",
+          "evidence": "https://docs.aws.amazon.com/waf/latest/developerguide/what-is-aws-waf.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify security-group relationships allowing only the ALB to reach tasks and only tasks to reach PostgreSQL and the cache, together with least-privilege task and execution roles; private placement alone does not define these controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make the ECS service configuration explicit: maintain tasks across both AZs, configure health checks and sufficient surviving-zone capacity, and handle database and cache reconnections after failover.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The connection notation is misleading in two places: WAF should be associated with the ALB rather than presented as a separately invoked HTTPS endpoint, and tasks pull images from ECR rather than ECR initiating delivery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The claim that sessions survive an AZ loss needs qualification because Redis-compatible replication is asynchronous and failover can lose recent session writes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Identify the credential-rotation implementation and explain how application connections obtain refreshed credentials; storing and rotating a secret does not by itself refresh credentials already cached by the application.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-matched, reasonably economical Multi-AZ container architecture covers the explicit requirements but needs a concrete authentication decision and clearer operational and security configuration."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The REST API integration with the internal ALB omits the required VPC link and private-integration configuration. The illustrated forwarding edges alone do not provide connectivity into the VPC.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "The RDS Proxy authentication path is incomplete: no proxy access to the stored database secret or alternative database-authentication configuration is shown, and the task-to-proxy authentication method is not selected. Placing a proxy between the application and database does not establish these credentials automatically.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-setup.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that the REST API uses a Cognito user-pool authorizer with appropriate resource-server scopes for client-credentials access tokens; 'Cognito client-credentials authorizer' is not a distinct authorizer type.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the ECS service's minimum cross-AZ task placement, surviving-zone capacity, security-group boundaries, least-privilege IAM roles, and encrypted database/cache connections rather than relying solely on private-subnet placement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API Gateway, an internal ALB, RDS Proxy, and Aurora introduce additional cost and configuration compared with a simpler ALB-and-RDS baseline; explain the workload or API-management needs that justify each addition.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B provides an explicit machine-to-machine authentication choice and a plausible HA stack, but its private API integration and proxy authentication are incomplete and its additional components need stronger justification."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R13 promises duplicate-free email delivery on reruns, but no durable per-report/per-recipient delivery state or deduplication workflow is described. Deterministic S3 keys do not prevent duplicate emails after a partial failure or repeated task launch.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For the public-subnet Fargate approach, explicitly enable a task public IP and internet-gateway routing, deny unsolicited inbound traffic, and scope task permissions; public-subnet placement alone does not establish outbound connectivity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned URLs are transferable bearer credentials, not recipient-bound authorization. State that forwarded links remain usable until expiration and account for the signing task credentials' lifetime when selecting link validity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define the schedule's time zone, launch-failure retry/DLQ behavior, and a completion-or-missing-success alarm. Scheduler delivery success does not demonstrate that the 25-minute task completed successfully.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Include SES sender verification, production access where required, and handling of throttling or failed sends so emailing all 40 managers is an explicit deployment prerequisite.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A is a simple and cost-conscious fit for the 25-minute nightly job, with remaining gaps around deduplication, task networking, delivery readiness, and the limits of emailed bearer links."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The private-subnet Fargate task has no specified NAT route or suitable VPC endpoints for image retrieval and its S3, SES, and logging calls. An explicit outbound-access design is required, and its cost must be included.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "No database authentication or credential-delivery mechanism is selected for the reporting task. Define a read-only database identity and securely supply its credentials, or explicitly configure an alternative such as supported IAM database authentication.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/specifying-sensitive-data.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For the HTTP API, specify a JWT authorizer using the Cognito issuer and intended audience rather than leaving the configuration as a REST-style 'Cognito user pool' authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The emailed-link sign-in experience is incomplete: identify the landing page or client that performs sign-in and submits the resulting token to the download API, and restrict access to provisioned manager identities.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito, API Gateway, Lambda, and sign-in client introduce an additional application to build and maintain; justify this against the simple-and-cheap requirement rather than treating authenticated downloads as cost-free complexity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the schedule time zone, task completion and missing-run alarms, launch-failure handling, and a rerun strategy that avoids unnecessary duplicate emails.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B selects suitable long-running serverless compute and stronger download authentication, but omits essential task connectivity and database authentication while adding a comparatively complex download application."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "R10 promises prompt content updates, but no cache TTL, Cache-Control policy, or invalidation procedure is specified; uploading replacement files does not immediately refresh cached CloudFront responses.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly configure the viewer protocol policy to redirect HTTP to HTTPS or require HTTPS, and use the S3 REST origin with OAC rather than an S3 website endpoint.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Identify the alarm notification destination and keep alarm count and noncurrent object-version retention bounded so optional monitoring and versioning remain consistent with the small monthly budget.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A is a strong low-cost static-site design with correctly located TLS certification, private OAC-backed storage, and scoped staff access, needing only small caching and operational refinements."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The bucket is declared private, but no OAC/OAI origin authentication or bucket policy authorizing CloudFront is specified. HTTPS origin requests alone do not grant CloudFront access to private objects.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in an unspecified Primary Region; explicitly require us-east-1 for the certificate attached to CloudFront, regardless of the bucket's Region.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The staff upload path does not define authenticated, least-privilege access limited to the website content; add an explicit IAM-based access arrangement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify cache lifetimes or an invalidation procedure for menu and opening-hours updates, because replacing an S3 object does not immediately replace previously cached responses.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B uses the right inexpensive hosting services and explicitly redirects HTTP, but leaves private-origin authorization, the CloudFront certificate Region, and staff access insufficiently specified."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "A meets the explicit hosting, availability, egress, and rotation requirements with fewer components and a clearer ingress path; B adds cost and leaves its VPC-link and proxy-authentication integrations incomplete."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "A",
+      "why": "A better matches the simple-and-cheap priority through a single scheduled Fargate job, direct email delivery, and an explicit credential store; B adds a download application while omitting essential private-task connectivity."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "A",
+      "why": "Both choose an appropriate low-cost static stack, but A explicitly supplies OAC, the required us-east-1 certificate placement, and scoped staff access."
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import type { Project } from '@cloudarchitect/domain';
+import type { Project, Provider } from '@cloudarchitect/domain';
 import type { LlmClient, LlmRequest } from '@cloudarchitect/generator';
 import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
-import { loadConfig } from './config.js';
+import { effectiveModels, loadConfig, type Settings } from './config.js';
+import { SetupService } from './setup.js';
 import { OPERATION_TTL_MS } from './operation-token.js';
 import { MemorySpendStore } from './store.js';
 
@@ -93,7 +94,12 @@ function fakeLlm(opts: FakeOptions = {}) {
         : (opts.graphText ?? JSON.stringify(graph));
     return { text, usage, stopReason: 'end_turn' };
   };
-  return { factory: (_apiKey: string) => llm, requests };
+  const factoryCalls: [Provider, string][] = [];
+  const factory = (provider: Provider, apiKey: string) => {
+    factoryCalls.push([provider, apiKey]);
+    return llm;
+  };
+  return { factory, requests, factoryCalls };
 }
 
 function setup(opts: FakeOptions & { env?: Record<string, string> } = {}) {
@@ -113,7 +119,7 @@ function setup(opts: FakeOptions & { env?: Record<string, string> } = {}) {
     llm: fake.factory,
     now: () => clock.t,
   });
-  return { app, store, logs, clock, requests: fake.requests };
+  return { app, store, logs, clock, requests: fake.requests, factoryCalls: fake.factoryCalls };
 }
 
 const post = (body: unknown, ip = '203.0.113.7', signal?: AbortSignal) => ({
@@ -526,5 +532,180 @@ describe('/api/ai/generate', () => {
         ].sort(),
       );
     expect(events.map((l) => l.outcome)).toEqual(['questions', 'done']);
+  });
+});
+
+describe('multiple providers', () => {
+  const OPENAI_KEY = 'sk-openai-test-not-a-real-key';
+  const GEMINI_KEY = 'gemini-test-not-a-real-key';
+  const ANTHROPIC_KEY = 'sk-ant-saved-not-a-real-key';
+
+  it('a 0.2 install (Anthropic key and Haiku saved) starts and generates as before', async () => {
+    const settings: Settings = {
+      ANTHROPIC_API_KEY: ANTHROPIC_KEY,
+      AI_MODELS: 'haiku',
+      DEFAULT_MODEL: 'haiku',
+      CLIENT_KEY_SALT: 'saved-salt-0123456789',
+      setupCompletedAt: '2026-10-20T10:00:00.000Z',
+    };
+    const service = new SetupService({
+      env: {},
+      persistence: { read: () => settings, write: () => undefined },
+      setupCode: 'c',
+      generateSalt: () => 'unused-salt-0123456789',
+    });
+    expect(effectiveModels(service.config())).toEqual({
+      enabled: ['haiku'],
+      defaultModel: 'haiku',
+    });
+    expect(service.status()).toMatchObject({
+      configured: true,
+      providers: { anthropic: 'saved', openai: 'none', google: 'none' },
+    });
+    const fake = fakeLlm();
+    const app = createApp({
+      config: () => service.config(),
+      setup: service,
+      store: new MemorySpendStore(),
+      llm: fake.factory,
+    });
+    // The browser saved `haiku` in 0.2 and sends it.
+    const res = await app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion, model: 'haiku' }),
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Done).status).toBe('done');
+    expect(fake.factoryCalls.every(([p, k]) => p === 'anthropic' && k === ANTHROPIC_KEY)).toBe(
+      true,
+    );
+    expect(fake.requests.map((r) => r.model)).toEqual(['claude-haiku-5-5', 'claude-haiku-5-5']);
+  });
+
+  it('routes a gpt-sol generation to the OpenAI client for both calls', async () => {
+    const s = setup({
+      env: {
+        OPENAI_API_KEY: OPENAI_KEY,
+        AI_MODELS: 'haiku,gpt-sol',
+      },
+    });
+    const res = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion, model: 'gpt-sol' }),
+    );
+    expect(res.status).toBe(200);
+    expect(s.factoryCalls.length).toBeGreaterThan(0);
+    expect(s.factoryCalls.every(([p, k]) => p === 'openai' && k === OPENAI_KEY)).toBe(true);
+    expect(s.requests.map((r) => r.model)).toEqual(['gpt-6-luna', 'gpt-6.1-sol']);
+    expect((await s.store.spend()).dayMicroUsd).toBeGreaterThan(0);
+  });
+
+  it('routes continue to the provider of the model in the token', async () => {
+    const s = setup({
+      questions: [question],
+      env: { GEMINI_API_KEY: GEMINI_KEY, AI_MODELS: 'haiku,gemini-argon' },
+    });
+    const start = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion, model: 'gemini-argon' }),
+    );
+    const q = (await start.json()) as Questions;
+    const res = await s.app.request(
+      '/api/ai/generate/continue',
+      post({ operationId: q.operationId, operationToken: q.operationToken }),
+    );
+    expect(res.status).toBe(200);
+    expect(s.factoryCalls.every(([p, k]) => p === 'google' && k === GEMINI_KEY)).toBe(true);
+    expect(s.requests.map((r) => r.model)).toEqual(['gemini-3.5-flash-lite', 'gemini-4-argon']);
+  });
+
+  it('a model whose provider has no key answers setup_required; the default falls back', async () => {
+    const s = setup({ env: { AI_MODELS: 'haiku,gpt-luna', DEFAULT_MODEL: 'gpt-luna' } });
+    const models = (await (await s.app.request('/api/models')).json()) as {
+      defaultModel: string;
+      enabled: string[];
+      available: Record<string, boolean>;
+    };
+    expect(models.enabled).toEqual(['haiku']);
+    expect(models.defaultModel).toBe('haiku');
+    expect(models.available).toMatchObject({ haiku: true, sonnet: true, 'gpt-luna': false });
+
+    const missing = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion, model: 'gpt-luna' }),
+    );
+    expect(missing.status).toBe(503);
+    expect(await missing.json()).toEqual({ error: 'setup_required' });
+    expect(s.requests).toHaveLength(0);
+
+    const fallback = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion }),
+    );
+    expect(fallback.status).toBe(200);
+    expect(s.factoryCalls.every(([p]) => p === 'anthropic')).toBe(true);
+    expect(s.requests.map((r) => r.model)).toEqual(['claude-haiku-5-5', 'claude-haiku-5-5']);
+
+    const none = setup({ env: { AI_MODELS: 'gpt-luna', DEFAULT_MODEL: 'gpt-luna' } });
+    const res = await none.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion }),
+    );
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'setup_required' });
+    expect(none.requests).toHaveLength(0);
+  });
+
+  it('spending limits count OpenAI and Gemini spend together and block every provider', async () => {
+    // One generation is two calls: 2000 in / 800 out each.
+    const luna = 2 * Math.ceil(2000 * 0.1 + 800 * 0.5);
+    const flash = 2 * Math.ceil(2000 * 0.3 + 800 * 2.5);
+    const s = setup({
+      env: {
+        OPENAI_API_KEY: OPENAI_KEY,
+        GEMINI_API_KEY: GEMINI_KEY,
+        AI_MODELS: 'haiku,gpt-luna,gemini-flash-lite',
+        DAILY_BUDGET_MICRO_USD: String(luna + flash),
+      },
+    });
+    for (const model of ['gpt-luna', 'gemini-flash-lite']) {
+      const res = await s.app.request(
+        '/api/ai/generate',
+        post({ prompt: PROMPT, catalogVersion, model }),
+      );
+      expect(res.status).toBe(200);
+    }
+    expect((await s.store.spend()).dayMicroUsd).toBe(luna + flash);
+    const calls = s.requests.length;
+    for (const model of ['haiku', 'gpt-luna', 'gemini-flash-lite']) {
+      const res = await s.app.request(
+        '/api/ai/generate',
+        post({ prompt: PROMPT, catalogVersion, model }),
+      );
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: 'ai_unavailable' });
+    }
+    expect(s.requests.length).toBe(calls);
+  });
+
+  it('a provider error that contains the key returns provider_error and never logs the key', async () => {
+    const s = setup({
+      env: { OPENAI_API_KEY: OPENAI_KEY, AI_MODELS: 'haiku,gpt-luna' },
+      onCall: () => {
+        throw Object.assign(new Error(`401 Incorrect API key provided: ${OPENAI_KEY}`), {
+          status: 401,
+        });
+      },
+    });
+    const res = await s.app.request(
+      '/api/ai/generate',
+      post({ prompt: PROMPT, catalogVersion, model: 'gpt-luna' }),
+    );
+    expect(res.status).toBe(502);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({ error: 'provider_error' });
+    expect(text).not.toContain(OPENAI_KEY);
+    expect(s.logs.length).toBeGreaterThan(0);
+    expect(JSON.stringify(s.logs)).not.toContain(OPENAI_KEY);
   });
 });

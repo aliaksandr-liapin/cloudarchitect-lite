@@ -1,0 +1,278 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "There is no explicit barrier between asynchronous file validation and starting automated checks. Starting the workflow on submission can race with S3 upload notifications and validation; require all expected documents to have successful validation results before proceeding.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+        },
+        {
+          "severity": "major",
+          "description": "The audit table's append-only enforcement is incomplete: denying UpdateItem and DeleteItem does not stop PutItem from replacing an existing audit item. Specify conditional-create writes and an appropriate retention and tamper-protection mechanism.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "major",
+          "description": "The no-duplicate-email requirement is not established by conditional claim writes. SES SendEmail has no request idempotency token, so a successful send followed by a failure before recording completion can cause another email on retry; define a notification ledger, reconciliation, and the limits of the delivery guarantee.",
+          "evidence": "https://docs.aws.amazon.com/ses/latest/APIReference/API_SendEmail.html"
+        },
+        {
+          "severity": "major",
+          "description": "The API Gateway-to-CloudTrail edge incorrectly suggests that CloudTrail records customer-facing REST API invocations. API Gateway CloudTrail integration covers management operations; request-level access auditing needs API Gateway access logs and the application audit records already proposed.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/logging-using-cloudtrail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The purportedly decided clarification requirements still leave volume, retention duration, and applicable compliance assumptions unresolved.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A strong serverless workflow foundation addresses callbacks, retries, backups and operational recovery, but validation ordering and the audit and email guarantees require correction."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The failure-resumption requirement is under-specified: no concrete Retry/Catch policy, submission deduplication, or reconciliation is provided for failures between persisting an adjuster decision and sending its task-token callback. Durable execution state alone does not make these separate side effects atomic or recover them automatically.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authentication and staff authorization are described, but per-claim authorization is not specified for customer status, claim-detail, and document-access operations. These endpoints must verify ownership or authorized assignment rather than merely accept a valid Cognito identity.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/permissions-management.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Defined retention, DynamoDB recovery settings, document versioning, and enforcement of append-only audit writes are left unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The workflow-to-adjuster HTTPS edge is conceptual rather than an actual delivery integration; identify how the staff interface discovers pending claims and who receives timeout escalations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the document-read path used by automated checks and define notification deduplication and recovery after ambiguous email-send outcomes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The main submission and human-callback paths are coherent and economical, but the design leaves too much of the explicitly required failure recovery and authorization behavior undefined."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes back to its triggering bucket without an explicit originals-only notification filter or excluded output prefix. This needs to be specified before deployment to prevent thumbnail writes from recursively invoking thumbnail generation.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "An SQS on-failure destination for a DynamoDB Streams event source does not preserve the complete failed stream records. Configure the event-source mapping destination explicitly and account for the stream's limited retention; otherwise the claimed ability to inspect and replay failed subscriber events can disappear after the source records expire.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify CloudFront cache keys, TTLs, origin request policies and publication invalidation behavior, keeping authenticated or personalized responses outside shared public caches.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Email idempotency is asserted without describing persistent deduplication state or recovery after SES accepts a message but the processor fails before recording completion.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned URL generation is local request signing, not an invocation of S3; the diagram should distinguish signing from the browser's actual upload request.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The low-cost global read architecture fits the request well, but thumbnail recursion protection and recoverable stream-failure handling are important missing safeguards."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The DynamoDB Streams-to-SQS relay has no specified failure destination, retry limits, or reconciliation mechanism. Worker DLQs do not protect events that never reach the welcome-email queue; a prolonged relay failure can outlast stream retention despite the claim that the outbox path avoids lost events.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify CloudFront cache keys, TTLs, forwarding policies and post-publication invalidation behavior so public reads are cached efficiently without caching authenticated author responses.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Complete the client-side connection descriptions for author sign-in and direct presigned S3 uploads, and distinguish local URL signing from an S3 write.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Subscriber-level email idempotency needs a persistent state model and an explicit policy for ambiguous SES send outcomes; an idempotency key alone does not explain that recovery behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design meets the blog requirements with effective edge caching, protected author writes and well-separated asynchronous workers, with the stream relay remaining its main recovery gap."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "As modeled, there are two separate ALBs, each placed in only one Availability Zone. A regional ALB requires subnets in at least two Availability Zones; use one ALB spanning both public subnets, or explicitly identify the two nodes as placements of that single resource rather than separate single-AZ load balancers.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "No NAT or VPC-endpoint egress path is provided for the private Fargate tasks. The tasks need a working path for image pulls and service dependencies, including Secrets Manager, logging and public Cognito JWKS access.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Customer-managed encryption is not configured for Fargate ephemeral storage, which otherwise uses AWS-owned encryption. The listed KMS integrations therefore do not establish the blanket customer-controlled-key requirement for container storage.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Aurora replica is incorrectly described as a synchronous standby. Aurora replicas share the cluster storage volume but can have replication lag; applications must not assume synchronous, immediately current replica reads.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Replication.html"
+        },
+        {
+          "severity": "major",
+          "description": "Versioning and KMS encryption alone do not make the audit bucket immutable. The stated immutability guarantee needs controls such as S3 Object Lock with an appropriate retention configuration.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify CloudTrail log-file validation, multi-Region coverage, global service events, and both read and write management events to substantiate the full-account, tamper-evident audit claim.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify certificate and WAF deployment scopes: CloudFront needs its ACM certificate in us-east-1, regional ALBs need regional certificates, edge and regional WAF associations require appropriate ACLs, and container certificates need an installation and renewal mechanism.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Although the service selection broadly matches a banking portal, the ALB model is not deployable as specified and significant networking, encryption and audit guarantees remain incomplete."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The customer-controlled-key requirement is not completed for Fargate ephemeral storage. Configure its customer-managed KMS key explicitly rather than relying on the default AWS-owned encryption.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html"
+        },
+        {
+          "severity": "major",
+          "description": "The private ECR repository has no customer-managed encryption configuration. ECR's default encryption does not use a bank-controlled key, so specify customer-managed KMS encryption when creating the repository.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the CloudTrail trail explicitly multi-Region, include global service activity and both read and write management events, and state the audit retention duration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the CloudFront certificate's us-east-1 placement, the regional ALB certificate, and how container HTTPS certificates are issued, installed and renewed.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that application JWT validation checks signatures and required claims using the user pool's JWKS rather than implying a generic Cognito token-validation API.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a coherent, highly available private-container portal with strong edge and audit controls, but customer-managed encryption must be extended to container storage and images."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A more directly addresses the central recovery requirement through explicit retries, conditional writes, a validation DLQ, backups and timeout alarms, although its validation ordering and audit/email guarantees still need fixes."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B explicitly separates upload and thumbnail prefixes and provides buffered workers with independent DLQs and partial-batch handling, improving reliability without materially compromising the low-cost serverless approach."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B correctly models one multi-AZ ALB, provides per-AZ private-task egress, and includes least-privilege roles, log validation and Object Lock; its remaining encryption gaps are narrower than A's deployment and security problems."
+    }
+  ]
+}

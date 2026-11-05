@@ -1,0 +1,298 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The HTTP API authorizer references N17, which is CloudWatch, rather than a valid JWT authorizer using the Cognito user pool. Authentication cannot work as configured.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The order lookup connects an HTTP API directly to DynamoDB using AWS-SDK semantics. DynamoDB is not a supported HTTP API AWS service integration; route the lookup through Lambda or use an appropriately configured REST API integration.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "major",
+          "description": "Saving the order and publishing its event are separate writes. A failure after the DynamoDB write but before successful SNS publication can leave an accepted order without downstream processing. A transactional outbox or equivalent durable publication mechanism is needed.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "The three DLQs are listed but have no redrive relationships or maxReceiveCount configuration, and no DLQ alarms or replay procedure is described. Their existence alone does not implement exhausted-retry handling.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Consumer DLQs do not cover failures delivering from SNS into the work queues. Subscription-level dead-letter handling is missing, leaving a separate notification-loss path.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "No worker idempotency mechanism is specified. Lambda's SQS integration can deliver records more than once, making duplicate payment capture and inventory reservation possible.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege execution roles and order ownership checks; authenticating a caller does not establish that they may read any supplied order ID.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The fan-out service choices are appropriate, but invalid API configuration and incomplete publication, retry and duplicate-handling paths prevent this design from meeting the request."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "SNS subscriptions have no delivery DLQs. The work-queue DLQs only handle messages successfully delivered into SQS, so SNS delivery failures remain outside the stated no-silent-loss handling.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The publisher failure path does not specify durable retention of complete failed events. If implemented with Lambda's DynamoDB-stream SQS on-failure destination, it retains batch metadata rather than the original records, while stream records expire after 24 hours. Specify full-event storage or reconstruction from the orders table and a replay procedure.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Generating a fresh order ID and conditionally inserting by that ID does not make repeated POST requests idempotent. A retried request can generate another order and payment; use a stable client/request idempotency key mapped to the original result.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Document execution-role permissions and customer-to-order authorization checks for GET /orders/{id}. Cognito authentication alone does not provide object-level authorization.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the stream filter for newly placed orders, queue retention and visibility settings, and the operational owner and procedure for replaying alarmed failures.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a strong managed fan-out design with a committed-write publication path, explicit redrive handling and duplicate-aware workers, but delivery recovery and request idempotency need tightening."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The 500 TPS statement and availability language are not backed by model benchmarks, endpoint instance sizing, minimum instance count or autoscaling bounds. Treat these as targets rather than demonstrated checkout guarantees.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify timeout, retry and fail-closed behavior for inference or persistence failures, plus a stable transaction-id policy for retried checkout requests.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The monthly deployment workflow needs explicit model-quality acceptance criteria and rollback alarms; stating blue/green deployment does not define when a candidate should be rejected or rolled back.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document least-privilege Lambda, workflow and SageMaker execution roles, and avoid logging sensitive payment payloads.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design directly satisfies managed custom-model hosting, synchronous scoring, score persistence and monthly retraining, with remaining work mainly in operational safeguards and capacity validation."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The private-subnet Lambda has an explicitly described private route to SageMaker but no DynamoDB VPC endpoint or NAT egress. Its transaction-write path therefore lacks the network connectivity needed to complete checkout.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "The checkout Lambda is configured only in the AZ1 subnet despite claiming two-AZ checkout availability. Configure the function with suitable subnets in multiple Availability Zones rather than relying solely on a multi-AZ model endpoint.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that SageMaker hosting VPC configuration and private runtime invocation are different controls. Name the runtime interface endpoint and IAM or endpoint conditions that enforce checkout-only access; a private route alone does not prohibit other authorized invocation paths.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The architect-decided latency, availability and peak-throughput questions remain unanswered. Provide measurable targets, instance sizing assumptions and autoscaling minimum and maximum capacity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define scoring and persistence failure behavior, model-quality gates, and endpoint rollout and rollback criteria before automating monthly production updates.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed ML and model-version traceability choices are sound, but the private checkout path lacks DynamoDB connectivity and does not implement its claimed two-AZ function deployment."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The explanation incorrectly treats KMS encryption and S3 versioning as making the audit trail tamper-evident. They do not provide CloudTrail log-integrity verification. Enable log-file validation and protect retained logs and digest files rather than relying on that assurance.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+        },
+        {
+          "severity": "major",
+          "description": "Customer-controlled encryption is explicit for the database and archive bucket but not for CloudWatch log groups. CloudWatch Logs requires an explicit customer-managed KMS key association to meet the bank's key-control requirement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+        },
+        {
+          "severity": "major",
+          "description": "Secrets Manager has no customer-managed key selection. Its default service-managed key does not satisfy the requirement that the bank control keys for all stored data.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+        },
+        {
+          "severity": "major",
+          "description": "The claimed application-tier AZ resilience is not implemented in the deployment shown: tasks and the sole NAT gateway are only in AZ A. Place tasks across both AZs and provide resilient required egress.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/availability-zone-rebalancing.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The HTTPS edge to Route 53 incorrectly labels ordinary DNS resolution as an HTTPS invocation. Use DNS semantics unless an explicit DNS-over-HTTPS resolver is intended.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Replace the generic Cognito token-validation call with a defined JWT verification or ALB-claim verification flow, including signature, issuer, audience and authorization checks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make multi-Region read/write management-event coverage, global-service events, audit retention, and key-control treatment for image storage, task storage and identity data explicit.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the principal portal security services and private container pattern, but overstates audit integrity and leaves customer-key coverage and application-tier resilience incomplete."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The API path assumes that ALB Cognito authentication validates a customer identity token carried on an API request. ALB authenticate-cognito uses its redirect-based authorization-code and session-cookie flow, not a general bearer-token authorizer. Use that browser flow correctly or validate API JWTs in an appropriate API authorizer or application component.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "WAF protects CloudFront, but the public ALB has no documented restriction to CloudFront-originated requests. Direct ALB requests can bypass the web ACL. Restrict origin access or also protect the ALB with WAF.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "major",
+          "description": "The private SSE-KMS S3 origin lacks a specified origin access control and the necessary bucket and KMS permissions. Those authorizations are required for CloudFront to retrieve encrypted objects without making the bucket public.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "No NAT egress or service VPC endpoints are provided for the private Fargate tasks. Required image pulls and the explicitly shown CloudWatch log delivery need a working network path.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Bank-controlled encryption is specified only for the S3 buckets. CloudWatch log groups have no customer-managed KMS association, so the explicit all-data key-control requirement is not fully implemented.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify multi-Region read/write management-event coverage, global-service events, log-file validation and concrete audit retention and access controls rather than leaving the full-account audit configuration implicit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Resolve customer-key coverage for identity data, container images and task storage, and document any bank-approved exceptions instead of narrowing the original requirement to supported S3 encryption.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The edge-delivery and two-AZ container layout are useful, but the incorrect ALB token-authentication model and missing origin, egress and encryption controls leave core security requirements unmet."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B provides a valid lookup path, committed-write event publication, explicit queue redrive relationships, failure alarms and duplicate-aware workers, although its final delivery and replay guarantees still need work."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "A",
+      "why": "A meets the requested managed hosting, synchronous scoring, persistence and monthly retraining with a coherent service path; B introduces private networking without completing DynamoDB connectivity or its claimed two-AZ Lambda deployment."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "A is closer to a workable authenticated private-container portal and protects the direct public application entry point with WAF; B additionally relies on an incorrect ALB bearer-token authentication model and leaves its CloudFront origin bypassable."
+    }
+  ]
+}

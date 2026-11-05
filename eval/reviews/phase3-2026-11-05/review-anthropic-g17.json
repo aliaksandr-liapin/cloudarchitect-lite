@@ -1,0 +1,203 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No WAF in front of the internet-facing ALB for a public B2B API. Authentication is left entirely to application code.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Application tasks and the RDS and ElastiCache nodes share one private subnet per AZ, so there is no separate data tier. Encryption uses AWS-managed keys only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The payments API credential and the ECR image source are not modelled. VPC endpoints are not mentioned, so image pulls and Secrets Manager traffic all go through the NAT gateways.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Splitting the single ALB into two 'attachment' nodes makes the diagram noisy, although the rationale explains it correctly.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, fully multi-AZ Fargate, RDS, Valkey and Secrets Manager design with an explicit rotation Lambda and per-AZ NAT egress. It is lighter on edge security and extras such as WAF."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The rotation path is drawn as Secrets Manager -> RDS 'native rotation', with no rotation Lambda or managed-rotation detail. It is unclear how the rotation mechanism reaches the VPC database, which is an explicit requirement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only the AZ A tasks have an edge to Cognito for JWKS validation. The AZ B tasks are missing it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ECR node is marked UNRESOLVED. The ALB is placed only in public subnet A although the text says it spans two AZs.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A more complete production baseline with WAF, Route 53, ACM, customer-managed KMS keys, CloudTrail, separate data subnets and a payments-key secret. Its credential rotation mechanism is only sketched."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The mechanism that keeps the S3 bucket private is not stated. Origin Access Control is not named, even though the bucket is said to be reachable only via CloudFront.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in an unnamed 'Primary Region'. Certificates for CloudFront must be in us-east-1. CloudFront metrics and alarms also live in us-east-1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Bakery staff write directly to S3. The IAM or credential method is not described, and there is no versioning to undo bad uploads.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Right services (Route 53, ACM, CloudFront, private S3) and an explicit staff update path. The private-origin mechanism and the certificate region are left vague."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No explicit content upload or update path is modelled. HTTP-to-HTTPS redirect and a default root object are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal, correct low-cost design. It names Origin Access Control for the private bucket, puts the certificate in us-east-1, enables S3 versioning and gives accurate cost rationale."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Handlers write step status back to the same Orders table that feeds the stream publisher. The publisher must filter for INSERT events only, otherwise status updates would republish OrderPlaced. The text says 'new orders' but does not state the filter.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SNS-to-SQS subscription permissions are not detailed. Queue encryption described as 'AWS-managed' must be SSE-SQS, because SNS cannot deliver to a queue encrypted with the aws/sqs key. Stream retry limits and bisect-on-error are not specified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thorough outbox, SNS fan-out and per-step SQS and DLQ design with WAF and Cognito, idempotent handlers that record status in the Orders table, and DLQ alarms. It covers every requirement and inferred need."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The payment and email workers claim idempotency but no idempotency record or per-step status store exists. Only inventory has a conditional-write table. Payment capture results are not persisted, so duplicate captures on redelivery cannot be prevented or inspected, and order progress cannot be queried.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No WAF or throttling protection on the public API. The Cognito authorizer is only a configuration value and the Cognito service is not modelled.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Queue and topic encryption and SNS-to-SQS access policies are not specified. The client is typed as 'third-party'.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound outbox, fan-out, per-step DLQ and alarm structure that meets the core asks. It is thinner on idempotency state, per-step status visibility and API protection."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "Both are valid multi-AZ designs. B adds WAF, customer-managed KMS, CloudTrail, ECR, a payments-key secret and a separate data tier, while A shows the rotation Lambda more precisely. B's stronger security baseline gives it a slight edge."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "B explicitly uses Origin Access Control, places the certificate in us-east-1, enables versioning and gives accurate cost rationale. A leaves the private-origin mechanism and the certificate region vague."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "A persists per-step status and idempotency state in the Orders table, adds WAF and Cognito, and provides full DLQ alarms. B's payment and email workers have no idempotency or status store."
+    }
+  ]
+}

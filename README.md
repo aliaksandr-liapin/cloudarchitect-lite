@@ -15,21 +15,21 @@ _Replay of a real recorded generation with Claude Haiku, shortened: a real gener
 
 ## Install
 
-You need [Docker](https://docs.docker.com/get-docker/) and an [Anthropic API key](https://platform.claude.com/settings/keys). Then run one command.
+You need [Docker](https://docs.docker.com/get-docker/) and an API key from Anthropic, OpenAI or Google (Gemini): [Anthropic](https://platform.claude.com/settings/keys), [OpenAI](https://platform.openai.com/api-keys), [Google AI Studio](https://aistudio.google.com/apikey). Any one is enough. Then run one command.
 
 macOS and Linux:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml && docker compose up
 ```
 
 Windows (PowerShell):
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml; docker compose up
 ```
 
-Open the setup link printed in the terminal. A short wizard checks your key, lets you pick a model and sets your daily and monthly spending limits. Then the editor is at <http://localhost:8080>.
+Open the setup link printed in the terminal. A short wizard checks your keys, lets you pick models and sets your daily and monthly spending limits. Then the editor is at <http://localhost:8080>.
 
 Details, upgrading and troubleshooting: [installation guide](docs/operations/installation.md). To build from source, see [development guide](docs/engineering/development.md).
 
@@ -44,18 +44,31 @@ Details, upgrading and troubleshooting: [installation guide](docs/operations/ins
 3. **Validate**: 25 deterministic rules (VR-001 to VR-025, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
 4. **Edit and export** on the canvas, then export JSON, PNG or SVG.
 
+## Claude vs GPT vs Gemini
+
+**Claude vs GPT vs Gemini: GPT-6.1 Sol scored highest in a blind review by a panel of all three providers.** Six models were measured on the same code; the four that met the listing bar are offered in the setup wizard and the editor.
+
+| Model             | Blind score (0-3) | Checks passed | Cost per design | Typical wait |
+| ----------------- | ----------------- | ------------- | --------------- | ------------ |
+| GPT-6.1 Sol       | 2.86              | 86.7%         | $0.0440         | 65 s         |
+| Claude Sonnet 5.5 | 2.55              | 100%          | $0.0490         | 30 s         |
+| Claude Haiku 5.5  | 2.52              | 86.4%         | $0.0071         | 53 s         |
+| Gemini 4 Argon    | 2.43              | 100%          | $0.1197         | 50 s         |
+
+Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked 2026-11-04; Gemini 4 Argon is priced at its December rate. Method, the two unlisted models and all limits: [benchmark report](docs/product/phase3-provider-benchmark.md).
+
 ## What works today
 
 - Plain-English description, clarifying questions and design-priority toggles (serverless-first, backups, disaster recovery, high availability, cost-optimized, security hardening).
 - AWS diagrams with official icons, containers and 25 validation rules with findings.
 - Editor: drag, resize, auto layout, light and dark theme, and versions that keep earlier diagrams.
 - Import and export JSON; export PNG and SVG.
-- Self-hosted with Docker on your own Anthropic key, with daily and monthly spending limits.
-- Choice of Claude Haiku 5.5 or Claude Sonnet 5.5. In the Gate A live runs, Haiku cost about $0.007 per generation and Sonnet about $0.045, and both passed the automated checks on 93% of runs. On the same nine base scenarios, blind reviewers scored Haiku 2.00 and Sonnet 2.57 out of 3. Method and caveats: [Gate A report](docs/product/phase2-gate-a.md).
+- Self-hosted with Docker on your own Anthropic, OpenAI or Gemini key (one is enough), with daily and monthly spending limits that count all providers together.
+- Choice of four measured models from three providers: Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol and Gemini 4 Argon. Scores, cost and wait are in the [benchmark table](#claude-vs-gpt-vs-gemini); method and caveats: [benchmark report](docs/product/phase3-provider-benchmark.md).
 
 ## What's next
 
-0.3 compares Claude, GPT and Gemini with a public benchmark. 0.4 adds Review (an AI critique of any diagram) and Mermaid export. See the [roadmap](docs/product/roadmap.md#2-public-release-roadmap-from-2026-10-26).
+0.3 added OpenAI and Gemini next to Claude and the public benchmark above. 0.4 adds Review (an AI critique of any diagram) and Mermaid export. See the [roadmap](docs/product/roadmap.md#2-public-release-roadmap-from-2026-10-26).
 
 ## Documentation
 

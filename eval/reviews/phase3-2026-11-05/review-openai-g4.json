@@ -1,0 +1,263 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design explicitly proposes two separate zonal, single-subnet Application Load Balancers. An ALB requires subnets in at least two Availability Zones; use one regional ALB spanning both public subnets and targeting both API task groups.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "A Kinesis event-source mapping's SQS failure destination retains failure metadata and sequence information, not the complete failed CDC payload. The queue therefore does not independently preserve product changes for replay after stream retention expires; specify retention-aware replay or a full-payload archive/destination, together with bounded retries.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "The index updater must reach the private ElastiCache cluster, but its VPC attachment, subnet selection and security-group access are unspecified. A default Lambda networking configuration cannot reach private VPC resources.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain has no specified VPC placement, access policy, caller permissions or encryption settings. These controls must be defined rather than assuming that the security of the relational database also protects the search copy.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html ; https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
+        },
+        {
+          "severity": "major",
+          "description": "WAF protects CloudFront, but the public ALB origins have no stated restriction preventing direct access. Requests could bypass the distribution and its WAF protection; restrict origin access using appropriate listener controls and security groups, or use a private-origin arrangement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The updater invalidates Valkey entries but not CloudFront pages. Define edge TTLs or invalidations for price-bearing pages to satisfy the design's own broader cache-freshness requirement, and specify source-version guards for replay and reindex overlap.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The search and CDC service choices cover the request well, but the invalid zonal ALB construction and unresolved networking, search security and replay controls prevent implementation as drawn."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The Aurora-to-SQS arrow provides no actual mechanism for capturing committed product changes and publishing messages. An outbox relay, CDC publisher or equivalent integration is required; without one, price changes never reach the indexing Lambda.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "The two ALB nodes are depicted as separate single-subnet resources, and the AZ2 node is entirely disconnected. Specify one ALB with subnet mappings in at least two Availability Zones and healthy targets in both zones; an unwired second ALB does not establish redundancy.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "There is no initial indexing path for the existing two million products or a rebuild procedure. A change-only pipeline cannot populate unchanged existing rows; define a full-load-plus-CDC cutover and a reindex strategy.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Tasks.Creating.html"
+        },
+        {
+          "severity": "major",
+          "description": "Queue ordering and stale-update protection are unspecified. Standard SQS provides at-least-once delivery and best-effort ordering, so the indexer needs source-version checks and idempotent writes, or an appropriately designed FIFO pipeline, to prevent older events from restoring stale prices.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the DLQ redrive policy, partial-batch failure behavior, queue-age alarms and end-to-end indexing-lag alarms explicit; merely adding queue and CloudWatch nodes does not demonstrate the one-minute operating target.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify service IAM roles, security-group boundaries and cache invalidation or TTL behavior. Private placement and encryption are useful, but do not fully describe least privilege or price freshness on product pages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The main serving services fit the workload, but the missing CDC producer and catalog bootstrap make the search synchronization path non-working as specified."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The DynamoDB Streams relay has no stated bounded-retry or failure-retention configuration. Downstream email queues protect only jobs successfully enqueued; relay failures can outlast the stream's 24-hour retention and lose welcome-email work. Add a failure destination and reconciliation/replay procedure.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html ; https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned upload URL is a signing operation, not an S3 object write. Show the browser-to-S3 upload using that URL and specify its key scope, expiration and upload restrictions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify CloudFront behavior for authorization headers, upload-authorization responses and other authenticated requests rather than describing all API GETs as cached; also state how membership in the author-only user pool is provisioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a well-matched, low-cost serverless architecture with useful queue isolation and backups, but the subscriber relay failure path and upload/cache details need completion."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Add an explicit recovery policy for authored content and original photos, such as DynamoDB PITR and S3 versioning with lifecycle limits. Encryption and storage durability do not provide recovery from application mistakes or logical deletion.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define recovery for email jobs left in a claimed or uncertain state when the processor fails around the SES send/status update boundary. Conditional status writes reduce duplicates but do not make the external send and database update atomic.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify throttling or abuse controls for public subscription requests and upload-size limits so automated signups or oversized images cannot unnecessarily increase email and processing costs.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design closely matches the global, read-heavy serverless workload and clearly specifies secure uploads, cache separation and asynchronous failure handling, with recovery and abuse-control details remaining."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The checkout Lambda is configured only in the AZ1 subnet despite the design's explicit two-AZ checkout availability requirement. Configure VPC attachment using subnets in multiple Availability Zones.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "No route from the private checkout Lambda to DynamoDB is specified. The SageMaker runtime VPC endpoint does not provide DynamoDB connectivity; add a DynamoDB gateway endpoint or another explicit egress path for the required transaction write.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "The monthly workflow rolls out a new model without stated evaluation gates, deployment health checks or rollback criteria. Add model-quality validation and a monitored rollout before replacing the model used synchronously by checkout.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/deployment-guardrails.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Define inference deadlines, failure behavior and conditional transaction persistence. A transaction-ID key alone does not specify safe handling of concurrent retries, rescoring or failures between inference and storage.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege InvokeEndpoint, S3, DynamoDB and KMS permissions, and enforce the intended checkout-only/private invocation restriction through IAM and endpoint policies rather than relying on network placement alone.",
+          "evidence": ""
+        }
+      ],
+      "summary": "SageMaker hosting and Step Functions retraining are appropriate and preserve the synchronous scoring contract, but private database connectivity, multi-AZ Lambda configuration and safe model rollout need completion."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The timeout fallback can complete a payment without a model prediction, but there is no durable pending-score state or later scoring/reconciliation path. A rules-based decision must be distinguished from a model score if every payment is ultimately to receive and retain the requested prediction.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_runtime_InvokeEndpoint.html"
+        },
+        {
+          "severity": "major",
+          "description": "The schedule targets a composite training-job/registry node, but no executable workflow is identified to wait for training, evaluate and register the output, then update the endpoint. Training jobs and Model Registry do not by themselves implement that complete deployment lifecycle.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/model-registry-deploy.html ; https://docs.aws.amazon.com/step-functions/latest/dg/connect-sagemaker.html"
+        },
+        {
+          "severity": "major",
+          "description": "Endpoint availability and rollout controls are unspecified: there is no minimum multi-instance capacity, concrete scaling policy or monitored deployment/rollback strategy. Autoscaling alone does not establish resilient synchronous checkout inference.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-auto-scaling.html ; https://docs.aws.amazon.com/sagemaker/latest/dg/deployment-guardrails.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Persist model version, scoring source and fallback reason with each transaction, and define idempotent checkout writes. These details are needed to audit rescoring and distinguish a rules decision from an actual model prediction.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the Lambda authorizer's identity-validation behavior and least-privilege permissions for endpoint invocation, transaction writes, training data and KMS access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed hosting choice is appropriate, but fallback scoring semantics, executable retraining orchestration and endpoint availability controls are insufficiently defined."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A provides an actual CDC service, initial load, rebuild path, ordered stream and lag monitoring, whereas B lacks the producer that would move database changes into its queue; both still require substantial corrections."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B more clearly specifies author authorization, direct scoped uploads, public-versus-authenticated cache behavior and bounded asynchronous failure handling, while retaining a low-cost serverless design."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "A",
+      "why": "A provides explicit retraining orchestration, model-version persistence and private synchronous inference without substituting an unreconciled rules decision for the requested model score."
+    }
+  ]
+}

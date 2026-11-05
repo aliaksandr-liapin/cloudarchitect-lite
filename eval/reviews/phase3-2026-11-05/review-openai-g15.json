@@ -1,0 +1,243 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The promise of unchanged Helm charts and manifests is too broad without checking EKS Fargate compatibility, particularly DaemonSets, privileged workloads, storage requirements, and existing telemetry agents.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The telemetry design names generic Container Insights collection without specifying the Fargate-compatible metrics collection mechanism; distinguish built-in Fluent Bit logging from ADOT-based metrics and tracing collection.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database secret access uses IRSA, but Redis authentication, workload-specific permissions for telemetry, and security-group restrictions between the ALB, pods, database, and cache remain unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Two sets of Fargate pods do not by themselves establish application-level AZ resilience; specify replica counts, placement controls, disruption budgets, and sufficient surviving-zone capacity.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the requested platform services, but its minimal-change and availability claims need Fargate-specific compatibility, telemetry, and placement details."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "No secure storage or delivery mechanism is specified for database and cache credentials; define how pods obtain narrowly authorized secrets without embedding credentials in Helm values or deployment manifests.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/best-practices.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Private placement does not document the promised access restrictions; specify workload IAM identities, ALB-to-frontend access, database/cache security-group rules, and Redis authentication.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Managed EKS workers preserve broad Kubernetes compatibility and provide a coherent migration and observability plan, with credential handling the main unresolved security issue."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Credentials are injected into running tasks, but no refresh or task-redeployment mechanism follows rotation; ECS-injected secret values do not update automatically, so tasks can retain invalid database credentials.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design claims automatic task replacement and scaling but specifies only Fargate tasks, not an ECS service or equivalent controller with desired count, health replacement, and scaling configuration.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html"
+        },
+        {
+          "severity": "major",
+          "description": "ALB Cognito authentication uses a browser-oriented redirect and session workflow; the design does not establish how customer-system REST clients authenticate without that interaction, so a suitable programmatic-client authentication flow and token-validation mechanism must be selected.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "R12 promises encryption in transit broadly, but ALB-to-task connections are explicitly HTTP; either configure backend TLS or narrow the stated requirement, and document security-group restrictions on task ingress.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The Multi-AZ compute, database, cache, and egress choices fit the workload, but credential refresh, service orchestration, and programmatic API authentication require substantial completion."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The rotation function has no specified VPC attachment or network permissions to reach private Aurora; configure suitable subnets, security groups, and access to Secrets Manager so automatic rotation has a working network path.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotation-function-network-access.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Redis session connections specify only Redis, with no in-transit encryption or client TLS configuration; explicitly enable encrypted connections and certificate validation for session data rather than relying on private subnet placement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/in-transit-encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the stateful topology concrete: identify an Aurora reader in the other AZ and the Redis primary/replica placement with automatic failover, rather than relying solely on a generic multiAz enabled property.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Runtime secret retrieval is preferable to static injection, but the application should explicitly refresh cached credentials and reconnect database pools after rotation or authentication failure.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify PostgreSQL TLS enforcement, restrictive tier security groups, and payments-provider credential storage; these security details are not established by private subnet placement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides an appropriate managed Multi-AZ architecture and a clearer rotation workflow, but rotation networking and data-plane security need explicit configuration."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The stream failure queue receives batch metadata, not the original DynamoDB event payload, so it cannot support the claimed guaranteed replay after stream records expire. DynamoDB Streams retention is 24 hours; preserve complete failed payloads, such as with an S3 on-failure destination, or implement durable outbox reconciliation before claiming events cannot be lost.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Worker DLQs cover failures after messages reach SQS, but none of the SNS subscriptions has a delivery-failure DLQ; SNS can discard undeliverable notifications after its delivery policy is exhausted, leaving an uncovered loss path.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The email worker lacks an explicit deduplication strategy, despite at-least-once delivery and possible retries after SES accepts a message but before order status is updated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "JWT authentication does not establish order-level authorization; specify ownership checks for order lookup and narrowly scoped IAM permissions for each handler.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Independent queues and concrete payment and inventory processing are well chosen, but the claimed loss-free processing guarantee is invalid at the stream-recovery boundary."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The SQS stream failure destination does not hold the original failed DynamoDB records as claimed; it receives failure metadata. Once the 24-hour stream retention expires, the design has no specified payload archive or reconciliation path, invalidating its guaranteed-event-emission and no-loss claims.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "The SNS subscriptions have no delivery-failure DLQs; downstream SQS redrive policies cannot recover notifications that SNS never successfully delivered and subsequently discarded.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Inventory reservation writes only to the Orders table, whose description contains no stock-item model; document the single-table inventory schema or another inventory source and the atomic conditional operation used to prevent overselling.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency is asserted but not implemented concretely; specify payment-provider idempotency keys, inventory reservation tokens, and the email duplicate-handling policy.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify order-owner authorization, per-handler least-privilege IAM, and secure payment-provider credential retrieval rather than relying only on API authentication.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The fan-out and worker retry structure is sound, but stream failure preservation is technically incorrect and inventory and idempotency details remain underdeveloped."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "B",
+      "why": "Managed workers better support minimal-change migration of existing Helm workloads, and B provides clearer instrumentation, migration, and placement guidance without assuming Fargate compatibility."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "B",
+      "why": "B explicitly includes ECS service management, API token authorization, runtime secret retrieval, and a rotation function, avoiding A's larger gaps in task lifecycle management and credential refresh."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "Both require critical stream-recovery fixes and SNS delivery-failure protection, but A more concretely defines atomic inventory reservation, payment-provider idempotency, and payment credential management."
+    }
+  ]
+}

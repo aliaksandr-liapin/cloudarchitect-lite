@@ -12,7 +12,13 @@ Run CloudArchitect Lite on your own computer or server with Docker. It works the
 
 Check it works: `docker compose version` should print version 2.24 or newer.
 
-You also need an **Anthropic API key** for AI features: [platform.claude.com → API keys](https://platform.claude.com/settings/keys). Set a monthly spend limit there. Manual editing, validation and export work without a key.
+You also need an API key from **at least one** AI provider for AI features; any one of the three is enough:
+
+- Anthropic (Claude): [platform.claude.com → API keys](https://platform.claude.com/settings/keys)
+- OpenAI (GPT): [platform.openai.com → API keys](https://platform.openai.com/api-keys)
+- Google (Gemini): [Google AI Studio → API key](https://aistudio.google.com/apikey)
+
+Set a monthly spend limit at the provider. Manual editing, validation and export work without a key.
 
 ## 2. Install and start
 
@@ -21,13 +27,13 @@ Run one command in an empty folder. It downloads `compose.yaml` and starts the p
 **macOS and Linux**
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml && docker compose up
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.2.1/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml; docker compose up
 ```
 
 The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI, on every release). Windows (Intel/AMD or Arm) runs the same Linux images through Docker Desktop and is expected to work, but has not been tested by hand yet; please [report](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=bug.yml) what you find. Docker Desktop on Windows needs WSL 2 and virtualization; inside a virtual machine (Parallels, VMware, Hyper-V) nested virtualization must be turned on.
@@ -56,11 +62,11 @@ Open that link. The wizard has five steps.
 
 <img src="../images/setup-1-welcome.png" alt="Setup step 1: welcome page listing the five steps, with the setup code filled in" width="720">
 
-**2. API key.** Paste your key and press **Check key**; Anthropic confirms it before you can continue. If the key comes from a `.env` file, this step only shows that it is set.
+**2. AI providers.** One card each for Claude, OpenAI and Gemini, with a link to the page where you create the key. Paste at least one key and press **Check key**; the provider confirms it before you can continue. You can add the other keys now or later by re-running setup. A key that comes from a `.env` file (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) is only shown as set.
 
-<img src="../images/setup-2-key.png" alt="Setup step 2: masked API key field with the confirmation 'Key works'" width="720">
+<img src="../images/setup-2-key.png" alt="Setup step 2: AI providers, masked API key field with the confirmation 'Key works'" width="720">
 
-**3. Models.** Choose which models the editor can use with your key (Claude Haiku 5.5, Claude Sonnet 5.5) and the default. The table shows the measured quality, cost and speed of each. Models you leave off are shown in the editor but cannot be selected.
+**3. Models.** Choose which models the editor can use (Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol, Gemini 4 Argon; a model is offered only when its provider has a key) and the default. The table shows the measured quality, cost and speed of each. Models you leave off are shown in the editor but cannot be selected.
 
 <img src="../images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
 
@@ -85,7 +91,7 @@ The editor opens with a sample diagram, so you can try dragging, resizing, **Aut
 
    <img src="../images/generate-clarify.png" alt="Clarification card with suggested answers for traffic and thumbnail sizes, and an editable list of requirements" width="720">
 
-3. The design appears after about a minute with Claude Haiku (faster with Sonnet). The 25 built-in rules check it; click a finding's rule id (for example VR-008) to select the component it is about. The previous diagram is kept: use **Restore previous** or **Versions**.
+3. The design appears after 30 to 65 seconds, depending on the model. The 25 built-in rules check it; click a finding's rule id (for example VR-008) to select the component it is about. The previous diagram is kept: use **Restore previous** or **Versions**.
 4. Edit names and layout by hand, then **Export** a PNG or SVG image, or a JSON project you can **Import** later.
 
 Projects are saved in your browser on this computer. Export JSON to back them up or move them to another machine. **Dark mode** is in the top bar.
@@ -102,13 +108,15 @@ Projects are saved in your browser on this computer. Export JSON to back them up
 
 ## Upgrading
 
+Settings from 0.2 keep working. To use OpenAI or Gemini, add their keys by re-running setup (see below).
+
 Run these commands **in the same folder** as the original install. Docker names the `gateway-data` volume after the folder, so a new, empty folder starts over with a fresh setup. Set the version you upgrade to, download its `compose.yaml`, then pull and restart:
 
 **macOS and Linux**
 
 ```bash
 cd path/to/your/install/folder
-VERSION=0.2.1   # the version you upgrade to
+VERSION=0.3.0   # the version you upgrade to
 curl -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$VERSION/compose.yaml"
 docker compose pull && docker compose up -d
 ```
@@ -117,7 +125,7 @@ docker compose pull && docker compose up -d
 
 ```powershell
 cd path\to\your\install\folder
-$Version = '0.2.1'   # the version you upgrade to
+$Version = '0.3.0'   # the version you upgrade to
 curl.exe -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$Version/compose.yaml"
 docker compose pull; docker compose up -d
 ```
@@ -132,26 +140,28 @@ docker compose restart gateway
 docker compose logs gateway   # open the new setup link
 ```
 
-The wizard starts from your current values; the API key and the client salt are kept unless you enter a new key.
+The wizard starts from your current values; saved API keys and the client salt are kept unless you change them. Run it again to add a key for another provider, to replace a saved key (enter and check the new one), or to remove one: press **Remove saved key** on that provider's card (**Undo** takes it back). At least one key must remain, and the provider's models are no longer offered. A key set in `.env` cannot be removed in the wizard; delete it from `.env` and restart.
 
 ## Presetting or locking values
 
-Values in a `.env` file override the wizard; the wizard shows which ones are locked. Copy `.env.example` to `.env` and uncomment only what you want to fix, for example `ANTHROPIC_API_KEY` for automated installs. Set `SETUP_WIZARD=disabled` to configure only through `.env`.
+Values in a `.env` file override the wizard; the wizard shows which ones are locked. Copy `.env.example` to `.env` and uncomment only what you want to fix, for example `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` for automated installs. Set `SETUP_WIZARD=disabled` to configure only through `.env`.
 
 ## Troubleshooting
 
-| Problem                          | Fix                                                                                                                                                                                                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Port 8080 is in use              | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                                                                                                            |
-| Lost the setup link              | `docker compose logs gateway`; the code changes on every gateway restart                                                                                                                           |
-| "The setup code is wrong"        | Use the link from the latest log; restarting creates a new code                                                                                                                                    |
-| "Could not reach Anthropic"      | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
-| Behind an HTTP(S) proxy          | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
-| AWS icons do not appear          | They need internet on first start. Once online, press **Retry** in the editor's icon notice, or run `docker compose restart gateway`                                                               |
-| Docker does not start on Windows | Turn on WSL 2 (`wsl --install` in an administrator PowerShell, then restart). In a virtual machine, turn on nested virtualization in its settings first                                            |
+| Problem                                   | Fix                                                                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Port 8080 is in use                       | Add `WEB_PORT=8081` to `.env`, run `docker compose up -d`, open <http://localhost:8081>                                                                                                            |
+| Lost the setup link                       | `docker compose logs gateway`; the code changes on every gateway restart                                                                                                                           |
+| "The setup code is wrong"                 | Use the link from the latest log; restarting creates a new code                                                                                                                                    |
+| "Could not reach" a provider              | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
+| Behind an HTTP(S) proxy                   | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
+| Gemini key rejected ("API key not valid") | The key must come from [Google AI Studio](https://aistudio.google.com/apikey). Google Cloud and Vertex AI keys are not supported                                                                   |
+| OpenAI key rejected ("Key rejected")      | A restricted OpenAI project key needs the **Models: read** permission (or **All**) for the setup key check, which lists models; without it the check gets 403 although generation would work       |
+| AWS icons do not appear                   | They need internet on first start. Once online, press **Retry** in the editor's icon notice, or run `docker compose restart gateway`                                                               |
+| Docker does not start on Windows          | Turn on WSL 2 (`wsl --install` in an administrator PowerShell, then restart). In a virtual machine, turn on nested virtualization in its settings first                                            |
 
 ## Security notes
 
 - The app has **no login**. Ports are bound to `127.0.0.1`, so only this computer can reach it. Do not publish it on a network without an authenticating reverse proxy in front.
-- The API key is stored in `/data/settings.json` inside the `gateway-data` volume, readable only by the gateway user, and never logged or sent back to the browser.
+- API keys are stored in `/data/settings.json` inside the `gateway-data` volume, readable only by the gateway user, and never logged, sent back to the browser or sent to any provider but their own.
 - See [SECURITY.md](../../SECURITY.md) to report vulnerabilities.

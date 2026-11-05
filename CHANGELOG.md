@@ -4,6 +4,33 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10
+
+Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-provider benchmark.
+
+### Added
+
+- OpenAI (GPT-6.1 Sol) and Google Gemini (Gemini 4 Argon) next to Claude Haiku 5.5 and Claude Sonnet 5.5. GPT-6 Luna and Gemini 3.5 Flash-Lite are supported but not listed: they missed the listing bar (pass rate and no-critical-defect rate of at least 85%, blind median of at least 2.0).
+- One key from any of the three providers is enough. The setup wizard has an "AI providers" step with a card per provider and a link to its key page; `OPENAI_API_KEY` and `GEMINI_API_KEY` work like `ANTHROPIC_API_KEY`.
+- Re-running setup can replace or remove a saved provider key (**Remove saved key** on its card; at least one key must remain). Keys set in `.env` are not removable in the wizard.
+- Requirements extraction runs on the selected provider's economical model, so one operation never mixes providers.
+- Benchmark: six models measured on the same code, then a blind review by a panel of three reviewers, one per provider, scored by the median. GPT-6.1 Sol scored highest (2.86 of 3). See the [report](docs/product/phase3-provider-benchmark.md).
+- [ADR-0014](docs/adr/0014-multi-provider-ai.md): multiple AI providers.
+
+### Changed
+
+- Models whose provider has no key are not offered; the editor shows "Add a key in setup" for them.
+- Daily and monthly spending limits count all providers together.
+- README, installation guide and `.env.example` cover the three providers; the setup wizard's key step is now "AI providers".
+
+### Deprecated
+
+- Kept for 0.2 web clients; removal planned in 0.4: the setup status field `keyFromEnvironment` (use `providers`), a verify-key request body without `provider` (treated as Anthropic), and `apiKey` in the setup request (`SetupInput.apiKey`; use `apiKeys.anthropic`).
+
+### Upgrade notes
+
+- 0.2 settings keep working: your saved key, enabled models, default and browser choices (`haiku`, `sonnet`) are unchanged. To use OpenAI or Gemini, add their keys by re-running setup (see the [installation guide](docs/operations/installation.md#re-running-setup)).
+
 ## [0.2.1] - 2026-11-04
 
 ### Fixed
@@ -71,7 +98,8 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/releases/tag/v0.1.0

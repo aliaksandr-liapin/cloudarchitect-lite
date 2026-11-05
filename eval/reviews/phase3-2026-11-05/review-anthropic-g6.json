@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Fargate tasks are shown without an ECS cluster or service node. Fargate needs ECS or EKS to schedule tasks and keep the desired count across AZs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The single ALB is drawn as two nodes with duplicated edges, which is a modelling artifact. The ALB-to-task hop uses plain HTTP.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Client authentication (R16) is not addressed beyond WAF, and encryption in transit to RDS and ElastiCache is not stated. Encryption at rest uses AWS-managed keys only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only AZ A tasks send logs to CloudWatch. The ECR edge points from the registry to the tasks, although the tasks pull the images. Session reads and writes are modelled as a 'read' edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Meets the core requirements with Fargate behind an ALB, Multi-AZ RDS and ElastiCache, per-AZ NAT and Secrets Manager rotation, but it omits ECS orchestration, caller authentication and in-transit encryption detail."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "ALB is placed only in public subnet A in the diagram, although its rationale says it spans two AZs. AZ B tasks have no edge to Cognito.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Customer-managed KMS keys, CloudTrail and a separate data-subnet tier add some cost and complexity beyond what the prompt asked for.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The network path for the Secrets Manager rotation function to reach RDS is not described.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Complete and coherent design: ECS on Fargate in private app subnets, Multi-AZ data tier in separate subnets, per-AZ NAT with stable egress IPs, Secrets Manager rotation, Cognito JWT auth, KMS encryption and TLS to the data stores."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB is described as 'restricted to CloudFront' but no mechanism is given, such as the CloudFront managed prefix list or a secret origin header. The public ALB could otherwise be reached directly and bypass WAF.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Customer-managed KMS encryption is claimed for secrets, logs and ECR, but only Aurora, the S3 buckets and CloudTrail have KMS edges. Log groups, ECR and secrets are not wired, so 'all data encrypted with keys we control' is only partly shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB is split into a fake 'AZ2 presence' node. Several AZ2 edges (Secrets Manager, Cognito, CloudWatch, IAM) are missing. NAT gateways serve AWS API access where VPC endpoints would be cheaper and keep traffic private.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Shield Standard only. A bank may want Shield Advanced, but this was not asked for. WAF is shown as placed in Region, although a CloudFront web ACL must be global.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong layered design with CloudFront, WAF and Shield, TLS to the tasks, Cognito with MFA, Aurora with a customer-managed key and an Object-Lock CloudTrail archive, but the KMS coverage and ALB lockdown are asserted more than wired."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 1,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Customer sign-in with MFA is built as a self-hosted identity service in the Fargate tasks (password plus TOTP). Customer credentials and MFA secrets are stored in the application's RDS database. For a bank, this takes on credential storage, MFA and attack-surface risk that a managed service such as Cognito already handles.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-mfa.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Application and database share the same subnets ('Private application and database A/B'), so there is no separate data tier. The ALB is drawn only in subnet A.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Edges from the VPC endpoints to ECR, Secrets Manager and CloudWatch run in the wrong direction. Only the Secrets Manager rotation is described loosely, and no operator notification path exists for the alarms.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Region is hard-coded to us-east-1 for a 'regional bank' without an assumption being marked. Shield Standard only.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Very thorough encryption, endpoint and audit design (KMS across data, logs, ECR and Fargate storage; Object-Lock CloudTrail; VPC endpoints), but it self-builds the customer identity and MFA layer in containers, which is the weakest choice for a bank."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The stream publisher reads the Orders table stream, but the handlers also write status updates to that table. No event filter is specified to restrict publishing to INSERT events. Without it, status updates could re-publish order-placed events and re-trigger the steps.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The stream publisher's SQS on-failure destination records metadata about the failed batch, not the records themselves. The records must still be fetched from the stream within its 24-hour retention, so 'not lost' is only partly true. No bisect or retry limits are given.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms on DLQ depth have no notification target such as an SNS topic, so operators are not actually alerted. No SNS subscription DLQ is configured. There is no payment provider credential store and no order-creation idempotency key.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound fan-out with an SNS topic, three SQS queues with DLQs and a DynamoDB Streams outbox, WAF and Cognito, but replay support, alert delivery and duplicate-event protection are thinner than they should be."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "HTTP API with a JWT authorizer cannot use WAF directly, so abuse protection relies on API throttling. That is acceptable for an MVP.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Many specifics are chosen without confirmation (Stripe, an inventory stock table, us-east-1). They are listed as architect decisions, but the stock dataset must be seeded before use.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Thorough, correct event pipeline: an outbox through DynamoDB Streams with filtering and an S3 failure destination, SNS with subscription redrive, per-step SQS queues with DLQs, idempotent workers and SNS-delivered alarms, so failures are retried, surfaced and replayable."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B explicitly models ECS, JWT authentication, KMS encryption and TLS to the data stores, and keeps the data tier in separate subnets. A is workable but has the fake ALB split, no ECS orchestration and no caller authentication."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "A uses a managed Cognito user pool for MFA behind CloudFront and WAF. B hand-builds password and TOTP identity in the app tier and stores customer credentials and MFA secrets in RDS, which is a significant security and operational risk for a bank, even though B's KMS and endpoint coverage is more complete."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B is more complete on the 'never silently lost' requirement: it filters stream events, archives failed batches to S3, adds an SNS subscription DLQ, alerts operators and uses idempotency keys. A's alarms have no notification target and its outbox publisher has no event filter."
+    }
+  ]
+}

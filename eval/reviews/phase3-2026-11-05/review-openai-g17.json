@@ -1,0 +1,243 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The isolation intent is clear, but implementation should specify ALB-to-task and task-to-data security-group rules, resource-scoped task and rotation-function permissions, and Valkey authentication.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make the implied minimum of two tasks explicit, state surviving-AZ capacity assumptions, and test application reconnect and retry behavior during database and cache failovers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A strong fit that explicitly covers private multi-AZ containers, resilient PostgreSQL and session caching, independent payment egress, and automatic credential rotation."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Clarify the rotation mechanism: RDS-managed master credentials and Secrets Manager rotation of an application database user are different implementations; the latter normally requires a rotation Lambda with database connectivity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The description mixes runtime retrieval with secret injection; specify refresh behavior because secrets injected when an ECS task starts do not automatically update inside an already-running container after rotation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ECR-to-ECS read edge reverses the image-pull relationship: Fargate task startup pulls images using the task execution role rather than ECR reading from the ECS service.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify tenant authorization, least-privilege task and execution roles, security-group boundaries, and cache authentication rather than relying on token validation and private placement alone.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define minimum task count, surviving-AZ capacity, database/cache reconnect behavior, and rotation-failure alarms; Multi-AZ deployment does not by itself guarantee uninterrupted requests during failover.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed multi-AZ service choices meet the request, but rotation, secret refresh, failover behavior, and several connection details need clarification."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The private S3 origin has no specified CloudFront authorization mechanism; define an S3 REST origin with OAC or OAI and the corresponding restricted bucket policy while retaining public-access blocking.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Pin the CloudFront viewer certificate to us-east-1; placing it only in an unspecified Primary Region leaves an important deployment constraint unresolved.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Replacing S3 files does not immediately replace cached CloudFront responses; define cache lifetimes or an invalidation/versioned-asset workflow for menu and opening-hours changes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Add a lightweight content recovery mechanism such as S3 versioning and identify an alarm notification destination so accidental overwrites and availability alerts are actionable.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The service selection fits the bakery's budget and maintenance constraints, but private-origin authorization and several deployment and update details remain incomplete."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The CloudFront-to-ACM edge should represent certificate association in distribution configuration, not an HTTPS read of ACM during website requests.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Despite the Website Bucket label, explicitly select the S3 REST endpoint: S3 website endpoints cannot support the proposed OAC access or HTTPS origin connection.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify HTTP-to-HTTPS redirection or HTTPS-only access, an alarm notification destination, and a cache-expiration or invalidation policy for content changes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Private S3 with OAC, CloudFront, correctly located ACM certification, and content versioning is a strong low-cost fit with only minor configuration clarifications."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The stream failure queue is incorrectly described as holding failed stream records: Lambda's DynamoDB Streams on-failure destination to SQS contains batch metadata, not the original records. Once the stream's 24-hour retention expires, this queue cannot provide the claimed payload replay; preserve full payloads through an S3 failure destination or an explicit durable outbox/archive and replay mechanism.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "The worker DLQs do not cover SNS failing to deliver to a subscribed SQS queue. Add SNS subscription DLQs and alarms because messages can otherwise be discarded following delivery failure, including after applicable retries are exhausted.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Order creation lacks a stable client-request idempotency key or equivalent deduplication mechanism. Worker idempotency by order ID does not prevent a retried POST from creating another order and consequently another payment capture.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the implied new-order-only publisher filter explicit, preferably using INSERT events with the required stream image; the handlers' status updates also produce stream records and must not emit additional OrderPlaced events.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify order-ownership authorization, scoped service and queue policies, queue visibility/retention settings, and a tested alarm-to-redrive procedure.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The fan-out and per-step queues correctly isolate work, but the incorrect stream-recovery claim and uncovered SNS delivery failures undermine the no-loss requirement."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The publisher failure queue is described as capturing failed stream records for replay, but the standard Lambda DynamoDB Streams on-failure integration with SQS retains batch metadata rather than full records, and no separate payload-preservation mechanism is specified. After the stream's 24-hour retention expires, the claimed replay path is unavailable; use a full-payload S3 destination or explicitly persist replayable events.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Consumer redrive policies do not protect the SNS-to-SQS delivery boundary. Configure monitored SNS subscription DLQs so subscription delivery failures cannot result in silent message discard.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "A conditional put against a newly generated order ID does not establish retry-safe POST idempotency. Specify a stable client-request token and persist its mapping or result so retried requests cannot create distinct orders and payment captures.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito authorization is selected, but user-pool provisioning, order-ownership checks, and least-privilege service and queue policies are not described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify queue visibility timeouts, retry and retention settings, publisher event filtering, and an operational redrive procedure rather than leaving recovery at DLQ alarms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Independent workers and explicit inventory persistence fit the workflow, but lossless publisher recovery and retry-safe order creation are not established."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "A more clearly specifies rotation execution, credential refresh, multi-AZ placement, and failover connections while satisfying the same managed-container requirements."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "B explicitly includes OAC, places the CloudFront certificate in us-east-1, and enables content versioning without introducing unnecessary infrastructure."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "Both require fixes to publisher recovery and SNS delivery failure handling, but B more clearly models persistent inventory reservations and conditional writes for duplicate handling."
+    }
+  ]
+}

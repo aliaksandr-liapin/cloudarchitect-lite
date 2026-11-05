@@ -1,0 +1,268 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Separate user pools establish identity separation, not authorization for individual API operations. The design must specify adjuster-only authorization for decision endpoints and claim-ownership checks for customer reads, uploads and downloads.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html"
+        },
+        {
+          "severity": "major",
+          "description": "End-to-end recovery still has dual-write gaps: a failure between creating the DynamoDB record and starting the workflow can strand a claim, while SES acceptance followed by failure before writing the notification flag can produce duplicate email. Execution names and a sent flag do not resolve these boundaries; submission reconciliation and ambiguous-delivery handling are needed.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make upload finalization explicit: start automated checks only after the required objects exist and their references have been committed, rather than merely after issuing upload URLs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly select Standard workflows and define complete step-level logging, audit retention and lifecycle policies. Native completed-execution history does not provide the assumed seven-year audit retention.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A strong serverless workflow foundation covers the human wait and operational failure visibility, but authorization and cross-service recovery need hardening."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "CloudTrail is incorrectly characterized as providing an immutable, compliance-grade log intrinsically. Neither CloudTrail nor its CloudWatch destination makes the stored evidence immutable; no protected archive or integrity-validation configuration is specified, leaving the stated audit protection unsafe to rely on.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+        },
+        {
+          "severity": "major",
+          "description": "The explanation conflates the one-year maximum Standard workflow execution duration with audit-history retention. Completed Standard execution history is retained for 90 days, so longer audit requirements must be met through separately retained application records or logs.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html"
+        },
+        {
+          "severity": "major",
+          "description": "The CloudTrail-to-CloudWatch integration omits a configured trail and its S3 delivery destination. CloudWatch forwarding supplements a trail rather than replacing its S3 log destination.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/send-cloudtrail-events-to-cloudwatch-logs.html"
+        },
+        {
+          "severity": "major",
+          "description": "Idempotency is described only for automated checks. Intake, workflow starts, decision callbacks and notification delivery need explicit duplicate handling and recovery across DynamoDB, Step Functions and SES; workflow retries alone do not make these side effects safe.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "HTTP API JWT authorization does not automatically enforce Cognito group membership. The adjuster function's explicit role check is therefore important; describe group authorization as application logic rather than a built-in JWT-authorizer check.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify a completed-upload submission boundary before starting checks, including handling missing, incomplete or replaced documents.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The callback workflow and application audit records are sensible, but false audit guarantees, incorrect history retention and incomplete recovery handling materially weaken the design."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Private workers have no specified NAT or VPC-endpoint egress path. Image pulls and access to services such as STS, CloudWatch and X-Ray require an explicit reachable path; the HTTPS arrows do not establish that networking.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "major",
+          "description": "No AWS Load Balancer Controller or equivalent Ingress and target-registration mechanism is specified. The ALB-to-worker arrows alone do not connect the existing Helm-managed Services and Ingress resources to working ALB targets.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify database credential delivery, TLS for MySQL connections and security-group restrictions between the ALB, workloads and data services; private subnet placement and IRSA do not define these controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Tracing needs existing or newly configured application instrumentation and cross-service context propagation. An OpenTelemetry collector forwards spans but does not create complete distributed traces by itself.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Name the HPA metrics source and node-capacity autoscaler, and define resource requests and minimum multi-AZ capacity to implement the stated scaling assumption.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Managed-node EKS is a good fit for minimal-change Helm migration, with the main gaps being private-service connectivity, ingress integration and operational configuration."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fargate is selected without checking the existing charts against its Kubernetes restrictions. DaemonSets, privileged containers, host networking and some storage patterns are unsupported, so unchanged manifests cannot be promised without a compatibility assessment and an EC2-node fallback.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the Fargate-compatible observability deployment: built-in Fluent Bit log routing and an appropriate metrics and OpenTelemetry pipeline. A generic reference to Container Insights leaves the required configuration unclear.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document application tracing instrumentation and context propagation, preferably reusing existing instrumentation or compatible auto-instrumentation to preserve the minimal-change goal.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "TLS is shown for ingress and data-service connections, but service-to-service TLS between the microservices is not specified despite the design's broader internal-TLS requirement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define pod resource requests, replica placement and scaling behavior so that the two-AZ layout provides actual workload resilience rather than merely two available scheduling locations.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The networking, secrets and security topology is well developed, but Fargate compatibility and its observability setup must be validated before claiming a minimal-change migration."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The archive rationale incorrectly presents S3 versioning and KMS encryption as establishing tamper-evidence. Neither supplies CloudTrail digest-based integrity validation, and versioning alone does not protect all versions from privileged deletion; the claimed audit-integrity guarantee is unsafe without additional controls.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+        },
+        {
+          "severity": "major",
+          "description": "The customer-controlled-key requirement is only partially implemented. Explicit settings cover RDS and the archive bucket, but not CloudWatch logs, secrets, registry images or Fargate ephemeral application storage; Fargate storage requires explicit customer-managed-key configuration rather than relying on its default encryption.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+        },
+        {
+          "severity": "major",
+          "description": "The claimed AZ-failure tolerance is not implemented by the shown placements: tasks and NAT appear only in AZ A, and the ALB's required second-AZ subnet configuration is not stated. Deploy tasks across both private subnets and explicitly configure resilient ingress and egress.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the administrative-audit scope explicit: a multi-Region trail covering read and write management events, including global-service activity, with defined retention and monitoring for trail changes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Route 53 lookup edge should normally be labeled DNS rather than HTTPS; ordinary authoritative DNS resolution is not an HTTPS invocation.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides suitable container, MFA and TLS building blocks, but overstates audit integrity and leaves customer-key coverage and AZ resilience incomplete."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Customer-managed encryption is described for S3, Aurora, secrets and logs, but not the container registry or Fargate ephemeral application storage. Explicitly cover these stores as well; Fargate's default ephemeral-storage encryption does not use a bank-controlled key.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Separate the regional TLS resources from edge resources: the CloudFront ACM certificate must be in us-east-1, the ALB certificate must be in the ALB Region, and the CloudFront WAF ACL needs CLOUDFRONT scope.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify that the administrative trail covers all AWS Regions, read and write management events and global-service activity. A single-Region application does not limit the scope of account administration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document how the ALB restriction is bound to this CloudFront distribution, such as origin-header verification alongside network restrictions; permitting CloudFront-originated traffic generally is not sufficient to exclude other distributions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a strong layered-security and multi-AZ design with protected audit storage, needing broader customer-key coverage and a few explicit edge and account-wide configurations."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A provides stronger explicit idempotency measures, failure routing and validated audit storage, whereas B makes unsafe audit claims and misstates execution-history retention."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A better preserves existing Kubernetes and Helm workloads through managed EC2 nodes without Fargate compatibility restrictions, although B has more complete networking and secret handling."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B more completely implements layered protection, multi-AZ deployment, least privilege and protected audit retention; A overstates audit integrity and leaves more security and availability controls unspecified."
+    }
+  ]
+}

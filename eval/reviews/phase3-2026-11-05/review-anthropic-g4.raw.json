@@ -1,0 +1,245 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The index updater Lambda is placed at Region level, outside the VPC, yet it writes to the ElastiCache cache to invalidate keys. ElastiCache is only reachable from inside the VPC, so cache invalidation would not work unless the function is attached to the VPC, which the design does not show. Stale cached product or price data could result.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Two zonal ALBs are used as separate CloudFront origins. A single ALB is already multi-AZ, so the second one adds cost and ambiguity, and it is unclear how CloudFront distributes or fails over between them.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single NAT Gateway in AZ A is a single point of failure for the private tasks in AZ B. ElastiCache and Aurora are shown in one subnet only, and the OpenSearch network placement and access policy are unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "DMS is marked UNRESOLVED. Index document shape from the DMS full load into OpenSearch may differ from the Lambda upserts, and the design does not address this.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Solid CDC pipeline (DMS to Kinesis to Lambda to OpenSearch) with full load, ordering, DLQ, WAF and CloudFront, but with a VPC-placement flaw on cache invalidation and some redundant or costly components."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design draws Aurora directly to an SQS queue as a 'Price Update Event' and names no CDC component. Aurora does not natively publish row changes to SQS, so the sync pipeline that feeds the one-minute price-update requirement does not work as drawn. A CDC service such as DMS, or an outbox/trigger mechanism, is missing.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Kinesis.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no initial full load of the 2 million products and no reindex path. The OpenSearch index would be empty at cutover and could not be rebuilt from the source of truth.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Task.CDC.html"
+        },
+        {
+          "severity": "major",
+          "description": "Nothing protects the public entry point (no WAF, no edge CDN), and the ALB and caching sit directly in front of the API. Caching of product pages relies only on ElastiCache behind the API, so every request still hits the API tier. This is weak for a read-heavy storefront exposed to bots and spikes.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-networks.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The DLQ has no redrive edge from the update queue and no alarm edge from CloudWatch. ECS tasks, OpenSearch and ElastiCache are each shown in a single subnet. The cache edge is labelled 'read' but described as read/write.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The architecture looks plausible but has a non-existent Aurora-to-SQS change feed, no initial load, and no edge protection, so the core search sync would not work."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Duplicate of the A review above; see that entry."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Static site, uploads/ originals and thumbnails share one bucket behind CloudFront OAC. Unvalidated original uploads could be served publicly through the CDN unless the behavior or path is restricted. The thumbnail trigger relies on prefix filtering to avoid recursion, which is more fragile than separate buckets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The DynamoDB Streams relay Lambda has no failure destination or bounded retries, so a poison stream record can block the shard until the record expires. There is also no event filter for subscriber inserts versus post writes, and the relay plus SQS hop adds components and cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A Cognito authorizer only checks that the caller is in the user pool. Restricting writes to authors needs sign-up disabled or group checks, which are not stated. The SES sandbox and verified identity are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Well-formed serverless design with CloudFront, WAF, Cognito, SQS buffers and DLQs with alarms, but it carries some extra hops, a shared bucket and an unprotected stream-relay failure path."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no WAF or explicit throttling on the public API for subscribe and read routes. API Gateway default throttling helps, but a rate-limit rule would be cheap hardening. The SES sandbox exit is not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single shared failure queue mixes thumbnail and email failures. This is acceptable at low volume and the design preserves source identifiers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Lean, correct serverless design with separate original and thumbnail buckets, MFA Cognito, filtered DynamoDB Streams with partial batch failures, native on-failure destinations to SQS, and cost and failure alarms."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Duplicate of the A review above; see that entry."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The scoring Lambda is attached to a single private subnet in AZ1 with no NAT or VPC endpoints shown for DynamoDB, CloudWatch Logs, or other services. Only the SageMaker call is described as going via a VPC endpoint. Without those endpoints, the DynamoDB write and logging would fail. A single-subnet Lambda also undermines the stated two-AZ resilience.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no timeout or fallback path if the model endpoint is slow or unavailable. Synchronous scoring in the checkout path means an endpoint failure blocks payments.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_mitigate_interaction_failure_graceful_degradation.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The retraining workflow rolls out the new model to the endpoint automatically, with no evaluation or approval gate. The endpoint is placed in AZ2 only, though described as two-AZ. It is not explained how the Lambda learns the model version it records with the score.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong private networking, KMS and model-version traceability, but missing VPC endpoints and a single-subnet Lambda break connectivity and resilience, and there is no graceful degradation when scoring fails."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Lambda is not in a VPC and the endpoint is invoked over the public AWS API with IAM auth. This is acceptable because private access was not requested, but it is less locked down. The Lambda authorizer is unspecified, and the endpoint's multi-AZ instance count and autoscaling minimum are not stated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EventBridge triggers the 'training and model registry' node directly. In practice this needs a SageMaker Pipeline or a Step Functions state machine as the target, and an approval gate before deploy needs to be explicit. The model version is not recorded with the score.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Pragmatic design with a 200 ms timeout and rules-based fallback with review flagging, fallback-rate alarms, a stable endpoint name across model versions and approved-model deployment, with only minor networking and orchestration gaps."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A has a working CDC pipeline (DMS, Kinesis, Lambda, OpenSearch), initial load, ordering, DLQ, CDN and WAF. B draws an impossible Aurora-to-SQS change feed and has no initial load or edge protection."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B uses separate buckets, MFA Cognito, filtered streams with native failure destinations, scoped presigned uploads and cost alarms, with fewer moving parts. A is good but has a shared bucket and an unprotected stream relay."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "B keeps checkout resilient with a timeout and rules-based fallback and has no connectivity gaps. A's VPC-attached Lambda lacks endpoints for DynamoDB and logs, sits in one subnet and has no fallback."
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "reviews": [
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Portal API containers (AWS Fargate) run in a private subnet without a NAT Gateway or VPC endpoints in the VPC, leaving private tasks with no network path to pull container images or reach Amazon Cognito and Amazon CloudWatch.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The architecture omits a backend database or persistent data tier in private subnets for customer banking data, only storing static web assets and CloudTrail logs in S3.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Application Load Balancer — Availability Zone B (N6) has no outgoing edge to Portal API containers (N7), and Portal API containers are placed only in Private application subnet A.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A provides a strong edge and audit security posture with CloudFront OAC, WAF, end-to-end TLS, Cognito TOTP MFA, and Object Lock CloudTrail storage, but omits a customer database tier and lacks a NAT Gateway or VPC endpoints for private Fargate tasks."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A single NAT Gateway is placed only in Public subnet A while Portal API tasks run in Private app subnet B; if Availability Zone A fails, private tasks in Availability Zone B lose outbound internet access to Amazon Cognito and container registries, violating R17.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Application Load Balancer (Availability Zone B nodes) (N6), AWS Shield (N2), and AWS KMS (N12) have no edges, and Portal API tasks (N9) is missing an egress edge to the NAT Gateway.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Portal web app tasks (N8) are placed only in Availability Zone A and Portal API tasks (N9) are placed only in Availability Zone B rather than deploying both services across both Availability Zones.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B covers all functional and security requirements including a KMS-encrypted Multi-AZ Aurora database in dedicated private data subnets and end-to-end TLS, with its main weakness being a single-AZ NAT Gateway and several unconnected diagram nodes."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Configuring the Application Load Balancer to authenticate all shopper requests against an Amazon Cognito user pool before forwarding to Web API containers blocks anonymous e-commerce shoppers from browsing product pages or searching, and the edge direction from Cognito to ALB is reversed.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "EventBridge scheduled rules have a minimum resolution of 1 minute, so polling the outbox on an EventBridge schedule cannot reliably guarantee that price updates appear in OpenSearch within one minute once polling delay, execution, and index refresh latency are combined.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-scheduled-rule-pattern.html"
+        },
+        {
+          "severity": "major",
+          "description": "Web API containers (Fargate) run in a private subnet without a NAT Gateway or VPC endpoints in the VPC, preventing tasks from pulling container images or reaching public AWS endpoints.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Indexer failure queue (N11) has no connected edges, and the ALB, Fargate tasks, RDS Proxy, and Aurora are placed only in Availability Zone A.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A uses an appropriate Aurora, RDS Proxy, and OpenSearch core, but forces Cognito login at the ALB for public shoppers, relies on 1-minute EventBridge polling that can miss the 1-minute price SLA, and leaves its DLQ and private subnet egress unconnected."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only a single NAT Gateway is provisioned in Public subnet A (and has no connected edges), creating a single-AZ point of failure for private subnet outbound connectivity if Availability Zone A fails.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 is modeled inline in the HTTPS request path (Shoppers -> Route 53 -> CloudFront over HTTPS) rather than as a DNS lookup service.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "While the Lambda index updater invalidates ElastiCache (Valkey) on product changes, CloudFront edge cache TTL or invalidation is not specified to prevent stale prices on edge-cached product pages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B is a well-architected e-commerce search solution combining CloudFront and ElastiCache Valkey for read-heavy product pages with a DMS-to-Kinesis-to-Lambda CDC pipeline that updates OpenSearch and invalidates cache within the one-minute window."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Edges from API tasks A to Aurora and ElastiCache are typed as read while edges from API tasks B are typed as write, even though the edge labels state that both task groups read and write data.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API tasks (Fargate) B is missing an edge to CloudWatch, and the helper Lambda function used by Secrets Manager to rotate private Aurora credentials is omitted.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A delivers a complete, genuinely Multi-AZ container architecture on AWS Fargate with redundant per-AZ NAT Gateways for third-party payment calls, Multi-AZ Aurora PostgreSQL and ElastiCache, and automated credential rotation via Secrets Manager."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Amazon API Gateway REST API (apiType: REST) is wired directly to an Internal ALB (which is also mistakenly placed in Public Subnet 1); API Gateway REST APIs require a VPC Link connected to a Network Load Balancer for private integrations and cannot target an Internal ALB directly.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "A single NAT Gateway is placed in Public Subnet 1 (Availability Zone 1); if Availability Zone 1 fails, Fargate tasks lose outbound internet connectivity to the third-party payments API, violating the Multi-AZ requirement.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Availability Zone 2 contains no resources at all, Cognito User Pool and CloudWatch have no edges, and Secrets Manager has no edge to Fargate Tasks to supply rotated database credentials.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B contains critical architectural flaws, including a non-working direct integration from an API Gateway REST API to an Internal ALB placed in a public subnet, a single-AZ NAT Gateway that breaks payment calls during an AZ outage, and an empty second Availability Zone."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "Design B includes the required KMS-encrypted database tier in dedicated private data subnets along with NAT egress and end-to-end TLS, whereas Design A omits any customer data store and lacks NAT or VPC endpoints for private Fargate tasks."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "Design B uses a streaming CDC pipeline (DMS to Kinesis to Lambda) with ElastiCache Valkey invalidation and DLQ handling that reliably meets the sub-minute price update requirement while keeping shopping anonymous, whereas Design A blocks shoppers with ALB Cognito authentication and uses 1-minute EventBridge polling."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "A",
+      "why": "Design A properly distributes ALB nodes, Fargate tasks, and redundant NAT Gateways across both Availability Zones with Multi-AZ Aurora and ElastiCache, while Design B uses an invalid API Gateway REST-to-Internal-ALB integration in a public subnet and a single-AZ NAT Gateway."
+    }
+  ]
+}

@@ -757,3 +757,23 @@ dialog.confirm::backdrop {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.provider-cards {
+  display: grid;
+  gap: 12px;
+}
+.provider-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.provider-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.05em;
+}
+.alert-text {
+  color: var(--error);
+}
+.model-group h3 {
+  margin: 12px 0 4px;
+  font-size: 1em;
+}

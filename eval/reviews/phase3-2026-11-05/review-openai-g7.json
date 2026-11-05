@@ -1,0 +1,277 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Committing the database write and then publishing to SQS creates a dual-write failure window: a committed price change can lose its indexing notification. Periodic reconciliation with no specified cadence does not establish the one-minute freshness requirement; use a transactional outbox or CDC.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both database-reading Lambdas need an explicit VPC attachment and security-group path to private Aurora. Regional placement and the presence of a NAT gateway do not establish that connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The public API performs product and price writes, but no authentication or authorization boundary is specified for those operations. WAF protection does not establish permission to modify the catalog.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain has no specified access policy, caller authorization, or at-rest and node-to-node encryption configuration. HTTPS and a NAT egress path alone do not establish the required protected search-store boundary.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "major",
+          "description": "The product cache has no write-population, invalidation, or TTL policy. Product and price changes can therefore leave cached product pages stale without a defined bound.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the ALB's second public-subnet association explicit and address the single-AZ NAT dependency where outbound connectivity is needed during an AZ failure.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify partitioning, checkpoints, and execution cadence for the two-million-product bootstrap and reconciliation rather than leaving both as unspecified Lambda scans.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The relational-source, OpenSearch, and container architecture fits the workload, but atomic change capture, cache consistency, and explicit security and network boundaries are needed before deployment."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The two-AZ RDS Multi-AZ standby is incorrectly treated as a readable replica for read scaling and initial index seeding. A Multi-AZ DB-instance standby cannot serve reads, so the specified seeding connection cannot work; use the primary, a separate read replica, or an appropriately designed Multi-AZ DB cluster.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZSingleStandby.html"
+        },
+        {
+          "severity": "major",
+          "description": "The private Fargate tasks have no specified NAT or VPC-endpoint connectivity for image retrieval and AWS API calls, including publishing outbox events to SQS.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "The indexer needs VPC subnet and security-group configuration to access private ElastiCache and the database, but that attachment is not specified.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Cognito authenticates shoppers and catalog administrators, but no role, group, or scope enforcement distinguishes catalog-changing operations from ordinary shopper access. Authentication alone does not establish administrator authorization.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-user-groups.html"
+        },
+        {
+          "severity": "major",
+          "description": "OpenSearch access policies, fine-grained permissions, and encryption settings remain unspecified despite the inferred security requirements.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Traffic and availability decisions remain questions rather than stated assumptions; also specify outbox polling, indexing capacity, and checkpointed bootstrap execution to substantiate the one-minute target.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify whether authentication uses ALB's browser-oriented Cognito session flow or JWT validation in the API; the ALB edges should not imply generic bearer-token introspection.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Transactional-outbox indexing and cache invalidation are strong choices, but the unreadable standby dependency makes the stated bootstrap path non-working and several deployment boundaries remain undefined."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fetching a private S3 bucket over HTTPS requires an authorized origin connection, not just a CloudFront origin edge. Specify OAC or OAI and the corresponding restricted bucket policy, preferably with Block Public Access enabled and an S3 REST origin.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly place the CloudFront ACM certificate in us-east-1 rather than an unspecified primary region.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify index.html as the CloudFront default root object and define explicit page paths or rewrites for the private S3 origin.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define least-privilege staff upload access and a cache-expiry or invalidation procedure so menu and opening-hours replacements become visible predictably.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The service selection is appropriately inexpensive and maintenance-free, but private-origin authorization and a few essential CloudFront deployment settings need to be explicit."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Private S3 hosting with CloudFront OAC, correctly located ACM, explicit page routing, and restrained monitoring provides a complete and proportionate MVP for the bakery."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design assigns presigned-upload URL generation directly to API Gateway and S3 without a signing implementation. An API Gateway S3 service integration does not execute SDK presigning code; add a Lambda or another explicit signing component with scoped credentials.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html ; https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-integration-types.html"
+        },
+        {
+          "severity": "major",
+          "description": "The DynamoDB Streams-to-SQS connection names a consumer but identifies no deployed consumer or integration resource. Specify a Lambda consumer or EventBridge Pipe, including subscriber-insert filtering and failure handling, to make the welcome-email handoff implementable.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes-dynamodb.html"
+        },
+        {
+          "severity": "major",
+          "description": "The static-site and thumbnail buckets are described as private CloudFront origins, but OAC/OAI and restricted bucket policies are not specified. HTTPS alone does not authorize CloudFront to fetch private objects.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the two source-queue redrive policies explicit, including receive limits, retention, visibility timeouts, and recovery procedures; the DLQ nodes and alarms alone do not describe those settings.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify whether paid API Gateway stage caching is actually enabled; use the existing CloudFront public-read cache unless an additional continuously billed cache has a measured benefit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Describe the DynamoDB connections as API Gateway AWS service integrations with execution roles and request/response mappings, rather than implying API Gateway runs arbitrary AWS SDK code.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The edge-caching and queued-processing approach fits the blog, but upload URL signing is unsupported as drawn and the stream-to-queue and private-origin integrations need concrete implementations."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The thumbnail Lambda writes into the same bucket that triggers it, with no specified original-only prefix or suffix filter. Thumbnail writes can trigger recursive processing and runaway invocations; use separate buckets or an explicitly filtered upload prefix.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authors and subscribers share Cognito authentication, but author privileges are not separately enforced for post writes and upload-URL issuance. Require explicit author groups, scopes, or application authorization checks rather than accepting any authenticated subscriber.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-user-groups.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudFront caching is described broadly for API GET responses without a public-only cache boundary or authorization-aware policy. Explicitly exclude authenticated and upload-URL responses, or configure appropriate cache keys and forwarding, to prevent reuse across callers.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/header-caching.html"
+        },
+        {
+          "severity": "major",
+          "description": "The welcome-email stream consumer has no specified idempotency mechanism. DynamoDB event source mappings can deliver records more than once, so retries can send duplicate welcome emails; maintain durable deduplication state and define replay behavior.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Distinguish the thumbnail Lambda's asynchronous failure handling from the DynamoDB event source mapping's on-failure destination, and specify bounded retries, record age, and recoverable event retention for the latter.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify how readers retrieve generated thumbnails, preferably through a private CloudFront photo origin; only upload and processing paths are currently shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Acknowledge the fixed WAF charges and REST API pricing in the low-cost rationale instead of leaving their cost tradeoff implicit.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The explicit API Lambda and stream-triggered email worker make the main workflows implementable, but thumbnail recursion, author authorization, cache isolation, and retry idempotency require correction."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A avoids B's non-working standby-read dependency and includes reconciliation and credential storage, although its dual-write publication must become an outbox or CDC path to meet the freshness requirement reliably."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "B makes private-origin access, the CloudFront certificate region, default-root routing, and cost-conscious monitoring explicit while retaining the same inexpensive serverless service selection."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B supplies executable API and stream-consumer components, including the upload URL signer missing from A, although its event-loop, authorization, and caching safeguards need fixes before deployment."
+    }
+  ]
+}

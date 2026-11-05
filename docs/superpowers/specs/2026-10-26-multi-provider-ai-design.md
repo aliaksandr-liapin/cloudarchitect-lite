@@ -1,6 +1,6 @@
 # Multiple AI providers (Claude, OpenAI, Gemini) — design
 
-Date: 2026-10-26 · Status: draft, scheduled for release 0.3 (approval before build) · Scope: `packages/generator`, `packages/domain`, `apps/gateway`,
+Date: 2026-10-26, updated 2026-11-04 after the 0.2 release · Status: approved 2026-11-04 for release 0.3 · Scope: `packages/generator`, `packages/domain`, `apps/gateway`,
 `apps/web` (setup wizard, AI model panel), `eval`
 
 ## Where this fits
@@ -33,8 +33,9 @@ launch hook. The code already routes every model call through one small interfac
 3. **Measured numbers only.** Each new model gets the same live eval and blind review Claude had, run
    with the maintainer's own OpenAI and Gemini keys (both created 2026-10-26, each behind a hard $10
    cap). Every paid run is approved by the product owner before it starts.
-4. **Free credits stay in this project**; they are removed in the launch-polish project. The only change
-   to that code is the one Gemini- or OpenAI-only installs need (Builder-check answer 3).
+4. ~~Free credits stay in this project~~ Superseded: 0.2 removed free credits, the kill switch and the
+   Cloudflare code (ADR-0013). What is left is the daily and monthly spending limits, which count all
+   providers together.
 5. **A three-provider review panel, and all six models re-measured together** (2026-10-27). See
    Goals §6.
 
@@ -61,9 +62,23 @@ launch hook. The code already routes every model call through one small interfac
 
 - Each provider offers two models: a fast, economical one and a best-quality one. Claude keeps Haiku
   5.5 and Sonnet 5.5 with their existing ids `haiku` and `sonnet` (saved settings and browser choices
-  keep working). OpenAI and Gemini models are chosen at build time: the cheapest and the strongest
-  current models with reliable structured output, verified against each provider's documentation on
-  the day.
+  keep working). OpenAI and Gemini models, checked against the official pricing pages on 2026-11-04
+  (per million tokens, input / output). The best-quality tier is **price-matched to Claude Sonnet**
+  rather than each provider's most expensive model, so the comparison is like for like and the
+  benchmark fits the budget (product owner's call, 2026-11-04):
+
+  | Tier         | Claude                   | OpenAI                      | Gemini                                                     |
+  | ------------ | ------------------------ | --------------------------- | ---------------------------------------------------------- |
+  | Economical   | Haiku 5.5, $0.10 / $0.50 | `gpt-6-luna`, $0.10 / $0.50 | `gemini-3.5-flash-lite`, $0.30 / $2.50                     |
+  | Best quality | Sonnet 5.5, $2 / $10     | `gpt-6.1-sol`, $2 / $10     | `gemini-4-argon`, $2 / $10 until 2026-11-30, then $4 / $20 |
+
+  Not chosen: `gpt-6-astra` ($10 / $50, OpenAI's flagship, about 5× Sonnet per design) and
+  `gemini-3.1-pro-preview` (preview). The builder re-checks ids, structured-output support and prices
+  on the day the adapters are written; any change is recorded in the plan.
+
+- `PRICES` uses the price a user pays on the release date. Gemini 4 Argon's price doubles on
+  2026-12-01, so the published cost per design uses the December price; measured token counts are
+  re-priced if a price changes before release.
 - `ModelOption` gains the real `provider` (`anthropic | openai | google`). `PRICES` gets an entry per
   new model, with the source URL and date, as today.
 - The extraction step currently always uses Claude Haiku (`EXTRACTION_MODEL`). It moves to the
@@ -124,8 +139,13 @@ launch hook. The code already routes every model call through one small interfac
   designs are paired with each other, as in Gate A.
 - Review tooling is a repeatable script in `eval/` (packets in, rubric scores out), not hand-run
   sessions, so the benchmark can be re-run later. Reviewer calls count toward `--max-usd`.
-- Budget: about $3–6 across the three keys in total, within the $10 caps; each paid run is approved
-  first.
+- Budget (estimate from the Gate A run shape: economical models 22 scenarios × 2 repeats, best-quality
+  models 15 base scenarios × 1, then the review panel): about $9–12 in total, at most about $5 on any
+  one key, within the $10 caps (approved by the product owner, 2026-11-04). Each paid run is approved first and capped with `--max-usd`. Running the
+  Gemini part before 2026-12-01 halves the Argon cost.
+- **Pull requests stop spending by default:** the live eval runs on a pull request only with the
+  `live-eval` label, or on manual dispatch (product owner's decision 2026-10-28). 0.3 changes the
+  generator often, and each run costs money.
 - The numbers go into `MODEL_OPTIONS` with a report `docs/product/phase3-provider-benchmark.md`
   (method, panel, per-model results, limits), linked from the README.
 - **Partly measured models.** The blind-review fields of `ModelBenchmark` become optional. A model
@@ -134,13 +154,17 @@ launch hook. The code already routes every model call through one small interfac
 - **Quality bar**: every model must meet the Gate A thresholds (`docs/product/phase2-gate-a.md`) to
   appear in `MODEL_OPTIONS`; the bar is the same absolute bar for both tiers. Each model's one-line
   summary states how it compares with the others.
+  **Product owner's decision 2026-11-05 (replaces the Gate A bar for 0.3):** a model is listed when
+  its live pass rate is ≥ 0.85, its no-critical-defect rate is ≥ 0.85 and its blind median is ≥ 2.0
+  (`LISTING_BAR` in `eval/src/gate.ts`; `LIVE_GATE.passRate` lowered from 0.9 to 0.85 to match).
+  Listed: Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol, Gemini 4 Argon. Not listed: GPT-6 Luna,
+  Gemini 3.5 Flash-Lite ([report](../../product/phase3-provider-benchmark.md)).
 
 ## Non-goals
 
 - No local models (Ollama) in this project.
 - No change to prompts beyond what a provider strictly needs; prompt tuning per provider is a later
   task, driven by eval results.
-- No change to the free-credit, kill-switch or Cloudflare deploy code beyond keeping it compiling.
 - No Review button yet (project 2).
 - No mixing providers inside one operation.
 
@@ -169,12 +193,11 @@ launch hook. The code already routes every model call through one small interfac
    against the same-tier Claude model, all six models re-measured together (Goals §6).
 2. **Partly measured models and the quality bar** — my call: blind-review fields optional, shown as
    "Not yet measured"; one absolute Gate A bar for every model (Goals §6).
-3. **Gemini- or OpenAI-only installs** — my call: the gateway's "free AI available" check stops
-   requiring `ANTHROPIC_API_KEY` and instead requires a key for the selected model's provider. Spending
-   limits and the kill switch keep working across all providers. Free credits otherwise behave as
-   today until the launch-polish project removes them.
+3. **Gemini- or OpenAI-only installs** — my call (updated 2026-11-04): the gateway's "AI available"
+   check requires a key for the selected model's provider instead of `ANTHROPIC_API_KEY`; without one
+   it answers `setup_required`. Spending limits count all providers together.
 
 ## Left to the builder
 
-The exact OpenAI and Gemini model ids, the effort mapping per provider, how schemas are converted,
+Final confirmation of the OpenAI and Gemini model ids, the effort mapping per provider, how schemas are converted,
 the new model ids' naming, wizard card layout, and how cached-token usage maps per provider.
