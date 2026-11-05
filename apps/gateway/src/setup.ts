@@ -1,6 +1,8 @@
-import { ModelChoice } from '@cloudarchitect/domain';
+import { ModelChoice, modelOption, PROVIDERS, type Provider } from '@cloudarchitect/domain';
 import { z } from 'zod';
-import { resolveConfig, SETTING_KEYS, type Config, type Settings } from './config.js';
+import { KEY_SETTING, resolveConfig, SETTING_KEYS, type Config, type Settings } from './config.js';
+
+const KEY_SETTINGS: readonly string[] = Object.values(KEY_SETTING);
 
 /** Where wizard settings live. Node uses a 0600 JSON file on the data volume (settings-file.ts). */
 export interface SettingsPersistence {
@@ -10,24 +12,62 @@ export interface SettingsPersistence {
 
 export type KeyCheck = 'valid' | 'invalid' | 'unreachable';
 
-/** Checks an Anthropic key with a read-only call; the key is never logged or returned. */
-export async function verifyAnthropicKey(apiKey: string): Promise<KeyCheck> {
+/** Read-only "list models" call per provider; each key goes only to its own provider's host. */
+function keyCheckRequest(provider: Provider, apiKey: string): [string, Record<string, string>] {
+  switch (provider) {
+    case 'anthropic':
+      return [
+        'https://api.anthropic.com/v1/models?limit=1',
+        { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      ];
+    case 'openai':
+      return ['https://api.openai.com/v1/models', { authorization: `Bearer ${apiKey}` }];
+    case 'google':
+      return [
+        'https://generativelanguage.googleapis.com/v1beta/models',
+        { 'x-goog-api-key': apiKey },
+      ];
+  }
+}
+
+/** Checks a provider key with a read-only call; the key is never logged or returned. */
+export async function verifyKey(
+  provider: Provider,
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<KeyCheck> {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/models?limit=1', {
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    const [url, headers] = keyCheckRequest(provider, apiKey);
+    const res = await fetchImpl(url, {
+      method: 'GET',
+      headers,
       signal: AbortSignal.timeout(10_000),
     });
     if (res.ok) return 'valid';
-    return res.status === 401 || res.status === 403 ? 'invalid' : 'unreachable';
+    if (res.status === 401 || res.status === 403) return 'invalid';
+    // Gemini answers a bad key with 400 INVALID_ARGUMENT and reason API_KEY_INVALID.
+    if (
+      provider === 'google' &&
+      res.status === 400 &&
+      (await res.text()).includes('API_KEY_INVALID')
+    )
+      return 'invalid';
+    return 'unreachable';
   } catch {
     return 'unreachable';
   }
 }
 
+const ApiKey = z.string().min(20).max(300);
+
 export const SetupInput = z.object({
   code: z.string().min(1).max(64),
-  /** Omitted when the key comes from the environment. */
-  apiKey: z.string().min(20).max(300).optional(),
+  /** Keys entered in the wizard; a provider left out keeps its saved or environment key. */
+  apiKeys: z
+    .object({ anthropic: ApiKey.optional(), openai: ApiKey.optional(), google: ApiKey.optional() })
+    .optional(),
+  /** @deprecated 0.2 body: the Anthropic key. Use `apiKeys.anthropic`; kept for one release. */
+  apiKey: ApiKey.optional(),
   models: z.array(ModelChoice).min(1),
   defaultModel: ModelChoice,
   dailyBudgetUsd: z.number().min(0).max(100_000),
@@ -35,6 +75,8 @@ export const SetupInput = z.object({
   rateLimitPerMinute: z.number().int().min(1).max(10_000),
 });
 export type SetupInput = z.infer<typeof SetupInput>;
+
+export type KeySource = 'environment' | 'saved' | 'none';
 
 export class SetupError extends Error {
   constructor(
@@ -64,7 +106,7 @@ export class SetupService {
       persistence: SettingsPersistence;
       /** One-time code printed to the container log; proves the user can see the server console. */
       setupCode: string;
-      verifyKey?: (key: string) => Promise<KeyCheck>;
+      verifyKey?: (provider: Provider, key: string) => Promise<KeyCheck>;
       generateSalt: () => string;
     },
   ) {
@@ -80,13 +122,28 @@ export class SetupService {
     return this.current;
   }
 
+  /** Where each provider's key comes from; environment keys win over saved ones. */
+  private keySources(settings: Settings = this.settings): Record<Provider, KeySource> {
+    return Object.fromEntries(
+      PROVIDERS.map((p) => {
+        const name = KEY_SETTING[p];
+        const source = this.deps.env[name] ? 'environment' : settings[name] ? 'saved' : 'none';
+        return [p, source];
+      }),
+    ) as Record<Provider, KeySource>;
+  }
+
   status() {
+    const providers = this.keySources();
     return {
       configured: Boolean(this.settings.setupCompletedAt),
-      keyFromEnvironment: Boolean(this.deps.env.ANTHROPIC_API_KEY),
+      /** Key sources only, never key values. */
+      providers,
+      /** @deprecated Use `providers.anthropic === 'environment'`; kept for one release. */
+      keyFromEnvironment: providers.anthropic === 'environment',
       /** Settings fixed by environment variables; wizard values for these are ignored. */
       lockedByEnvironment: SETTING_KEYS.filter(
-        (k) => k !== 'CLIENT_KEY_SALT' && k !== 'ANTHROPIC_API_KEY' && Boolean(this.deps.env[k]),
+        (k) => k !== 'CLIENT_KEY_SALT' && !KEY_SETTINGS.includes(k) && Boolean(this.deps.env[k]),
       ),
       /** Effective non-secret values, so the wizard starts from what is in force. */
       current: {
@@ -116,9 +173,13 @@ export class SetupService {
     if (diff !== 0) throw new SetupError('invalid_code', 403);
   }
 
-  async checkKey(code: string, apiKey: string): Promise<KeyCheck> {
+  async checkKey(code: string, provider: Provider, apiKey: string): Promise<KeyCheck> {
     this.checkCode(code);
-    return (this.deps.verifyKey ?? verifyAnthropicKey)(apiKey);
+    return this.check(provider, apiKey);
+  }
+
+  private check(provider: Provider, apiKey: string) {
+    return (this.deps.verifyKey ?? verifyKey)(provider, apiKey);
   }
 
   async complete(input: SetupInput) {
@@ -126,17 +187,27 @@ export class SetupService {
     this.checkCode(input.code);
     if (!input.models.includes(input.defaultModel)) throw new SetupError('invalid_settings', 400);
 
-    const apiKey = this.status().keyFromEnvironment ? undefined : input.apiKey;
-    if (!this.status().keyFromEnvironment) {
-      if (!apiKey) throw new SetupError('invalid_api_key', 400);
-      const check = await (this.deps.verifyKey ?? verifyAnthropicKey)(apiKey);
-      if (check === 'invalid') throw new SetupError('invalid_api_key', 400);
-      if (check === 'unreachable') throw new SetupError('key_check_failed', 502);
-    }
+    // A key set in the environment wins, so a key entered for that provider is ignored.
+    const before = this.keySources();
+    const entered = { anthropic: input.apiKey, ...input.apiKeys };
+    const newKeys = PROVIDERS.flatMap((p) => {
+      const key = entered[p];
+      return key && before[p] !== 'environment' ? [[p, key] as const] : [];
+    });
+
+    const keys: Settings = Object.fromEntries(newKeys.map(([p, key]) => [KEY_SETTING[p], key]));
+    const after = this.keySources({ ...this.settings, ...keys });
+    if (PROVIDERS.every((p) => after[p] === 'none')) throw new SetupError('invalid_api_key', 400);
+    if (input.models.some((m) => after[modelOption(m).provider] === 'none'))
+      throw new SetupError('invalid_settings', 400);
+
+    const checks = await Promise.all(newKeys.map(([p, key]) => this.check(p, key)));
+    if (checks.includes('invalid')) throw new SetupError('invalid_api_key', 400);
+    if (checks.includes('unreachable')) throw new SetupError('key_check_failed', 502);
 
     const next: Settings = {
       ...this.settings,
-      ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+      ...keys,
       AI_MODELS: input.models.join(','),
       DEFAULT_MODEL: input.defaultModel,
       DAILY_BUDGET_MICRO_USD: String(Math.round(input.dailyBudgetUsd * 1_000_000)),

@@ -6,9 +6,15 @@ import { awsIconPack, type AwsIconPack } from '@cloudarchitect/catalog';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
-import { loadConfig, resolveConfig, type Settings } from './config.js';
+import {
+  effectiveModels,
+  loadConfig,
+  providerKey,
+  resolveConfig,
+  type Settings,
+} from './config.js';
 import { IconStore } from './icons.js';
-import { SetupService, type KeyCheck } from './setup.js';
+import { SetupService, verifyKey, type KeyCheck } from './setup.js';
 import { MemorySpendStore } from './store.js';
 
 const setup = (env: Record<string, string | undefined> = {}) => {
@@ -42,9 +48,18 @@ describe('gateway', () => {
       defaultModel: string;
       enabled: string[];
       options: { id: string; benchmark: { costPerOperationUsd: number } }[];
+      available: Record<string, boolean>;
     };
     expect(body.defaultModel).toBe('haiku');
     expect(body.enabled).toEqual(['haiku']);
+    expect(body.available).toEqual({
+      haiku: true,
+      sonnet: true,
+      'gpt-luna': false,
+      'gpt-sol': false,
+      'gemini-flash-lite': false,
+      'gemini-argon': false,
+    });
     expect(body.options.map((o) => o.id)).toEqual(['haiku', 'sonnet']);
     expect(body.options[1]!.benchmark.costPerOperationUsd).toBeGreaterThan(
       body.options[0]!.benchmark.costPerOperationUsd,
@@ -138,13 +153,18 @@ describe('gateway', () => {
 });
 
 describe('setup wizard', () => {
-  const wizard = (env: Record<string, string> = {}, check: KeyCheck = 'valid') => {
-    let saved: Settings = {};
+  const wizard = (
+    env: Record<string, string> = {},
+    check: KeyCheck = 'valid',
+    initial: Settings = {},
+  ) => {
+    let saved: Settings = initial;
+    const checked: [string, string][] = [];
     const service = new SetupService({
       env,
       persistence: { read: () => saved, write: (s) => (saved = structuredClone(s)) },
       setupCode: 'code-1234',
-      verifyKey: async () => check,
+      verifyKey: async (provider, key) => (checked.push([provider, key]), check),
       generateSalt: () => 'generated-salt-0123456789',
     });
     const app = createApp({
@@ -152,7 +172,7 @@ describe('setup wizard', () => {
       setup: service,
       store: new MemorySpendStore(),
     });
-    return { app, saved: () => saved };
+    return { app, saved: () => saved, checked, service };
   };
   const input = {
     code: 'code-1234',
@@ -235,14 +255,227 @@ describe('setup wizard', () => {
     expect(saved().ANTHROPIC_API_KEY).toBeUndefined();
   });
 
+  const ANT = 'sk-ant-test-0123456789abcdef';
+  const OAI = 'sk-openai-test-0123456789abcdef';
+  const GEM = 'gemini-test-0123456789abcdef';
+
+  it('reports each provider key source without returning any key', async () => {
+    const { app } = wizard({ OPENAI_API_KEY: OAI }, 'valid', { GEMINI_API_KEY: GEM });
+    const res = await app.request('/api/setup/status');
+    const text = await res.text();
+    expect(JSON.parse(text)).toMatchObject({
+      providers: { anthropic: 'none', openai: 'environment', google: 'saved' },
+      keyFromEnvironment: false,
+    });
+    expect(JSON.parse(text).lockedByEnvironment).toEqual([]);
+    for (const key of [OAI, GEM]) expect(text).not.toContain(key);
+    const models = await (await app.request('/api/models')).text();
+    for (const key of [OAI, GEM]) expect(models).not.toContain(key);
+  });
+
+  it('verify-key checks the named provider and defaults to Anthropic', async () => {
+    const { app, checked } = wizard();
+    const google = await app.request(
+      '/api/setup/verify-key',
+      post('', { code: 'code-1234', provider: 'google', apiKey: GEM }),
+    );
+    expect(await google.json()).toEqual({ result: 'valid' });
+    await app.request('/api/setup/verify-key', post('', { code: 'code-1234', apiKey: ANT }));
+    expect(checked).toEqual([
+      ['google', GEM],
+      ['anthropic', ANT],
+    ]);
+    const unknown = await app.request(
+      '/api/setup/verify-key',
+      post('', { code: 'code-1234', provider: 'mistral', apiKey: GEM }),
+    );
+    expect(unknown.status).toBe(400);
+    const wrongCode = await app.request(
+      '/api/setup/verify-key',
+      post('', { code: 'nope', provider: 'openai', apiKey: OAI }),
+    );
+    expect(wrongCode.status).toBe(403);
+  });
+
+  it('completes with only a Gemini key and saves it as GEMINI_API_KEY', async () => {
+    const { app, saved, checked } = wizard();
+    const { apiKey: _omit, ...rest } = input;
+    void _omit;
+    const res = await app.request(
+      '/api/setup/complete',
+      post('', {
+        ...rest,
+        apiKeys: { google: GEM },
+        models: ['gemini-flash-lite'],
+        defaultModel: 'gemini-flash-lite',
+      }),
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain(GEM);
+    expect(checked).toEqual([['google', GEM]]);
+    expect(saved()).toMatchObject({ GEMINI_API_KEY: GEM, AI_MODELS: 'gemini-flash-lite' });
+    expect(saved().ANTHROPIC_API_KEY).toBeUndefined();
+    const models = await (await app.request('/api/models')).text();
+    expect(JSON.parse(models)).toMatchObject({
+      enabled: ['gemini-flash-lite'],
+      defaultModel: 'gemini-flash-lite',
+      available: { haiku: false, 'gemini-flash-lite': true, 'gemini-argon': true },
+    });
+    expect(models).not.toContain(GEM);
+  });
+
+  it('complete needs at least one key and only models whose provider has a key', async () => {
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const none = await wizard().app.request('/api/setup/complete', post('', noKey));
+    expect(none.status).toBe(400);
+    expect(await none.json()).toEqual({ error: 'invalid_api_key' });
+
+    const { app, saved } = wizard();
+    const res = await app.request(
+      '/api/setup/complete',
+      post('', {
+        ...noKey,
+        apiKeys: { openai: OAI },
+        models: ['gpt-luna', 'haiku'],
+        defaultModel: 'gpt-luna',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_settings' });
+    expect(saved().OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('verifies each newly entered key and keeps saved keys that are not re-entered', async () => {
+    const { app, saved, checked, service } = wizard({}, 'valid', {
+      ANTHROPIC_API_KEY: ANT,
+      CLIENT_KEY_SALT: 'saved-salt-0123456789',
+    });
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const res = await app.request(
+      '/api/setup/complete',
+      post('', {
+        ...noKey,
+        apiKeys: { openai: OAI },
+        models: ['haiku', 'gpt-sol'],
+        defaultModel: 'gpt-sol',
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(checked).toEqual([['openai', OAI]]);
+    expect(saved()).toMatchObject({ ANTHROPIC_API_KEY: ANT, OPENAI_API_KEY: OAI });
+    expect(service.status().providers).toEqual({
+      anthropic: 'saved',
+      openai: 'saved',
+      google: 'none',
+    });
+  });
+
+  it('rejects a newly entered key that fails its check', async () => {
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const body = {
+      ...noKey,
+      apiKeys: { openai: OAI },
+      models: ['gpt-luna'],
+      defaultModel: 'gpt-luna',
+    };
+    const bad = wizard({}, 'invalid');
+    expect(await (await bad.app.request('/api/setup/complete', post('', body))).json()).toEqual({
+      error: 'invalid_api_key',
+    });
+    const down = wizard({}, 'unreachable');
+    const res = await down.app.request('/api/setup/complete', post('', body));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'key_check_failed' });
+    expect(down.saved().OPENAI_API_KEY).toBeUndefined();
+  });
+
   it('is absent when the gateway runs without a wizard', async () => {
     const res = await setup().app.request('/api/setup/complete', post('', input));
     expect(res.status).toBe(404);
   });
 });
 
+describe('verifyKey', () => {
+  const KEY = 'test-key-not-real-0123456789';
+  const fakeFetch = (status: number, body = '') => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response(body, { status });
+    }) as unknown as typeof fetch;
+    return { fetchImpl, calls };
+  };
+
+  it('calls each provider read-only on its own host with its auth header and a timeout', async () => {
+    const cases = [
+      ['anthropic', 'https://api.anthropic.com/v1/models?limit=1', 'x-api-key', KEY],
+      ['openai', 'https://api.openai.com/v1/models', 'authorization', `Bearer ${KEY}`],
+      ['google', 'https://generativelanguage.googleapis.com/v1beta/models', 'x-goog-api-key', KEY],
+    ] as const;
+    for (const [provider, url, header, value] of cases) {
+      const f = fakeFetch(200);
+      expect(await verifyKey(provider, KEY, f.fetchImpl)).toBe('valid');
+      expect(f.calls).toHaveLength(1);
+      expect(f.calls[0]!.url).toBe(url);
+      expect(f.calls[0]!.init.method ?? 'GET').toBe('GET');
+      expect(new Headers(f.calls[0]!.init.headers).get(header)).toBe(value);
+      expect(f.calls[0]!.init.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it('maps 401/403 to invalid and other failures to unreachable', async () => {
+    for (const provider of ['anthropic', 'openai', 'google'] as const) {
+      for (const status of [401, 403])
+        expect(await verifyKey(provider, KEY, fakeFetch(status).fetchImpl)).toBe('invalid');
+      for (const status of [429, 500])
+        expect(await verifyKey(provider, KEY, fakeFetch(status).fetchImpl)).toBe('unreachable');
+      const down = (async () => {
+        throw new TypeError('fetch failed');
+      }) as unknown as typeof fetch;
+      expect(await verifyKey(provider, KEY, down)).toBe('unreachable');
+    }
+  });
+
+  it('treats a Gemini 400 API_KEY_INVALID as invalid and other 400s as unreachable', async () => {
+    const invalid = JSON.stringify({
+      error: { code: 400, status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] },
+    });
+    expect(await verifyKey('google', KEY, fakeFetch(400, invalid).fetchImpl)).toBe('invalid');
+    expect(await verifyKey('google', KEY, fakeFetch(400, '{}').fetchImpl)).toBe('unreachable');
+    expect(await verifyKey('openai', KEY, fakeFetch(400, invalid).fetchImpl)).toBe('unreachable');
+  });
+});
+
 describe('config', () => {
   const base = { DEFAULT_MODEL: 'haiku', AI_MODELS: 'haiku', CLIENT_KEY_SALT: 'x'.repeat(16) };
+
+  it('saved provider keys load; environment keys win', () => {
+    const config = resolveConfig(
+      { GEMINI_API_KEY: 'gemini-env-0123456789' },
+      { ...base, OPENAI_API_KEY: 'sk-openai-saved-0123', GEMINI_API_KEY: 'gemini-saved-0123' },
+    );
+    expect(providerKey(config, 'openai')).toBe('sk-openai-saved-0123');
+    expect(providerKey(config, 'google')).toBe('gemini-env-0123456789');
+    expect(providerKey(config, 'anthropic')).toBeUndefined();
+  });
+
+  it('effective models drop models without a provider key and fall back to the first enabled', () => {
+    const config = loadConfig({
+      ...base,
+      AI_MODELS: 'gpt-luna,sonnet,haiku',
+      DEFAULT_MODEL: 'gpt-luna',
+      ANTHROPIC_API_KEY: 'sk-ant-test-not-a-real-key',
+    });
+    expect(effectiveModels(config)).toEqual({
+      enabled: ['sonnet', 'haiku'],
+      defaultModel: 'sonnet',
+    });
+    expect(effectiveModels(loadConfig(base))).toEqual({ enabled: [], defaultModel: undefined });
+  });
 
   it('ignores removed settings', () => {
     const config = resolveConfig({}, { ...base, FREE_CREDITS: '3' } as Settings);

@@ -1,13 +1,24 @@
 import { awsCatalog, awsIconPack, type IconSet } from '@cloudarchitect/catalog';
-import { listedModels, ModelChoice } from '@cloudarchitect/domain';
-import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
+import {
+  listedModels,
+  ModelChoice,
+  modelOption,
+  PROVIDERS,
+  type Provider,
+} from '@cloudarchitect/domain';
+import {
+  anthropicClient,
+  googleClient,
+  openaiClient,
+  type LlmClient,
+} from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 import { z } from 'zod';
-import type { Config } from './config.js';
+import { effectiveModels, providerKey, type Config } from './config.js';
 import { registerGenerateRoutes } from './generate.js';
 import type { IconStore } from './icons.js';
 import { SetupError, SetupInput, type SetupService } from './setup.js';
@@ -23,13 +34,25 @@ export interface Deps {
   icons?: IconStore;
   /** Structured logger. Must never receive prompts, graphs or keys (NFR-006). */
   log?: (event: Record<string, unknown>) => void;
-  /** Provider client factory; tests inject a fake. */
-  llm?: (apiKey: string) => LlmClient;
+  /** Provider client factory; tests inject a fake. One operation uses one provider. */
+  llm?: (provider: Provider, apiKey: string) => LlmClient;
   /** Clock in epoch ms for operation tokens; tests inject one. */
   now?: () => number;
 }
 
 export type Env = { Variables: { clientKey: string } };
+
+/** Picks the adapter for a provider. */
+export function providerClient(provider: Provider, apiKey: string): LlmClient {
+  switch (provider) {
+    case 'anthropic':
+      return anthropicClient(apiKey);
+    case 'openai':
+      return openaiClient(apiKey);
+    case 'google':
+      return googleClient(apiKey);
+  }
+}
 
 async function sha256(text: string) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -56,7 +79,7 @@ export function createApp({
   store,
   icons,
   log = () => {},
-  llm = anthropicClient,
+  llm = providerClient,
   now = Date.now,
 }: Deps) {
   const app = new Hono<Env>();
@@ -102,10 +125,13 @@ export function createApp({
     });
   });
 
-  /** True when a key is configured and neither the daily nor the monthly limit is reached (NFR-009). */
+  /**
+   * True when some provider key is configured and neither the daily nor the monthly limit is reached
+   * (NFR-009). The counters are shared by all providers.
+   */
   async function aiAvailable() {
     const config = cfg();
-    if (!config.ANTHROPIC_API_KEY) return false;
+    if (!PROVIDERS.some((p) => providerKey(config, p))) return false;
     const { dayMicroUsd, monthMicroUsd } = await store.spend();
     return (
       dayMicroUsd < config.DAILY_BUDGET_MICRO_USD && monthMicroUsd < config.MONTHLY_BUDGET_MICRO_USD
@@ -116,14 +142,18 @@ export function createApp({
 
   app.get('/api/catalog/manifest', (c) => c.json({ providers: { aws: awsCatalog.manifest } }));
 
-  /** Model options with their measured benchmark, and which ones this instance's key serves. */
-  app.get('/api/models', (c) =>
-    c.json({
-      defaultModel: cfg().DEFAULT_MODEL,
-      enabled: cfg().AI_MODELS,
-      options: listedModels(),
-    }),
-  );
+  /**
+   * Model options with their measured benchmark, which ones are enabled and can run, and which ones
+   * have a provider key (never the key itself).
+   */
+  app.get('/api/models', (c) => {
+    const config = cfg();
+    const { enabled, defaultModel } = effectiveModels(config);
+    const available = Object.fromEntries(
+      ModelChoice.options.map((m) => [m, Boolean(providerKey(config, modelOption(m).provider))]),
+    ) as Record<ModelChoice, boolean>;
+    return c.json({ defaultModel, enabled, options: listedModels(), available });
+  });
 
   const iconState = () => icons?.state() ?? 'missing';
   // The ready body (~150 KB) never changes for a release, so it is serialized once and served with an
@@ -169,11 +199,17 @@ export function createApp({
   app.post('/api/setup/verify-key', async (c) => {
     if (!setup) return c.json({ error: 'not_found' }, 404);
     const body = z
-      .object({ code: z.string().max(64), apiKey: z.string().min(20).max(300) })
+      .object({
+        code: z.string().max(64),
+        // 0.2 clients send no provider; their key is an Anthropic key.
+        provider: z.enum(PROVIDERS as [Provider, ...Provider[]]).default('anthropic'),
+        apiKey: z.string().min(20).max(300),
+      })
       .safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: 'invalid_request' }, 400);
+    const { code, provider, apiKey } = body.data;
     try {
-      return c.json({ result: await setup.checkKey(body.data.code, body.data.apiKey) });
+      return c.json({ result: await setup.checkKey(code, provider, apiKey) });
     } catch (err) {
       return setupFailure(c, err);
     }
@@ -216,10 +252,12 @@ export function createApp({
         400,
       );
     if (setup && !setup.status().configured) return c.json({ error: 'setup_required' }, 503);
-    const chosen = model.data.model ?? cfg().DEFAULT_MODEL;
+    const chosen = model.data.model ?? effectiveModels(cfg()).defaultModel;
+    if (!chosen) return c.json({ error: 'setup_required' }, 503);
     if (!cfg().AI_MODELS.includes(chosen))
       return c.json({ error: 'model_not_enabled', model: chosen }, 403);
-    if (!cfg().ANTHROPIC_API_KEY) return c.json({ error: 'setup_required' }, 503);
+    if (!providerKey(cfg(), modelOption(chosen).provider))
+      return c.json({ error: 'setup_required' }, 503);
     if (!(await aiAvailable())) return c.json({ error: 'ai_unavailable' }, 503);
     return c.json({ error: 'not_implemented' }, 501);
   };
