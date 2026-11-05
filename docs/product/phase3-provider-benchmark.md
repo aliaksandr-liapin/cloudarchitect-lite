@@ -36,7 +36,7 @@ One operation never mixes providers: the requirements-extraction call runs on th
 - **Panel:** three isolated reviewers from the best-quality tier, one per provider: `claude-sonnet-5-5`, `gpt-6.1-sol`, `gemini-4-argon`. Each reviewer gets every packet with the reviewer instructions and the PRD §14 rubric, copied unchanged from Gate A.
 - **Pairing:** each design is reviewed side by side with the same scenario's design from the Claude model of the same tier (economical with Haiku, best quality with Sonnet), in random A/B order. Claude designs are paired with each other (Haiku vs Sonnet), as at Gate A.
 - **Blinding:** a packet holds the user prompt, the selected toggles, the clarification answers and the two designs. Model names, ids, providers and provider-specific formatting are stripped. The unblinding key is `key.json`.
-- **Scoring:** the score of a design is the mean of the 7 rubric dimensions (0–3). The published score of a design is the **median of the three reviewers**; a design that appears in several packets (Haiku and Sonnet designs) is averaged over them. A model's blind score is the median over its designs. A design has a critical defect when a majority of reviewers report one; its major-defect count is the median over reviewers; a pair's preference is the majority of reviewers.
+- **Scoring:** the score of a design is the mean of the 7 rubric dimensions (0–3). The published score of a design is the **median of the three reviewers**; a design that appears in several packets (Haiku and Sonnet designs) is averaged over them. A model's blind score is the median over its designs. A design has a critical defect when a majority of reviewers report one in a packet, and, for a design that appears in several packets, when more than half of those packets flag it that way. Its major-defect count is the median over reviewers in each packet, averaged over the packets the design appears in and rounded. A pair's preference is the majority of reviewers.
 
 ## Results
 
@@ -52,7 +52,8 @@ One operation never mixes providers: the requirements-extraction call runs on th
 Run ids: Haiku `2026-11-05T07-56-51-552Z`, Luna `2026-11-05T07-45-53-363Z`, Flash-Lite `2026-11-05T07-43-39-110Z`, Sonnet `2026-11-05T08-14-50-217Z`, Sol `2026-11-05T08-10-20-537Z`, Argon `2026-11-05T08-06-49-090Z`.
 
 - Cost per generation is the mean over the live runs at the price list in force on the release date. Argon is priced at the December price ($4/$20); at the November price ($2/$10) it is about half.
-- Designs with a critical defect (majority of reviewers): Argon `product-search`; Luna `myblog`, `regulated-portal`; Flash-Lite `nightly-reports-serverless`, `product-search`, `regulated-portal`, `regulated-portal-security`.
+- Designs with a critical defect (rule above): Argon `product-search`; Luna `myblog`, `regulated-portal`; Flash-Lite `nightly-reports-serverless`, `product-search`, `regulated-portal`, `regulated-portal-security`.
+- Sonnet `fraud-model-serving` appears in three packets. In g11 two of three reviewers (OpenAI and Gemini) reported a critical defect; in g4 and g5 none did. It is flagged in one of three packets, so it is not counted, and Sonnet's no-critical-defect rate is 100%.
 - Economical and best-quality rates cover different scenario sets (12 vs 9 reviewed scenarios; 22 vs 15 live scenarios), so compare models within a tier.
 
 ### Pairwise preferences
@@ -69,7 +70,7 @@ Majority of the three reviewers; no ties.
 
 ### Agreement between reviewers
 
-Preferences per reviewer, from the saved review files. The Claude reviewer's answers for packets g10, g14 and g16 were incomplete, so its column covers 14 of the 17 packets.
+Preferences per reviewer, from the saved review files. The Claude reviewer's answers for packets g10, g14 and g16 covered only one scenario each, so its column covers 14 of the 17 packets.
 
 | Pair | Claude reviewer | OpenAI reviewer | Gemini reviewer |
 |---|---|---|---|
@@ -79,7 +80,7 @@ Preferences per reviewer, from the saved review files. The Claude reviewer's ans
 | Sonnet vs Argon | Sonnet 5–3 | Sonnet 5–4 | Argon 5–4 |
 | Sonnet vs Haiku | Sonnet 4–3 | Sonnet 6–3 | Sonnet 5–4 |
 
-All three reviewers agree on the direction of the economical pairs and of Sonnet vs Haiku. Sol vs Sonnet is unanimous for the OpenAI and Gemini reviewers and close for the Claude reviewer. Sonnet vs Argon is split. Each reviewer was a little more favourable to its own provider's model than the other two reviewers were (the Claude reviewer on Sol vs Sonnet, the OpenAI reviewer on Haiku vs Luna, the Gemini reviewer on Sonnet vs Argon); the majority and median of three limit the effect of one reviewer.
+All three reviewers agree on the direction of the economical pairs and of Sonnet vs Haiku. Sol vs Sonnet is unanimous for the OpenAI and Gemini reviewers and close for the Claude reviewer. Sonnet vs Argon is split. On the pair that best matches its own provider, each reviewer leaned toward its own provider's model more than the other two reviewers did (the Claude reviewer on Sol vs Sonnet, the OpenAI reviewer on Haiku vs Luna, the Gemini reviewer on Sonnet vs Argon). This does not hold for every pair: on Sonnet vs Haiku the Claude reviewer favoured Haiku as often as the OpenAI reviewer did. The majority and median of three limit the effect of one reviewer.
 
 ## Listing bar
 
@@ -147,8 +148,8 @@ By activity: contract smoke run ~$0.19, live generation ~$3.4, review panel ~$8.
 
 - **One design per scenario per variant.** The review covers repeat 1 only; a model's blind score rests on 12 or 9 designs, so one design moves a rate by 8 or 11 points.
 - **Live pass rates are small samples.** One run is 2.3 points of the pass rate at 44 runs and 6.7 points at 15 runs; re-runs on the same code can move a model by that much.
-- **Reviewers are models, and they saw no documentation.** They review from their own knowledge of AWS. All three reviewers are also benchmarked best-quality models, so each one reviews designs from its own provider, and in the pairs above each leaned slightly toward its own provider (see Agreement between reviewers). This is an AI review, not a human panel; a human spot check remains planned.
-- **Three Claude-reviewer packets are incomplete.** In packets g10, g14 and g16 the Claude reviewer skipped one design even after one retry, so those designs have a 2-reviewer median (`summary.json` has `complete: false`).
+- **Reviewers are models, and they saw no documentation.** They review from their own knowledge of AWS. All three reviewers are also benchmarked best-quality models, so each one reviews designs from its own provider, and on the pair that best matches its own provider each leaned toward its own provider (see Agreement between reviewers). This is an AI review, not a human panel; a human spot check remains planned.
+- **Three Claude-reviewer packets are incomplete.** The Claude reviewer's answers for packets g10, g14 and g16 covered only one scenario (that scenario reviewed three times, even after one retry), so its answer was dropped and all 9 pairs in those packets were scored by 2 reviewers. 17 designs have a 2-reviewer score in at least one packet (`reviewersPerDesign` in `summary.json`, which has `complete: false`), including GPT-6.1 Sol `product-search` and Gemini 4 Argon `claims-approval-workflow`, which count toward listed models' scores. The raw answers are in `review-anthropic-g10/g14/g16.raw.json`.
 - **Repeated entries normalized.** Some Claude reviewer answers listed the same design twice; the first entry was kept. The raw answers are saved as `review-*.raw.json`.
 - **Prices and dates.** Prices were checked on 2026-11-04. Argon's price doubles on 2026-12-01; its listed cost already uses the December price. Provider price changes after that date are not reflected.
 - **Different populations per tier.** Economical models are measured on 22 live and 12 reviewed scenarios, best-quality models on 15 and 9.
