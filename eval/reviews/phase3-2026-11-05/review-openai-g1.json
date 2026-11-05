@@ -1,0 +1,293 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The authentication flow incorrectly treats ALB Cognito authentication as validation of client-supplied bearer JWTs, including machine-to-machine tokens. ALB authentication uses an interactive authorization-code and session-cookie flow; the depicted token-based API integrations require JWT validation in the application or an appropriate API authorizer.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "Private placement is specified, but task security groups, least-privilege task roles, and restricted database/cache access are not. Database and Redis connections also do not specify TLS, leaving important access and transport controls unresolved.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-network.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that the two ALB nodes represent the subnet attachments of one multi-AZ load balancer, rather than independently deployable single-subnet ALBs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify whether rotation uses RDS-managed credentials or a Secrets Manager rotation function, and how running applications refresh credentials after rotation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define minimum task counts, surviving-AZ capacity, database/cache endpoint reconnection behavior, and the acceptable loss of sessions during asynchronous Redis replication failover.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The compute, data, and egress topology largely meets the request, but the proposed ALB bearer-token authentication flow will not work for the stated API integrations."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design does not specify task security groups accepting application traffic only from the ALB, restricted database/cache security groups, or least-privilege task and execution roles. These controls should be explicit before implementation.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-network.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Resolve the ambiguity between secrets being injected into containers and fetched by application code; define credential refresh and connection recovery so automatic rotation does not leave running tasks using stale credentials.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The image-pull edge is reversed and attributed to the ECS control plane rather than task startup using the execution role; JWT validation is also drawn only for AZ A despite both task groups needing identical authentication behavior.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify minimum healthy task counts, capacity after losing either AZ, failover retry behavior, and the cache's session-loss tolerance.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a strong managed, multi-AZ solution with appropriate application-level JWT validation, needing clearer least-privilege controls and rotation/failover behavior."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Writing Aurora and then publishing to SQS is a non-atomic dual write. A failure between those operations loses the indexing notification, and an unspecified reconciliation schedule does not establish the one-minute freshness requirement. Use transactional outbox or CDC capture.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "Neither indexing Lambda has specified VPC attachment, subnet selection, or security-group access to the private Aurora database. Regional placement and a NAT gateway do not themselves establish that connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The sole NAT gateway is an AZ-level dependency for the depicted regional/public endpoint access. Losing AZ2 can therefore break search access and task replacement despite the design's inferred AZ-survival requirement; use per-AZ egress or suitable private endpoints.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "OpenSearch access controls are unspecified: there is no domain access policy, workload identity/authorization model, or private-access decision. Its placement outside the VPC makes these unresolved controls particularly important.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotent upserts alone do not document protection against concurrent stale overwrites; specify per-product version checks or ordering, including reconciliation competing with live indexing.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define cache population and invalidation/TTL behavior, and make the two-million-product load resumable through bounded batches, checkpoints, or orchestration rather than an unspecified single Lambda scan.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Aurora PostgreSQL is assumed without identifying the existing relational engine or whether migration is intended; retaining the existing source should be the default unless replatforming is justified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The search and caching services fit the workload, but non-atomic change publication and unresolved private connectivity prevent a convincing one-minute freshness and recovery story."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design explicitly proposes two zonal ALBs, each associated with one AZ, and pairs them for availability. A standard regional ALB requires subnets in at least two Availability Zones; this layout cannot be deployed as described. Use one multi-AZ ALB unless separate multi-AZ load balancers are justified.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The index updater has no specified VPC attachment or security-group path to the private ElastiCache cluster, so its cache-invalidation connection is unresolved.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "A Kinesis event-source mapping's SQS failure destination receives an invocation record describing the failed batch, not a durable copy of its original change records. Replay therefore depends on retrieving records before stream retention expires; retry/record-age limits and durable payload recovery are not specified.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudFront cache behaviors, cache keys, and TTLs are unspecified. Invalidating Valkey does not invalidate edge-cached prices, and cached search responses need appropriate query-parameter keys and freshness limits or caching disabled.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design lacks an explicit OpenSearch authorization/access policy and workload-permission model; database authentication/credential handling and restrictions preventing direct bypass of the CloudFront-protected ingress are also unresolved.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the DMS partition-key mapping, version-aware indexing, and coordination between the direct full-load writer and live stream writer; Kinesis ordering alone does not describe a safe initial-load cutover.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The single NAT remains an AZ-level egress dependency, while RDS Proxy and multiple caching layers need sizing and cost justification; the existing database engine and any Aurora migration are also unstated assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 resolution should be shown as DNS rather than HTTPS request forwarding, and an ECS service or equivalent lifecycle controller should be identified for the Fargate tasks.",
+          "evidence": ""
+        }
+      ],
+      "summary": "CDC and full-load support are valuable, but the invalid zonal-ALB topology, incomplete failure replay, and unspecified edge-cache freshness make this design unsafe to implement unchanged."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The audit table's claimed append-only/tamper-evident protection is not established by denying update and delete operations: PutItem can completely replace an existing item. Enforce conditional creation through a restricted writer and provide independently protected audit evidence or immutable archival storage where required.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "major",
+          "description": "Duplicate-free email delivery is asserted but not implemented. The notifier has no depicted notification ledger or recovery protocol, and SES SendEmail has no client idempotency token; an accepted send followed by a timeout can produce another email on retry.",
+          "evidence": "https://docs.aws.amazon.com/ses/latest/APIReference/API_SendEmail.html"
+        },
+        {
+          "severity": "major",
+          "description": "Submission starts automated checks independently of asynchronous S3-triggered validation. No gate establishes that every referenced upload has completed and passed validation before checks read it, leaving a race against the stated pre-validation requirement.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly select Standard Workflows, define secure task-token persistence and claim/execution correlation, and coordinate decision persistence with callback retries and timeout races.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose concrete retention periods and distinguish application/API access logs from CloudTrail management and explicitly enabled data events; the current CloudTrail edge does not clearly establish coverage of customer requests and S3 object access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The workflow and human-callback architecture is substantially complete, but the audit immutability claim is incorrect and validation sequencing and email retry semantics need correction."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The only API-to-workflow integration shown starts an execution. There is no documented callback-token delivery/persistence or SendTaskSuccess/SendTaskFailure integration connecting an adjuster's decision to the waiting execution; explicitly use a Standard callback workflow and correlate the decision with that execution.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token"
+        },
+        {
+          "severity": "major",
+          "description": "No trusted component or integration is identified to authorize and generate the presigned upload URLs, bind object keys to a claim, and make those documents available to automated checks.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "major",
+          "description": "Only adjuster authentication is described. Customer submission/upload authorization, ownership checks, and adjuster claim-level authorization remain undefined; attaching a Cognito authorizer does not establish those business-level access rules.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html"
+        },
+        {
+          "severity": "major",
+          "description": "A disconnected CloudWatch node does not establish an end-to-end audit trail. Configure execution logging, submission/decision access records, document-access coverage, and retention; Step Functions history alone does not cover every external action or provide indefinite retention.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html"
+        },
+        {
+          "severity": "major",
+          "description": "Failure recovery is asserted without Retry/Catch policies, a 14-day timeout outcome, or idempotency handling for checks, decisions, and email side effects. Persisted workflow state alone does not define safe continuation after these failures.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+        }
+      ],
+      "summary": "The managed service choices are appropriate, but upload issuance, approval callbacks, authorization, auditing, and failure recovery remain too incomplete for an implementable claims process."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B preserves the required multi-AZ managed topology and uses application-level JWT validation rather than the unsupported ALB bearer-token flow, while also specifying stronger transport encryption and secret handling."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A has fewer fundamental deployment errors and a simpler serving path; B's stronger CDC approach is outweighed by its invalid zonal ALBs and additional replay/cache correctness gaps, though A still needs reliable change capture to meet the freshness requirement."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A explicitly models document handling, a human callback, durable claim/audit records, retries, and timeout escalation, whereas B leaves essential workflow integrations undefined; A's audit-protection claim and retry semantics must nevertheless be fixed."
+    }
+  ]
+}

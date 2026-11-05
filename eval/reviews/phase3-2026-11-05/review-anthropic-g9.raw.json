@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Textract is marked UNRESOLVED (not in the verified catalog), and multi-page PDFs need asynchronous Textract calls, which the design does not describe.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The submit step can start the workflow before the S3-triggered file validation finishes. The design does not show that the workflow waits for validation results, and it does not show where the task token is stored for the later adjuster callback.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudFront node says it fronts the 'API entry', but the edges send clients directly to API Gateway. The API Gateway -> CloudTrail edge is semantically odd, because CloudTrail records events rather than receiving them from the API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no explicit KMS node or key policy. The CMK requirement is expressed only through node configuration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Thorough, well-fitted serverless design. It has a task-token wait, upload validation with a DLQ, a separate append-only audit table with IAM deny, CMK encryption, idempotent writes, escalation and alarms."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Claim processing workflow -> Insurance adjusters (HTTPS)' implies Step Functions pushes work to adjusters. No queue, notification or task-listing mechanism exists. The task-token callback pattern needs the token stored and surfaced (for example via SQS, SNS or a table) so the adjuster flow can resume the execution.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token"
+        },
+        {
+          "severity": "major",
+          "description": "Claims data and audit events share one DynamoDB table. There is no immutability or tamper-evidence control, no stated CMK encryption, and no versioning or encryption on the document bucket. This is weak for an auditable insurance process.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_data_rest_encrypt.html"
+        },
+        {
+          "severity": "major",
+          "description": "There are no DLQs, no failure destinations, no retry or idempotency design, and no file type or size validation. Resume-after-failure and duplicate-prevention are asserted rather than designed.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no path for adjusters to retrieve documents, such as presigned download URLs. The document bucket edge only shows uploads.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the basic happy path with Step Functions and a 14-day wait. The human-task integration is vague, the audit design is weak, and failure handling is thin."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "One bucket holds site assets, original uploads and thumbnails. The thumbnail Lambda is triggered by ObjectCreated on that bucket and writes back to it. No prefix or suffix filter is specified, so this risks a recursive invocation loop. Original photos are also exposed through the same CloudFront origin.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB Streams will emit events for post writes as well as subscribers. An event filter is needed. The claim that DB writes and emails are 'atomically linked' overstates at-least-once stream delivery semantics.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no WAF or rate limiting on the public subscribe endpoint, which could be abused to send emails through SES. A single shared DLQ for two different producers complicates triage. The 'invoke' edge type for presigned URL generation is imprecise.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A lean, low-cost serverless design that meets the stated needs, but the shared bucket without a trigger scoping filter creates a loop risk, and it has less hardening than B."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "WAF protects only the API stage, not the CloudFront distribution. The WAF monthly fee is a small cost on a low-cost blog.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The stream relay Lambda has no on-failure destination. Persistent failures would stall the shard until the records expire.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The public subscribe route is open, and SES sandbox and verification are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Well-engineered event handling: stream to SQS to Lambda with partial-batch responses and DLQs, prefix-scoped S3 triggers, WAF, PITR, and alarms. Slightly more components and cost than the minimum."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design models two separate ALBs, one per AZ, with CloudFront forwarding to both. A single ALB spans multiple AZs, and a CloudFront behaviour targets one origin (or an origin group for failover) rather than load-balancing across two. This is wasteful and mis-describes how high availability is achieved.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks sit in private subnets with no ECR, NAT gateway or VPC endpoints. The tasks cannot pull images or reach Secrets Manager, CloudWatch or the Cognito JWKS URL, so the stated app tier would not start as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "ACM is described as providing 'public and private' certificates for the containers. Public ACM certificates cannot be installed on Fargate tasks, and no Private CA is included. The ALB-to-task TLS leg is therefore unsupported.",
+          "evidence": "https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html"
+        },
+        {
+          "severity": "major",
+          "description": "The audit bucket is described as 'immutable' and the trail as 'tamper-evident'. No Object Lock or CloudTrail log file validation is configured, and the ALB is not restricted to CloudFront traffic.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The rationale invents a '99.95% availability target' that was not requested. Shield Standard is modelled as a node attached to CloudFront. The ALB is said to 'authenticate requests' with no Cognito listener rule configured.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the security checklist on paper, but it duplicates the ALB, omits private-subnet egress and ECR, mis-describes ACM for containers, and overstates audit immutability."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB is modelled as two nodes ('AZ2 presence'), and CloudFront has an edge only to the first. The AZ2 tasks lack edges to Secrets Manager, Cognito, ECR and CloudWatch, and only the AZ1 tasks have an IAM edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Image pulls and AWS API calls go through two NAT gateways. VPC endpoints for ECR, S3, Secrets Manager and CloudWatch would cost less and keep traffic private. ECR is flagged UNRESOLVED.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB-to-task TLS certificate source (a container cert or Private CA) is not specified. KMS edges to Secrets Manager and CloudWatch logs are stated in the node text but not drawn.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Closer to a working, auditable design. It includes ECR and per-AZ NAT egress, Object Lock with log file validation, IAM least privilege, an ALB restricted to CloudFront, and a CMK for data stores. The AZ2 wiring is incomplete."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A has a real task-token wait with an upload validation path, DLQs and alarms, a separate append-only audit table, CMK encryption and idempotency. B lacks failure handling, tamper-evident audit and a coherent human-task path."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B uses SQS buffering with DLQs, prefix-scoped S3 triggers, WAF and PITR. A risks a thumbnail recursion loop in its single shared bucket and is less hardened."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B includes the egress and ECR path that private Fargate needs, a single ALB (modelled as two nodes), Object Lock with log validation, and accurate rationale. A has a duplicated ALB design, no way for private tasks to pull images, and incorrect ACM and immutability claims."
+    }
+  ]
+}

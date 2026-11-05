@@ -1,0 +1,198 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The edges from the Fargate tasks to RDS PostgreSQL primary and Valkey session primary use the edge type 'read' even though their labels state 'Read and write'.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Representing a single Application Load Balancer as two separate nodes (one per Availability Zone attachment) is non-standard, although the rationale clearly explains that both nodes represent subnet attachments of the same ALB.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A delivers a complete, well-reasoned Multi-AZ ECS Fargate architecture that explicitly models per-AZ failover paths, private networking, and the Secrets Manager Lambda rotation workflow."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The edge from Fargate API tasks to the Cognito user pool for JWT validation is only drawn from AZ A tasks and omitted for AZ B tasks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge 'Container registry (ECR) -> ECS cluster and service (read): Image pull' has the wrong direction and target; Fargate tasks pull images from ECR rather than ECR reading from the ECS control plane.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Amazon ECR node is marked as an unresolved service in the node definition, and single-node placement hides the second-AZ footprints of the ALB, RDS standby, and ElastiCache replica inside single subnets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Adds customer-managed KMS keys, AWS WAF, and CloudTrail without an explicit compliance requirement, increasing fixed monthly costs slightly compared to AWS-managed keys.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B covers all functional requirements with appropriate managed services and strong security controls, but has minor diagramming inconsistencies in its edges and Multi-AZ node placements."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in a generic 'Primary Region' without noting that certificates used with Amazon CloudFront must be provisioned in US East (N. Virginia) us-east-1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "S3 bucket versioning is not enabled, which would protect against accidental overwrites when bakery staff upload updated menu and opening-hours files.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A provides a clean, low-cost serverless static website architecture using Route 53, CloudFront, ACM, and private S3 storage, including a content update flow for bakery staff."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The DNS alias relationship between Amazon Route 53 and Amazon CloudFront is described in the Route 53 node purpose but omitted from the edges list.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Does not model how bakery staff upload or update the static menu and opening-hours files in the S3 bucket.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B accurately models a cost-effective static website using Route 53, CloudFront with Origin Access Control, ACM explicitly in us-east-1, and a versioned private S3 bucket."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Because the Payment, Inventory, and Email handlers all write status updates back to the Orders table, DynamoDB Streams event filtering on INSERT records is needed so status updates do not re-trigger the Stream publisher.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Inventory handler writes stock reservations to the Orders table rather than a dedicated inventory table keyed by SKU.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A implements a resilient transactional outbox and SNS-to-SQS fan-out pattern with DLQs, CloudWatch alarms, authentication, encryption, and per-step status updates back to the orders table."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "None of the downstream workers (payment capture, inventory reservation, confirmation email) update the Orders table after completing their work, so looking up an order by ID via GET /orders/{id} only ever returns the initial pre-processing state.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Orders API node specifies a Cognito authorizer in its configuration and rationale, but no Amazon Cognito node or edge is included in the architecture.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not specified on the SNS topic, the primary SQS queues, or the dead-letter queues, and the Shopper client app is typed as 'third-party' rather than 'client-app'.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses a solid DynamoDB Streams outbox and SNS-to-SQS fan-out pattern with dedicated inventory storage and DLQs, but omits status write-backs to the Orders table and leaves out the referenced Cognito authorizer node."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "Design A clearly represents the Multi-AZ topology across both availability zones and accurately models the Secrets Manager and Lambda credential rotation flow without the edge inconsistencies present in Design B."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Both designs are near-identical and well-suited, but Design B explicitly places the ACM certificate in us-east-1 (required for CloudFront), specifies Origin Access Control, and enables S3 versioning."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "Design A closes the loop by updating per-step processing status in the Orders table for order lookups, explicitly models the Cognito authorizer and WAF, and configures encryption across all messaging queues."
+    }
+  ]
+}

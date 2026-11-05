@@ -1,0 +1,253 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Monthly retraining is not implemented: the design includes an artifacts bucket but no scheduled training execution, evaluation, or deployment workflow. Storing model artifacts does not satisfy the monthly retraining requirement.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/pipelines.html"
+        },
+        {
+          "severity": "major",
+          "description": "The synchronous checkout path defines no handling for inference timeouts, Lambda failures, or transaction-write failures. API Gateway does not automatically retry failed Lambda invocations, so the application must define failure responses and safe retry behavior to avoid incomplete transaction records.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For an HTTP API, express Cognito integration as a JWT authorizer with issuer, audience, and protected routes. Also identify least-privilege Lambda and SageMaker execution roles rather than leaving invocation, database-write, and artifact-read permissions implicit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Endpoint autoscaling is asserted without identifying a scaling policy, minimum capacity, or availability baseline; the traffic and availability clarification questions also remain unanswered rather than becoming explicit architectural assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch node does not specify application logging, alarm thresholds, or notifications for inference latency, failed scoring, and failed transaction persistence.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core serving services fit the request, but monthly retraining and reliable handling of checkout-path failures are not designed."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The monthly workflow combines training jobs, registration, approval, and deployment into one service node without defining executable orchestration. Model Registry does not itself deploy registered versions; specify the scheduled workflow and explicit endpoint-update step.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/model-registry-deploy.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Rules-based fallback is a reasonable availability assumption, but it relaxes the requirement that every payment receive a custom-model score. Confirm that tradeoff and persist fallback provenance, review status, and model version rather than treating a fallback result as a model score.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The 200 ms inference timeout is not supported by a stated latency or throughput assumption. Validate it under load, bound SDK retries within the total deadline, and specify endpoint minimum capacity and scaling limits.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Lambda authorizer's identity-validation mechanism and the least-privilege execution roles and KMS permissions are unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inference fallback is addressed, but transaction-write failures and duplicate checkout submissions still need explicit handling and an idempotency strategy.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design covers serving, retraining intent, monitoring, and degradation more completely, but needs executable model lifecycle orchestration and clarification of fallback semantics."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The CloudFront-to-S3 origin access model is unspecified: neither OAC with an appropriate bucket policy nor an intentional public-origin alternative is defined. Establish authorized origin access, preferably using a private bucket, an S3 REST origin, and OAC.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The DNS alias, CloudFront alternate domain name, and ACM certificate attachment are implied by node purposes but not connected or configured; also specify the default root object and HTTP-to-HTTPS behavior.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Route 53 DNS lookup edge is mislabeled HTTPS. Ordinary authoritative DNS resolution is not an HTTPS request from the browser to Route 53.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch access-log delivery, retention, and actionable alarms are not configured, leaving the claimed observability largely unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The inexpensive serverless service selection is appropriate, but origin authorization and several domain, HTTPS, and monitoring connections need completion."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The promised prompt publication of menu and opening-hours changes needs an explicit HTML cache TTL, Cache-Control policy, or invalidation procedure; uploading a replacement S3 object alone does not immediately expire CloudFront's cached copy.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify alarm notification recipients and missing-data behavior. Request and error metrics alone provide limited outage detection for a low-traffic site.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make the deployment details explicit: use an S3 REST origin with OAC and its bucket policy, configure the default root object, and redirect or reject HTTP requests.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a well-matched, low-maintenance static-site design with private origin access and correctly connected domain and certificate services, needing only modest cache and monitoring detail."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The OpenSearch security configuration does not establish scoped task authorization, encryption at rest, or node-to-node encryption. VPC placement and client HTTPS are useful but do not establish those separate controls; define a domain access policy or fine-grained access-control scheme and encryption settings.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Document how the initial snapshot hands over to outbox replay without gaps, how product deletions are represented, and how a replacement index is rebuilt and cut over.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database credential acquisition and rotation are not specified. Also ensure the implementation grants outbox workers the write permissions needed for leases and acknowledgments, despite the database edges being labeled read.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The transactional outbox, versioned indexing, bounded caching, multi-AZ deployment, and freshness monitoring directly address the requirements, with security configuration the main remaining gap."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Writing Aurora and then publishing to SQS creates a dual-write failure window: the database commit can succeed while message publication fails. A DLQ cannot retain a message that was never published, and unspecified periodic reconciliation does not establish one-minute freshness. Use a transactional outbox or CDC-based publication path.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both indexing Lambdas access private Aurora, but neither has a defined VPC attachment, subnet selection, or security-group path. Specify those configurations and the corresponding outbound connectivity; a regional Lambda node and a database edge do not establish private connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both AZs depend on a single NAT gateway in AZ2 for the stated outbound path. An AZ2 outage can therefore prevent surviving AZ1 workloads from reaching public service endpoints or starting replacement tasks, undermining the intended single-AZ-failure resilience.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain has no specified access-control policy, private-versus-public endpoint decision, encryption at rest, or node-to-node encryption. These controls must be established rather than inferred from HTTPS query edges or encryption settings on other stores.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A Lambda performing the initial load and periodic comparison of two million products needs explicit partitioning, checkpoints, or continuation orchestration to remain within invocation limits; the diagram currently presents it as one unbounded operation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify cache population, TTL or invalidation, and index concurrency/version handling. An idempotent upsert alone does not explain how concurrent or delayed updates avoid overwriting newer indexed data.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The search and container services fit, but non-atomic change publication, incomplete Lambda networking, and shared outbound infrastructure leave freshness and resilience materially weaker."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "B addresses monthly retraining, model-version deployment intent, monitoring, and scoring failures, whereas A mainly covers the happy-path serving flow; B still needs concrete orchestration and acceptance of its fallback tradeoff."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "B preserves the inexpensive serverless approach while explicitly providing private origin access, domain and certificate associations, and limited staff publishing permissions."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A's transactional outbox, monotonic indexing versions, and measured freshness alarms provide a substantially stronger basis for one-minute search updates than B's database-then-queue dual write and periodic repair."
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Claim API handler starts Claim workflow on submission while File validation runs asynchronously on S3 upload events, without showing how the workflow waits for file validation to complete before running Automated checks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Adjuster has no edges to CloudFront distribution or Cognito user pool to load the web interface and authenticate before calling API Gateway REST API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge API Gateway REST API -> CloudTrail is imprecise because REST API execution/access auditing relies on CloudWatch Logs whereas CloudTrail logs API Gateway management calls and S3/DynamoDB data events.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-architected serverless claims workflow that pairs Step Functions task tokens with Textract document analysis, KMS-encrypted storage, an append-only audit table, and S3 upload validation with a dead-letter queue."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Neither Automated claim checks, Claims API handler, nor Adjuster decision handler has a read connection to Private claim documents bucket, leaving no path for automated checks to inspect uploaded PDFs/photos or for adjusters to download and review them.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/ShareObjectPreSignedURL.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge Claim processing workflow -> Insurance adjusters (other, HTTPS) is invalid because AWS Step Functions does not serve an HTTPS review interface to end users; it must notify adjusters via a messaging service or persist the task token for retrieval via the web app and API.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token"
+        },
+        {
+          "severity": "minor",
+          "description": "No encryption at rest (KMS), S3 versioning, DynamoDB point-in-time recovery, or dead-letter queues are configured on the storage and asynchronous processing nodes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Amazon SES has no delivery edge to Customers, and Claims API handler only has a write edge to Claims and audit tables despite also serving claim status queries.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the basic Step Functions callback workflow and presigned S3 upload flow, but omits read access to S3 documents for both automated checks and adjusters, models a direct HTTPS edge from Step Functions to adjusters, and leaves out encryption and backup details."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Thumbnail Generator writes resized images back to the same Blog Assets & Media Bucket that triggers it on ObjectCreated events, so S3 prefix/suffix event filtering should be explicitly noted to prevent a recursive invocation loop.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Blog & Subscribers Table and Blog Assets & Media Bucket do not specify point-in-time recovery or S3 versioning for accidental deletion protection.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, low-cost serverless blog architecture that uses CloudFront edge caching for static assets and REST API GETs, direct S3 presigned uploads with async Lambda thumbnail generation, and DynamoDB Streams with a shared SQS DLQ for reliable welcome emails."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Uses a redundant Subscriber stream relay Lambda and Welcome email queue (SQS) between DynamoDB Streams and Welcome email sender Lambda; DynamoDB Streams natively buffers events and invokes Lambda directly with retries and failure destinations, so the extra Lambda and queue add unnecessary cost and latency.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authors has no connection to Author user pool to authenticate and no write connection to Static site and media bucket to upload photos using the presigned URLs issued by API handler.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Attaches WAF web ACL to the regional REST API origin rather than the fronting CloudFront distribution, and adds fixed monthly WAF costs despite the low-cost constraint.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Meets the functional requirements with strong retry and backup settings, but introduces unnecessary Lambda-to-SQS relay hops on top of DynamoDB Streams and omits the edges for author authentication and direct S3 photo uploads."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "API Fargate Tasks in Private App Subnets A and B make outbound HTTPS calls to Amazon Cognito, AWS Secrets Manager, and Amazon CloudWatch (and must pull container images), but the VPC has no NAT Gateways in the public subnets and no VPC Endpoints, leaving private tasks with no network route to reach those services.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS WAF is modeled as a single regional node attached to both CloudFront (which requires a global scope Web ACL) and the regional Application Load Balancers, duplicating WAF inspection and cost.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Provides strong end-to-end TLS, KMS customer-managed encryption, Cognito MFA, and Multi-AZ compute and Aurora storage, but omits NAT Gateways or VPC Endpoints required for Fargate tasks in private subnets to pull images and reach AWS APIs."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Portal tasks AZ2 omits the outbound edges to Secrets Manager, Cognito user pool, Container registry, IAM roles and policies, and CloudWatch that are drawn for Portal tasks AZ1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "KMS customer managed keys states in its rationale that it encrypts secrets and logs in addition to S3 and Aurora, but edges are not drawn to Secrets Manager and CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Private data subnet AZ2 is empty because the Multi-AZ Aurora replica is represented only as a configuration property on the Aurora PostgreSQL node in AZ1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Adding VPC Endpoints for S3, ECR, Secrets Manager, and CloudWatch Logs would reduce NAT Gateway data processing costs for private Fargate tasks.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A comprehensive, production-grade regulated portal architecture that includes Multi-AZ NAT Gateways and ECR for private Fargate tasks, end-to-end TLS, KMS customer-managed keys, Cognito MFA, and tamper-evident CloudTrail logging with S3 Object Lock."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "Design A provides a complete end-to-end data flow including Textract for automated document checks, adjuster document download links, KMS encryption, and an append-only audit table, whereas Design B omits S3 read access for both automated checks and adjusters and draws an invalid HTTPS edge from Step Functions to adjusters."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "Design A is simpler, lower cost, and properly connected from end to end, whereas Design B adds an unnecessary Lambda-to-SQS relay after DynamoDB Streams and omits the edges for author sign-in and presigned S3 photo uploads."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "Design B includes the Multi-AZ NAT Gateways and ECR registry required for Fargate tasks in private subnets to pull images and reach Cognito, Secrets Manager, and CloudWatch, whereas Design A omits private-subnet egress networking and duplicates WAF on both CloudFront and the ALB."
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The edge to IAM roles for service accounts (N12) is only connected from EKS worker nodes in AZ A (N7) and omitted from EKS worker nodes in AZ B (N8).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edges from EKS worker nodes to the Aurora MySQL-compatible cluster are labeled only as read operations, although microservices also perform writes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "NAT Gateways or VPC interface endpoints are not explicitly depicted for private subnet worker nodes to pull container images or reach CloudWatch and X-Ray APIs.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A comprehensive, production-ready EKS architecture that spans two Availability Zones and properly addresses ingress TLS, pod identity, encryption, and full-stack observability."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Application Load Balancer and EKS Cluster are placed only in Availability Zone 1 (Public Subnet 1 and Private Subnet 1), while ElastiCache Redis is placed in Availability Zone 2 (Private Subnet 2) without Multi-AZ enabled; an ALB requires subnets in at least two AZs, and single-AZ compute/cache placement creates single points of failure and unnecessary cross-AZ data transfer.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-application-load-balancer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The HTTPS entry point on the Application Load Balancer omits AWS Certificate Manager (ACM) for TLS certificate lifecycle management and Route 53 for DNS resolution.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Distributed tracing is listed in the CloudWatch node purpose, but the telemetry edge only mentions Logs and Metrics and omits AWS X-Ray or an OpenTelemetry collector.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Pod-level IAM authentication (IRSA or EKS Pod Identity) and customer-managed KMS encryption are not included.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal high-level sketch that selects the core managed services but places compute and cache in single separate AZs, omits ElastiCache Multi-AZ, and lacks certificate and tracing details."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Orders API configures a Cognito authorizer, but the Amazon Cognito user pool resource is not shown as a node in the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The downstream payment, inventory, and email workers do not have edges back to the Orders table to update post-order processing status for subsequent order lookups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An exemplary serverless event-driven architecture using a DynamoDB Streams transactional outbox and SNS-to-SQS fan-out with isolated retries, dead-letter queues, and alarms."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Nodes N14 and N15 state that Amazon SQS queue retention is used to apply a one-year failure-detail retention policy, which is impossible because the maximum message retention period in Amazon SQS is 14 days (1,209,600 seconds).",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html"
+        },
+        {
+          "severity": "major",
+          "description": "Order API handler only enqueues new orders to the Order intake queue and relies on an asynchronous worker to write the order to DynamoDB, creating a read-after-write race condition where immediate order lookups by ID return not found.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Order intake dead-letter queue (N6) has no incoming redrive edge from Order intake queue (N5).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Payment capture handler (N10) has no outbound edge to an external payment gateway, and Step Functions Standard workflows incur higher state-transition costs than simple SNS/SQS fan-out.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A workable Step Functions orchestration design that suffers from an asynchronous order-creation lookup gap, a missing DLQ edge, and an inaccurate claim that SQS queues can retain messages for one year."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Thumbnail Lambda writes generated thumbnails back to the same Photo bucket that triggers it on upload; without explicit prefix or suffix filtering on the S3 event notification, this can cause recursive Lambda invocations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No edge is shown from CloudFront distribution to Photo bucket to serve uploaded photos and thumbnails to readers with low global latency.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-crafted, cost-effective serverless blog design that caches both static assets and REST API GET responses at CloudFront edge locations while handling side effects asynchronously with a DLQ."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Three nodes—User Pool (N11), Thumbnail Failure DLQ (N12), and CloudWatch (N10)—are completely disconnected with zero edges in the architecture graph.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "major",
+          "description": "Users invoke the REST API directly in us-east-1 instead of routing through CloudFront, and relying on API Gateway built-in caching incurs continuous hourly cache cluster charges while leaving global users with cross-region latency on cache hits.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "minor",
+          "description": "API Handler Lambda sends welcome emails synchronously via SES during the API call without asynchronous buffering or retry isolation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The photo upload edge is drawn from API Handler Lambda to Photo Upload Bucket rather than from Users directly to S3 via the presigned URL, and Thumbnail Generator Lambda writes back to the same triggering bucket without mentioning prefix filtering.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An incomplete serverless blog design with three orphaned nodes, synchronous email delivery in the API path, and regional API Gateway caching that increases both cost and global latency."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "Design A properly distributes the ALB, EKS worker nodes, Aurora MySQL, and ElastiCache across two Availability Zones and includes ACM, Route 53, IRSA, KMS, and X-Ray, whereas Design B places compute and cache in single separate AZs and omits key security and tracing components."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "Design A writes orders synchronously to DynamoDB for immediate lookup consistency and uses a DynamoDB Stream transactional outbox with SNS/SQS fan-out, whereas Design B delays order persistence behind an intake queue and mistakenly relies on SQS for one-year message retention."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "Design A caches both static assets and read-heavy REST API GET responses at CloudFront edge locations and decouples welcome emails via DynamoDB Streams, whereas Design B leaves three nodes disconnected, sends emails synchronously, and routes global API traffic directly to us-east-1."
+    }
+  ]
+}

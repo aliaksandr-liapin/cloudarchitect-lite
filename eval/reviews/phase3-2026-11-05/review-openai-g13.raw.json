@@ -1,0 +1,278 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "File validation runs asynchronously from S3 events, while submission independently starts automated checks; no explicit gate ensures that every required document has uploaded and passed validation before checks consume it.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+        },
+        {
+          "severity": "major",
+          "description": "Denying DynamoDB update and delete operations is insufficient to enforce the promised append-only audit model: PutItem can replace an existing item. Protect audit inserts against replacement and provide an independently protected integrity or immutable archival mechanism.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "major",
+          "description": "The CloudTrail connection conflates API Gateway management operations, customer API invocations, and S3 access. API Gateway invocation auditing needs access or application logs; S3 object access requires separately configured CloudTrail data events.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/logging-using-cloudtrail.html"
+        },
+        {
+          "severity": "major",
+          "description": "The retried notification step has no specified durable delivery coordination. SES SendEmail has no idempotency-token parameter, so retrying after an accepted send whose response was lost can duplicate the decision email.",
+          "evidence": "https://docs.aws.amazon.com/ses/latest/APIReference/API_SendEmail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The retention and compliance clarification questions are marked decided without concrete answers, leaving document, audit, backup and deletion policies unresolved.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless workflow and explicit business audit store are good fits, but validation ordering, audit protection, access-event logging and notification retry semantics need correction."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The seven-year audit requirement is not implemented for application-level workflow events. CloudTrail's archived AWS API events are not a substitute for every business transition, and native Standard workflow execution history is retained for only 90 days after completion; explicitly retain or archive workflow logs and decision events.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html"
+        },
+        {
+          "severity": "major",
+          "description": "A notification-sent flag alone does not close the failure window between SES accepting an email and DynamoDB recording success. A retry can send twice, while recording success before sending can lose the notification; define the delivery guarantee and add durable attempt tracking and reconciliation.",
+          "evidence": "https://docs.aws.amazon.com/ses/latest/APIReference/API_SendEmail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Separate customer and adjuster pools establish identity separation, but the handler should explicitly enforce claim ownership, adjuster assignment and endpoint-specific authorization before issuing document URLs or accepting decisions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify Standard Workflows for the callback wait and retain a recovery mechanism independent of EventBridge status notifications, whose delivery is best effort.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The seven-year retention decision is not translated into concrete DynamoDB archival/deletion rules or S3 current-version and noncurrent-version lifecycle policies.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides a coherent durable approval workflow with explicit execution deduplication and failure routing, but long-term business auditing and crash-safe notification handling remain incomplete."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Explicitly define security-group restrictions, database/cache transport encryption and Redis authentication; private subnets and encrypted storage alone do not establish these controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Worker capacity in two AZs does not itself ensure application availability; specify service replicas, topology spreading or anti-affinity, readiness checks and disruption budgets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ADOT exports spans but does not by itself instrument all application, MySQL and Redis calls; identify existing instrumentation or required instrumentation and trace-context propagation changes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify the autoscaling alternatives: Cluster Autoscaler scales managed node groups, whereas Karpenter provisions capacity through its own NodePools rather than directly resizing those groups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "EKS managed nodes, managed MySQL and Redis, and supported observability agents closely match the existing Helm workflow, with a few security and workload-availability details still needed."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fargate is selected without establishing compatibility with the existing Helm workloads. EKS Fargate does not support features such as DaemonSets and privileged containers, so preserving the existing tooling and manifests requires an explicit compatibility assessment and an EC2-node fallback where necessary.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ingress configuration omits the IP target type required for Fargate pods. Existing Ingress objects cannot simply be assumed to work unchanged; specify the ALB controller configuration and IP-target annotations.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify Fargate's built-in Fluent Bit logging configuration and a Fargate-compatible metrics collection deployment, rather than leaving the Container Insights collection mode unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Show how replicas of every required microservice are distributed across both AZs and maintained during deployments and disruptions; two Fargate pod groups alone do not establish this.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The blanket internal-TLS requirement is not backed by a pod-to-pod transport plan, and least-privilege security-group and workload IAM rules are not described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The tracing plan needs application instrumentation and cross-service context propagation in addition to an OpenTelemetry collector.",
+          "evidence": ""
+        }
+      ],
+      "summary": "EKS Fargate can preserve Kubernetes workflows, but the design needs workload compatibility checks, explicit Fargate ingress settings and a clearer telemetry deployment plan."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 0,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The HTTP API is depicted directly invoking private ECS containers without a supported private integration. It requires a VPC link and an ALB/NLB listener or Cloud Map service target; the shown direct path is not deployable as specified.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "critical",
+          "description": "Both API Gateway-to-container connections explicitly use plaintext HTTP, directly violating the bank's TLS-everywhere requirement. Configure HTTPS backends and the private integration's TLS settings.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "WAF protects CloudFront, but the public HTTP API has no documented origin-access restriction or equivalent WAF-protected entry path. Its endpoint can bypass the CloudFront web ACL, and HTTP APIs do not support direct WAF association.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+        },
+        {
+          "severity": "major",
+          "description": "A KMS node does not establish customer-controlled encryption for all persisted data. In particular, CloudWatch log groups have no customer-managed key association; their default service-managed encryption does not meet the stated key-control requirement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudTrail is only a standalone node: there is no retained log destination or account-wide trail configuration. Specify a multi-Region trail covering read and write management events and protected durable delivery, rather than relying on the default regional event history.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html"
+        }
+      ],
+      "summary": "The selected services are broadly suitable, but the depicted private-container integration is incomplete and plaintext, while WAF coverage, customer-controlled encryption and durable account auditing remain insufficient."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Authentication is specified for API tasks but not for protected web routes. Add an ALB Cognito authentication action or explicit web-application authentication enforcement, with intentional exceptions for sign-in resources, to satisfy authenticated access on every public interface.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudWatch application logs have no specified customer-managed KMS key association. Aurora and S3 encryption plus a KMS node do not satisfy the all-data customer-controlled-key requirement for log storage.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+        },
+        {
+          "severity": "major",
+          "description": "The trail has a protected destination, but its account-wide scope is not established. A single application Region does not limit administrative activity elsewhere in the account; explicitly configure a multi-Region trail with read and write management events and global-service coverage.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html"
+        },
+        {
+          "severity": "major",
+          "description": "Web tasks are placed only in AZ A and API tasks only in AZ B, so losing either AZ removes an entire required tier despite the stated AZ-failure requirement. Run replicas of each ECS service across both private app subnets.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-scheduler-concepts.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The single NAT gateway leaves private-task internet egress dependent on AZ A; use AZ-local NAT gateways or suitable VPC endpoints where that dependency conflicts with availability goals.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify that API tasks verify JWT signatures and claims using Cognito's published JWKS, normally with cached keys, rather than relying on an unspecified token-validation API call.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides sound private-container ingress, MFA, HTTPS backend links and protected audit storage, but web authentication, complete CMK coverage, account-wide trail scope and per-tier AZ redundancy need completion."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "B is slightly stronger on resumability through explicit execution-name deduplication, persisted callback tokens and failed-execution routing; both designs still need stronger notification failure handling and durable business-audit protection."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "Managed EC2 workers are the safer minimal-change migration target for existing Helm workloads and support the proposed observability agents without Fargate-specific compatibility and deployment constraints."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "B provides a workable ALB-to-private-container path with HTTPS and protected audit storage, whereas A's direct API Gateway integration is incomplete and explicitly violates TLS everywhere."
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "reviews": [
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No content-update path or staff access is modelled, so it is unclear how the bakery will change the menu and hours.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 bucket is described as private, but Origin Access Control is not named and no encryption or versioning is configured. The visitor to Route 53 DNS lookup is also missing from the edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch monitoring edge has no alarms or availability signal. Cache invalidation for updates is not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A minimal and correct, cheap Route 53, CloudFront, ACM and private S3 static site that leaves out the content-update path and some security and operability detail."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Cache invalidation or TTL handling for R10 is only implied. Bakery staff using IAM users with long-term credentials is not hardened with MFA or roles.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete, cost-appropriate static site with OAC-private S3, ACM in us-east-1, versioning, a least-privilege staff upload path and CloudWatch alarms."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ALB is modelled as two separate load balancers, one per AZ, with four cross edges. A single ALB spans both AZs, so this misrepresents the entry point, doubles cost and creates ambiguity for DNS and the ACM attachment.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "Worker nodes sit in private subnets with no NAT gateway or VPC endpoints. Nodes need a route to the EKS API, ECR, CloudWatch and X-Ray, so as drawn the cluster would not bootstrap or ship telemetry.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Aurora and ElastiCache are drawn in private subnet A only, although Multi-AZ is configured. The IRSA edge from the worker nodes to the IAM node is semantically odd. Read-only edge labels are used for read/write traffic.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong on HA, CMK encryption, backups, IRSA and an observability pipeline, but the duplicated ALB and the missing egress path for private nodes are real design flaws."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ALB routes to the 'Amazon EKS cluster' control-plane node. ALB targets must be instances, IPs or Lambda, such as worker nodes or pods. The DB and cache edges likewise originate from the cluster rather than the nodes or pods.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito authentication on the ALB was not requested for a public frontend and may block anonymous visitors. WAF is also added without being requested.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not specified for RDS or ElastiCache, and there are no ElastiCache backups, IRSA or log and trace collector details. The ALB is placed in public subnet A only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Two NAT gateways add cost, but they do give the private nodes a working egress path.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Includes NAT egress and WAF, but the connections are abstracted at the wrong level (ALB to the EKS cluster) and the security and observability detail is thin."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 0,
+        "serviceFitness": 0,
+        "connectionCorrectness": 0,
+        "securityBaseline": 0,
+        "reliabilityOperability": 0,
+        "costAwareness": 0,
+        "explanationAccuracy": 0
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "placeholder"
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB, NAT gateway, Fargate tasks and RDS are placed only in the AZ A subnet in the diagram, while the text claims AZ resilience. A single NAT gateway is a single point of failure for egress.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ECR node is marked UNRESOLVED. CloudWatch Logs and Secrets Manager use of the customer-managed key is not stated, and there are no VPC endpoints.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Route 53 DNS edge is labelled as invoke over HTTPS.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers every stated requirement coherently: WAF and Shield on the ALB, Cognito MFA, TLS to the Fargate tasks, a CMK-encrypted multi-AZ RDS, Secrets Manager and CloudTrail delivering to a KMS-encrypted S3 bucket. Only minor placement issues remain."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 0,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The ALB-to-ECS hop uses plain HTTP, which violates the explicit 'TLS everywhere' requirement for a bank, and no ACM certificate is modelled for any TLS endpoint.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/sec_protect_data_transit_encrypt.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ALB is placed in a single private subnet in one AZ, and the VPC has no public subnets, no NAT gateway and no VPC endpoints. A load balancer needs subnets in at least two AZs, and CloudFront reaching a private ALB needs a VPC origin that is not modelled. ECS tasks also cannot pull images or reach AWS APIs.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "KMS, CloudTrail and CloudWatch are not connected to anything, there is no data store or log bucket, and Cognito is not integrated with the app. The 'all data encrypted with keys we control' and 'audit trail' requirements are therefore not actually realised.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Satisfies mappings are inaccurate (for example, CloudFront is mapped to an availability requirement). Cluster and compute detail is missing, and the WAF edge is drawn from CloudFront.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thin, partially disconnected sketch with a plain-HTTP internal hop, a mis-placed ALB, no data tier, and KMS and CloudTrail not wired to any resource."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "B adds the staff update path, OAC-private bucket with versioning and encryption, least-privilege IAM and alarms at negligible extra cost, while A omits how content gets updated."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A gives the more complete and secure platform (HA data tier, CMK encryption, backups, IRSA, collector-based logs, metrics and traces). Its duplicated ALB and missing egress are fixable, whereas B's ALB-to-cluster connection and thin security detail are less complete."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "A satisfies the bank's security requirements end to end (WAF, Shield, ACM TLS to tasks, Cognito MFA, CMK-encrypted RDS and S3, CloudTrail delivery to S3). B has a plain-HTTP hop, a mis-placed ALB, and unconnected KMS and CloudTrail."
+    }
+  ]
+}

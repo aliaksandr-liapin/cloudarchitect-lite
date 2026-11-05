@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Requirement R16 (API client and tenant user authentication, marked as decided by the architect) is listed as satisfied by the client and Fargate nodes, but no authentication mechanism or identity service is actually included or explained.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API tasks in Availability Zone B (N8) are missing an edge to Amazon CloudWatch for logs and metrics (only AZ A tasks are connected).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Secrets Manager is only described as storing database credentials, omitting secret storage for credentials needed to call the third-party payments API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inbound traffic is modeled as sequential hops from B2B client applications to AWS WAF and then to the Application Load Balancer, whereas clients connect to the ALB and the ALB integrates with WAF for inspection.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid Multi-AZ Fargate, RDS, and ElastiCache architecture that meets all core availability and networking requirements but omits details on client authentication, payments API secret storage, and AZ B logging connections."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Fargate API tasks in AZ B (N13) are missing an edge to the Cognito user pool for JWT validation, whereas AZ A tasks (N12) have this connection.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The image pull edge from ECR points to the regional ECS cluster and service node (N11) rather than the Fargate task nodes that pull container images over the VPC network.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A comprehensive, well-structured Multi-AZ container architecture that separates application and data subnets, enforces TLS in transit to data stores, uses KMS customer-managed keys, and includes Cognito authentication and CloudTrail auditing."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The prompt requires all data at rest to be encrypted with bank-controlled keys, but KMS customer-managed keys (N17) are only connected to Aurora and the two S3 buckets, omitting KMS encryption connections and configuration for CloudWatch Logs, ECR container images, Secrets Manager, and Fargate ephemeral storage.",
+          "evidence": "https://docs.aws.amazon.com/kms/latest/developerguide/overview.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Portal tasks in AZ2 (N13) are missing edges to Secrets Manager, Cognito user pool, Container registry (ECR), IAM roles, and CloudWatch that are present for Portal tasks in AZ1 (N12).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Application Load Balancer is split into two separate nodes (N7 and N10) that only route to targets in their respective AZs rather than showing cross-AZ load balancing across both task groups.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The WAF web ACL (N4) is placed inside the regional container even though it is attached to Amazon CloudFront (N2), which requires a global-scope Web ACL.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Uses appropriate managed services including CloudFront, S3, Cognito for MFA, and Aurora, but leaves the second Availability Zone tasks partially disconnected and omits KMS customer-managed key connections for several stateful services."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Instead of using a managed identity service like Amazon Cognito for customer sign-in and MFA, the design implements custom password and TOTP authentication inside the Fargate containers and stores customer credentials and MFA secrets in the portal RDS PostgreSQL database.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Web application assets are served directly from Fargate tasks behind the ALB without Amazon CloudFront, missing out on edge caching and edge-layer DDoS absorption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Private AWS service endpoints node (N13) is placed only in Private application and database A in the container tree, although its rationale states that interface endpoints are provisioned across both private subnets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Secrets Manager (N11) is not connected to the RDS PostgreSQL instance with an automatic credential rotation edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Provides rigorous security coverage with bank-controlled KMS keys explicitly wired to every data store, log group, secret, registry, and ephemeral volume alongside symmetric Multi-AZ connectivity, though it relies on custom container-hosted MFA rather than a managed identity service."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Inventory handler writes stock reservations directly to the Orders table (N7) without defining an inventory stock table or explaining how product stock counts are keyed and updated transactionally.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms for the dead-letter queues and stream failure queue have no downstream notification target (such as an SNS topic) to alert operators when failures occur.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Using an SQS queue (N9) as a DynamoDB Streams event source mapping on-failure destination only captures batch metadata (shard ID and sequence numbers) rather than the actual stream payloads, so records can still be lost if the 24-hour stream retention window expires before manual recovery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No secrets manager or credential store is included for the external payment provider API credentials.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Implements the transactional outbox and SNS-to-SQS fan-out pattern with per-step DLQs cleanly, but lacks an inventory stock table, operator notification target for alarms, and full payload retention for failed stream batches."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The public HTTP API relies on API Gateway defaults without explicit edge protection or rate-limiting details against abusive request bursts.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An exemplary serverless event-driven architecture that addresses outbox stream filtering, S3 payload archiving for failed stream batches, SNS subscription redrive queues, worker DLQs, transactional inventory reservation, and end-to-end idempotency."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "Design B is more complete and production-ready, adding dedicated data subnets, explicit API authentication with Cognito, Secrets Manager coverage for the payments API key, KMS customer-managed keys, and TLS in transit to RDS and ElastiCache."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "Although Design A makes a better service choice with Cognito for MFA and CloudFront for static assets, Design B strictly fulfills the bank's requirement to encrypt all data at rest with customer-controlled KMS keys across every service (including logs, ECR, Secrets Manager, and Fargate ephemeral storage) and avoids Design A's incomplete AZ2 wiring."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "Design B handles critical distributed systems edge cases that Design A misses, including stream event filtering to prevent status updates from re-triggering order events, an S3 failure destination to preserve full stream payloads beyond 24 hours, an SNS subscription delivery DLQ, a dedicated inventory stock table, Secrets Manager for Stripe credentials, and an SNS topic for operator alerts."
+    }
+  ]
+}

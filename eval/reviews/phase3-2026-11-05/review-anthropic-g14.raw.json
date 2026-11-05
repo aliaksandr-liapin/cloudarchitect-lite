@@ -1,0 +1,95 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No edges show customers or adjusters signing in to their Cognito pools, and Lambda functions have no explicit log or metric edges to CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Tamper-evidence relies on CloudTrail log file validation and S3 versioning; S3 Object Lock is not specified for the audit bucket. Step Functions execution history is the main step-level audit source but is not called out as one.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Two Cognito user pools with two authorizers on a REST API add some complexity compared with one pool and groups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Complete and well-reasoned design: Step Functions task-token wait with timeout handling, idempotent starts, EventBridge-to-SQS failure surfacing, CloudTrail with validation to a KMS-encrypted audit bucket, CMKs, and WAF on a REST API."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "CloudTrail is described as an immutable compliance-grade audit log, but the design has no S3 destination bucket, log file validation, or retention. Its only edge goes to CloudWatch. Without a trail delivering to S3, only the 90-day Event history is available, so the long-term audit requirement is not met.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Application audit records in the shared DynamoDB table are called immutable, but nothing enforces immutability (for example restrictive IAM or a write-once pattern).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no explicit DLQ or failure-event routing for failed executions. Only CloudWatch alarms are mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The automated-checks Lambda is invoked with the task token and also stores it. That conflates the checks step with the 14-day wait, so a Lambda failure after the token is stored complicates retries. The Intake-to-S3 presigned URL edge is labeled invoke, which is semantically loose.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no WAF, which is acceptable with an HTTP API but leaves the public intake endpoint less protected. All encryption uses AWS-managed keys.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Workable serverless workflow with Step Functions task-token wait and single Cognito pool with groups, but the audit story is weak because CloudTrail has no durable store and failure handling is thinner."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 0,
+        "serviceFitness": 0,
+        "connectionCorrectness": 0,
+        "securityBaseline": 0,
+        "reliabilityOperability": 0,
+        "costAwareness": 0,
+        "explanationAccuracy": 0
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "placeholder"
+    }
+  ],
+  "preference": []
+}

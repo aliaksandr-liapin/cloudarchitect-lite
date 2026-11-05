@@ -154,6 +154,11 @@ launch hook. The code already routes every model call through one small interfac
 - **Quality bar**: every model must meet the Gate A thresholds (`docs/product/phase2-gate-a.md`) to
   appear in `MODEL_OPTIONS`; the bar is the same absolute bar for both tiers. Each model's one-line
   summary states how it compares with the others.
+  **Product owner's decision 2026-11-05 (replaces the Gate A bar for 0.3):** a model is listed when
+  its live pass rate is ≥ 0.85, its no-critical-defect rate is ≥ 0.85 and its blind median is ≥ 2.0
+  (`LISTING_BAR` in `eval/src/gate.ts`; `LIVE_GATE.passRate` lowered from 0.9 to 0.85 to match).
+  Listed: Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol, Gemini 4 Argon. Not listed: GPT-6 Luna,
+  Gemini 3.5 Flash-Lite ([report](../../product/phase3-provider-benchmark.md)).
 
 ## Non-goals
 

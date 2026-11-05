@@ -1,0 +1,198 @@
+{
+  "reviews": [
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Product writes are followed by a separate SQS publish (dual write, no outbox), so a crash between the two could drop an index update. The scheduled reconciliation job repairs this, but it is slower than the one-minute target.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Lambdas and OpenSearch are shown as 'placed in Region' while Aurora is in private subnets. The VPC attachment for the Lambdas is only implied by the NAT description, and there is no OpenSearch access model (VPC or public endpoint with an access policy). The NAT-to-OpenSearch edge is semantically odd.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only one NAT Gateway (AZ2) is used, which weakens the claim that the tier survives an AZ failure. Product page cache invalidation on price change is not described. The secrets edge exists only for the AZ1 tasks, not AZ2 or the Lambdas. The bulk load of 2M rows in one Lambda may hit the 15-minute limit unless it is chunked.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Solid, mostly coherent design with Aurora, ElastiCache, OpenSearch, an SQS+DLQ sync path, reconciliation and bulk load, Secrets Manager and NAT; the gaps are minor and relate to VPC placement and cache invalidation."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The RDS 'Standby / Read Replica' is described as both a synchronous Multi-AZ standby and a read replica, and a Lambda reads it for the 2M-product bulk load. In a standard Multi-AZ instance deployment the standby cannot serve reads, and read replicas are asynchronous. The seeding path may not work, and the explanation is technically wrong.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZSingleStandby.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks in private subnets must reach ECR, SQS, CloudWatch and OpenSearch, but no NAT Gateway or VPC endpoints are modeled, so image pulls and the SQS publish may not work as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB is modeled as two separate nodes, one per AZ, although it is a single multi-AZ load balancer. Cognito at the ALB may force shoppers to log in for public search. No Secrets Manager or other credential store is shown for DB credentials. The Lambdas are not shown as VPC-attached even though they reach RDS and ElastiCache. AZ-B cache nodes are shown as the read path for AZ-B tasks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A strength: the transactional outbox, versioned idempotent writes, cache invalidation and a lag alarm are well chosen for the price-update SLA. However, there is no scheduled reconciliation, and the bulk load runs in the same Lambda, which may hit its time limit.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Good patterns (outbox, cache invalidation, WAF, DLQ alarm), but the RDS standby/read-replica confusion and missing private-subnet egress make parts of it unworkable as drawn."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in 'Primary Region' with no statement that it must be in us-east-1 for CloudFront. OAC, Block Public Access and the default root object are not specified. The staff write edge does not say how staff authenticate (IAM).",
+          "evidence": ""
+        }
+      ],
+      "summary": "Minimal, correct, cheap CloudFront+S3+Route 53+ACM design that also covers the content-update path and basic monitoring, though several configuration details are left unspecified."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No explicit content-update path (who uploads menu or hours changes, and how). The design does not mention invalidating the CloudFront cache after updates, and it has no alarm, only standard metrics.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Equally minimal and correct, with more precise security and config details (OAC, Block Public Access, us-east-1 certificate, default root object), but it omits how the bakery updates content."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "API Gateway is shown issuing presigned S3 upload URLs and reading/writing DynamoDB directly with no Lambda or compute in the design. API Gateway cannot generate S3 presigned URLs on its own, so the upload flow is not buildable as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge 'Subscribers table -> Welcome email queue (DynamoDB Streams consumer)' has no consumer. DynamoDB Streams cannot deliver directly to SQS; a Lambda or EventBridge Pipe is required. The welcome-email trigger is therefore missing.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No WAF or throttling on the public subscribe endpoint, which is open to abuse. Two queues and two DLQs add components, and there is no alarm on Lambda errors.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Rich, well-decoupled design (SQS+DLQ for thumbnails and email, separate buckets, CloudFront in front of both origins), but missing compute for the API and the DynamoDB stream consumer breaks key flows."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnails are written back to the same bucket that triggers the Thumbnail Lambda, and no prefix or suffix filter is stated. This risks a recursive invocation loop and runaway cost.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The photo bucket is not a CloudFront origin, so delivery of thumbnails to readers is not defined. Subscribers are routed to Cognito sign-up, which is probably unnecessary friction. Posts and subscribers share one DynamoDB table, and one shared failure queue serves both flows.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SES sandbox and identity verification are not mentioned, and S3 triggers Lambda directly rather than through a buffering queue, which gives less backpressure. The asynchronous failure destination is shown as an edge only.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Simpler, fully Lambda-based design that works end to end with WAF, a DynamoDB-stream-driven email flow and a shared failure queue, though thumbnail recursion risk and undefined thumbnail delivery are weaknesses."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A has fewer connection errors, covers secrets, NAT egress and reconciliation, and uses Aurora with readable replicas. B's standby-as-read-replica error and missing private-subnet egress could stop it from working, despite its good outbox and cache-invalidation ideas."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "tie",
+      "why": "Both are correct minimal CloudFront+S3+Route 53+ACM designs. A includes the content-update path; B has more precise security and configuration details."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B's Lambda-backed API and DynamoDB-stream-to-Lambda email flow work as drawn. A omits the compute needed for presigned URLs and for consuming the DynamoDB stream, leaving two core flows unbuildable despite its richer decoupling."
+    }
+  ]
+}

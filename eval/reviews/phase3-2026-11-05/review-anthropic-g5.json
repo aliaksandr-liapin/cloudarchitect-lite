@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The three DLQs exist as nodes, but no edge connects any work queue to its DLQ, so there is no redrive policy or maxReceiveCount. Messages that keep failing would be retried until retention expires and then dropped, which violates 'never silently lost'.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge 'Order API -> Order Store (read, AWS-SDK)' implies an HTTP API Gateway direct integration to DynamoDB. HTTP APIs do not support DynamoDB as a service integration, so the lookup path as drawn is not buildable. It would need a Lambda in between.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services.html"
+        },
+        {
+          "severity": "major",
+          "description": "The intake Lambda writes to DynamoDB and then separately publishes to SNS with no outbox, stream or error handling. A failure between the two steps leaves a stored order that never triggers payment, inventory or email, and nothing records the loss.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The API authorizer is configured as 'n17', which is the CloudWatch node, and the Cognito user pool has no edge to the API. The authentication wiring is therefore inconsistent.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The payment processor has no payment provider integration, the inventory processor has no stock store, and there is no idempotency handling for at-least-once delivery. CloudWatch has no edges and there are no DLQ alarms, so failures would not be noticed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design has the right SNS-to-SQS fan-out shape, but the DLQs are never wired to the queues, the order-to-event handoff is a lossy dual write, and one edge is an unsupported API Gateway integration."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The REST API type costs more than an HTTP API for a simple order and lookup API, and the DynamoDB stream plus publisher Lambda adds components. The extra pieces are justified by the need to never lose an event.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "SNS and SQS encryption, queue access policies for SNS delivery, and SES identity and sandbox setup are not stated. The order status is not updated by the workers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design closes the write-then-publish gap with a DynamoDB stream outbox, wires every queue to its DLQ with alarms, and adds idempotent workers, so it meets the retry and never-lose requirement well."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The rationale asserts '99.95% availability' for the SageMaker endpoint and 'scales to 500 TPS'. Neither figure was supplied by the user, and the SageMaker SLA figure is not supported here.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The checkout path has no timeout, fallback or fail-open or fail-closed behaviour when the endpoint is unavailable. The retraining workflow has no model evaluation gate or rollback, and only UpdateEndpoint is shown without CreateModel or CreateEndpointConfig.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The security baseline for payment data is thin. There is no WAF, no customer-managed keys, no private access to the endpoint, and the score is not tied to a model version.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a functional, simple and cheap serverless design for scoring and retraining, but it is light on security hardening and on failure handling in the scoring path."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The scoring Lambda is placed in a private subnet and writes to DynamoDB, CloudWatch and the SageMaker runtime. Only a VPC endpoint for SageMaker is mentioned. There is no DynamoDB gateway endpoint, CloudWatch Logs endpoint or NAT, so the DynamoDB write and logging cannot work as drawn. The Lambda is also placed in AZ1 only.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The endpoint is shown in one subnet, but the requirement is two AZs. The S3 access from a VPC-attached endpoint and training job also needs an S3 endpoint. The checkout path has no timeout or fallback behaviour.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cost is higher from REST API, WAF, interface endpoints and a minimum of two endpoint instances, but this is mostly justified by the private access and high availability requirements.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design is stronger on security and traceability (WAF, private endpoint, CMK encryption, model version stored with each score), but the VPC networking is incomplete so the Lambda could not reach DynamoDB or CloudWatch."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ALB, NAT gateway and Fargate tasks are placed in AZ A only in the diagram. A single NAT gateway is a single-AZ dependency. There are no VPC endpoints for ECR, S3 or CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are no explicit KMS edges, and CloudWatch Logs, Secrets Manager and ECR encryption with customer keys are not shown. This only partly covers 'all data encrypted with keys we control'.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ALB Cognito authentication suits browser sessions, and the API token flow is not detailed. ECR 'signed' images is asserted without a signing step. There is no ACM-to-ALB edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a coherent, complete regulated design with WAF on the ALB, Shield, an ACM TLS listener, a Cognito user pool, private Fargate, a multi-AZ RDS CMK, secrets, CloudTrail to a CMK bucket and a NAT path for ECR, with only minor AZ and KMS gaps."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ALB is public and is described as the only entry point, but WAF is attached only to CloudFront. Nothing restricts the ALB to CloudFront traffic (managed prefix list or secret header), so clients can reach the ALB directly and bypass WAF and Shield Advanced style edge controls.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks in private subnets have no route to pull images or send logs. There is no ECR, NAT gateway or VPC endpoints, and no image registry node at all, so the tasks cannot start or log as designed.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no data tier, no secrets management and no backup or restore. The portal's customer data at rest and the requirement for data availability across an AZ failure are not addressed. The CMK covers only two S3 buckets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A CloudFront-scoped WAF and ACM certificate must be in us-east-1, but the design places them in 'Bank selected Region'. The ALB Cognito authentication of tokens forwarded via CloudFront is unclear, and there are duplicate CloudFront-to-ALB edges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design uses a sensible CloudFront and private S3 front end, but the ALB can be reached directly around WAF, the private tasks have no image or log path, and it has no data tier."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B closes the lost-event gap with a stream-based outbox, wires DLQ redrive and alarms for every consumer, and handles idempotency, while A has unattached DLQs, an unsupported API-to-DynamoDB edge and a lossy dual write."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "B gives better security (WAF, private endpoint, CMK encryption) and ties each score to a model version, which suits a payment fraud workload. Its missing VPC endpoints are a fixable gap, while A is simpler and cheaper but weaker on security and traceability."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "A covers the data tier, secrets, image registry and egress path, and keeps WAF in front of the only public entry point. B leaves the ALB reachable around WAF, the Fargate tasks cannot pull images, and it has no data tier."
+    }
+  ]
+}

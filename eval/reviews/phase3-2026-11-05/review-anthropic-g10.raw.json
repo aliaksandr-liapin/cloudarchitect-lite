@@ -1,0 +1,90 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Monthly retraining is not designed. There is only an S3 bucket described as holding outputs from a 'monthly training pipeline' that does not exist: no scheduler, no training job, no registry, and no path to deploy a new model to the endpoint. R4 is only nominally satisfied.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/pipelines.html"
+        },
+        {
+          "severity": "major",
+          "description": "No handling for scoring failure. The Lambda calls SageMaker synchronously with no stated timeout, fallback, retry or alarms. An endpoint outage would block or fail every payment, and the open availability question R7 is not addressed in the design.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-interactions-in-a-distributed-system-to-mitigate-or-withstand-failures.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito authorizer is configured on the API but there is no edge from User Pool to API Gateway. The client-to-User-Pool edge exists, but the token validation path is implicit. Cognito user pools suit end users, not necessarily a server-side checkout API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The clarification questions R6 and R7 are restated as requirements and never answered with concrete values such as RPS, latency or availability. Nothing in the design is sized or tuned to them. The data stores use AWS-managed encryption only, and DynamoDB has no PITR.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean synchronous scoring path (API Gateway, Lambda, SageMaker, DynamoDB), but the monthly retraining pipeline is missing and there is no failure or fallback handling for the scoring call."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "EventBridge is described as starting the SageMaker training job directly. EventBridge targets a SageMaker Pipeline, so the training should be modelled as a pipeline; the node is UNRESOLVED and loosely specified. The 'deploy approved model version' step is a single vague edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A Lambda authorizer is configured but has no node or edge, so the identity source and token validation are unspecified. Lambda-to-endpoint and Lambda-to-DynamoDB IAM least-privilege roles are not shown. The 200 ms timeout is fixed without a stated basis, and the Lambda's DynamoDB write is implied rather than idempotent for retried payments.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "REST API plus WAF, a customer managed KMS key and PITR add modest cost and complexity, while the design gives no volume estimate. Reasonable for a payments workload but not justified in cost terms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A fuller design with the retraining and registry pipeline, a fast timeout with rules-based fallback, WAF and API auth, KMS, and alarms on latency, errors and fallback rate."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Duplicate entry placeholder; see the main review for design B."
+    }
+  ],
+  "preference": []
+}

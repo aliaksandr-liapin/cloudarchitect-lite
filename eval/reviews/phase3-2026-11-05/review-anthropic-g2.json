@@ -1,0 +1,208 @@
+{
+  "reviews": [
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fargate tasks sit in private subnets with no NAT gateway, VPC endpoints or ECR in the design. They cannot pull images or reach Cognito, CloudWatch or KMS, so the container tier would not run as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no customer data store and no private data subnets. The priority 'private subnets for data' and encryption of application data are only addressed for S3 assets and audit logs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB AZ B node has no edge to the containers or to Cognito. WAF and the CloudFront ACM certificate are placed in the regional container although both are global or us-east-1 resources. Restricting the ALB to CloudFront only via a prefix list, without a secret origin header, is weak.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong edge security with CloudFront, WAF, OAC, a CloudFront-only ALB, Cognito TOTP and an Object Lock audit bucket. It lacks a data tier and an egress or endpoint path for the private Fargate tasks."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A single NAT gateway sits in public subnet A while tasks run in both AZs. Loss of AZ A removes egress for the other AZ, which conflicts with the AZ-failure requirement R17.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Web tasks are placed only in subnet A and API tasks only in subnet B, so neither tier is shown across both AZs. The API-to-Aurora edge is read-only and the NAT edge starts only from the web tasks. There are no explicit KMS edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The public ALB has no origin restriction or ALB-level authentication. The WAF is regional, and Shield Standard is the only DDoS layer.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete and workable baseline with WAF, Shield, ALB, Fargate, Cognito TOTP, KMS-encrypted Aurora in private data subnets and an Object Lock audit bucket. It is weakened by single-AZ NAT and tier placement."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ALB authenticates every request with a Cognito user pool, but shoppers browse anonymously. Product pages and search would require login, and the edge from Cognito to the ALB has an inverted direction. Anonymous shoppers would not be served.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The outbox indexer is triggered by a scheduled EventBridge rule, and the finest schedule granularity is one minute. Polling latency plus processing can exceed the one-minute price-to-search requirement.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no initial full load or reindex path for the 2M products. The Lambda indexer and OpenSearch are not shown inside the VPC. There is no ECR, NAT or endpoints for Fargate. The SQS failure queue only covers failed scheduled invocations.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The transactional outbox is a sound and cheap pattern for consistency. Anonymous shoppers are blocked by ALB Cognito auth, the one-minute freshness target is at risk from schedule polling, and there is no bulk load."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design shows two separate ALBs, each in a single public subnet, as 'zonal' load balancers. An ALB must span subnets in at least two AZs, so this is invalid as drawn, and the pair is redundant and costly. One multi-AZ ALB is correct.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A DMS replication instance, Kinesis, ElastiCache, two ALBs and a NAT gateway is heavy for a 2M-row catalog. DMS-to-Kinesis ordering per product needs primary-key partition keys, which are not stated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Lambda updater must be VPC-attached to invalidate ElastiCache and is not shown that way. NAT is in a single AZ. CloudFront TTL for prices is not addressed. The API has no write path to Aurora.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The CDC pipeline (DMS to Kinesis to Lambda to OpenSearch) with initial load, idempotent upserts, DLQ and alarms meets the one-minute and rebuild needs, but it is over-built and has a flawed two-ALB layout."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "ALB authenticate-cognito is a browser redirect and session-cookie flow. It does not suit machine B2B API clients that present bearer tokens, so JWT validation at API Gateway or in the app is a better fit.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no ACM certificate for the ALB HTTPS listener and no WAF. Edges split Aurora and cache access oddly: task A is read-only and task B is write-only. Aurora and the cache are each placed in a single subnet. The Secrets Manager rotation Lambda is not shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid multi-AZ design with Fargate in both AZs, one NAT gateway per AZ, Aurora and ElastiCache with failover, ECR and Secrets Manager rotation. Its client authentication choice does not suit B2B API clients."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "API Gateway REST connects to an 'Internal ALB' with a plain HTTP edge and no VPC link. The ALB is placed in a public subnet and in only one subnet, although an ALB needs two AZ subnets. The private integration is neither modeled correctly nor guaranteed to work.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks, the ALB, the NAT gateway, RDS and ElastiCache are each placed in a single subnet or AZ-1. A single NAT gateway is used, so the AZ-loss requirement is not shown to be met, even though the rationale says 'across AZs'.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "Secrets Manager has only a reversed RDS-to-Secrets Manager edge for rotation. There is no edge injecting the credentials into the Fargate tasks, and no ECR for images. Containers cannot obtain the rotated credentials.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html"
+        }
+      ],
+      "summary": "The service list is reasonable, but the topology has an unmodeled API Gateway-to-ALB link, single-AZ placement and no credential delivery to the tasks."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "B is a complete, workable baseline with NAT egress and a KMS-encrypted Aurora in private data subnets. A has a tighter edge but its private Fargate tasks have no egress path and it has no data tier."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "B serves anonymous shoppers and uses CDC with an initial full load and a DLQ to meet the one-minute target. A's ALB Cognito auth blocks shoppers and its minute-granularity polling risks missing the freshness target."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "A",
+      "why": "A models a multi-AZ ALB, tasks in both AZs, NAT per AZ, ECR and credential injection with rotation. B has single-AZ placement, an unmodeled API Gateway-to-ALB link and no credential delivery."
+    }
+  ]
+}

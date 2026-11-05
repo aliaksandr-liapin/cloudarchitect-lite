@@ -1,0 +1,243 @@
+{
+  "reviews": [
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Missing DNS resolution edge from Website visitors to the Route 53 node.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 node rationale states that CloudFront accesses the bucket privately, but does not explicitly specify Origin Access Control (OAC) or S3 bucket versioning and encryption settings.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Does not model how bakery staff upload or update the menu and opening-hours files in the private S3 bucket.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Clean, cost-effective serverless static website architecture using Route 53, CloudFront, ACM in us-east-1, private S3 storage, and CloudWatch."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Requirement R10 infers that menu updates should appear shortly after upload without stale caching, but the CloudFront and S3 node descriptions do not specify short cache TTLs or CloudFront cache invalidations on upload.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Comprehensive serverless static website architecture that covers all functional and cost requirements while explicitly modeling Origin Access Control, S3 versioning, and least-privilege IAM access for staff content updates."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "EKS worker nodes are placed in private subnets and send data to CloudWatch and X-Ray over HTTPS, but the VPC lacks both NAT Gateways in the public subnets and VPC interface endpoints, leaving private nodes without network routes to reach regional AWS service APIs or pull public container images.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Amazon EKS cluster node (N6) has no edges connecting it to the EKS worker nodes or any other resource in the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single multi-AZ Application Load Balancer is modeled as two separate ALB nodes (N4 and N5) rather than one logical load balancer spanning both public subnets.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Edges from the EKS worker nodes to Aurora MySQL and ElastiCache are typed as 'read' even though microservices also write to both data stores, and the edge to IAM roles for service accounts is only drawn from AZ A.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarifying questions R12 and R13 are left phrased as raw questions in the requirements list alongside the answers in R14-R18.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Well-structured EKS architecture with accurate data-plane routing, Multi-AZ Aurora MySQL and ElastiCache, KMS encryption, and IRSA, marred primarily by omitting NAT Gateways or VPC endpoints for the private subnets."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Data-plane connections are routed through the regional Amazon EKS cluster control-plane node (N7) instead of the EKS worker nodes (N8, N9): the ALB routes HTTP/HTTPS frontend traffic to N7, and N7 connects to RDS MySQL, ElastiCache Redis, CloudWatch, and X-Ray, conflating the Kubernetes control plane with the worker node data plane.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Adds an unrequested Amazon Cognito User Pool authentication action on the public ALB, which forces a Cognito login before any public user can view the web frontend and introduces architectural changes beyond the requested minimal-change migration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Does not include IAM Roles for Service Accounts (IRSA) or EKS Pod Identity for least-privilege pod access to CloudWatch and X-Ray, nor does it specify encryption at rest for RDS and ElastiCache.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R8 is left phrased as an unanswered question in the requirements list.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Includes proper multi-AZ NAT Gateways for the private subnets, but inaccurately routes all ingress and database/cache traffic through the EKS control-plane node and adds an unrequested Cognito login gate on the ALB."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Although Requirement R12 specifies that the application and database tiers must remain available if one Availability Zone fails and the VPC defines subnets in two AZs, the ALB, Fargate tasks, RDS instance, and single NAT Gateway are all placed solely in Availability Zone A, creating a single point of failure.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Shield (N3), AWS Certificate Manager (N5), Amazon ECS (N9), and AWS KMS (N13) are disconnected orphan nodes with no edges to the resources they protect, certify, orchestrate, or encrypt.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Retail customer to Amazon Route 53 specifies HTTPS as the protocol instead of DNS.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Amazon ECR (N11) is marked as an unresolved service in the node definition.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong, security-focused banking portal architecture covering end-to-end TLS, WAF, Shield, Cognito MFA, KMS-encrypted RDS and S3 CloudTrail storage, and Secrets Manager, needing only proper multi-AZ resource placement and edges for supporting nodes."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 0,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Directly violates the explicit 'TLS everywhere' requirement (R3) by routing traffic from the Application Load Balancer to the Amazon ECS containers over unencrypted HTTP ('Application Load Balancer -> Amazon ECS (invoke, HTTP)').",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html"
+        },
+        {
+          "severity": "critical",
+          "description": "Completely omits any database or persistent storage service (such as Amazon RDS, DynamoDB, or S3) for the banking portal's customer data and CloudTrail audit logs, leaving the architecture unable to store application data or satisfy Requirement R4 (all data encrypted at rest with customer-controlled keys).",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"
+        },
+        {
+          "severity": "major",
+          "description": "Places the Application Load Balancer in a single private subnet (Private Subnet 2) in a VPC with no public subnets or Internet Gateway, and connects CloudFront directly to it without configuring CloudFront VPC Origins or meeting the two-AZ minimum subnet requirement for an ALB.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "Omits AWS Certificate Manager (ACM) entirely despite requiring custom HTTPS termination on CloudFront and the Application Load Balancer.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cnames-and-https-requirements.html"
+        },
+        {
+          "severity": "major",
+          "description": "Amazon Cognito (N6) is only connected to the Bank Customer node and has no integration with CloudFront, the ALB, or the ECS service to validate tokens or enforce authentication on web app and API requests.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Shield (N3), AWS KMS (N9), AWS CloudTrail (N10), and Amazon CloudWatch (N11) have zero edges in the diagram, and the edge from CloudFront to AWS WAF is modeled as an outbound HTTPS call.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8, R9, and R10 are left as raw clarifying questions with no answers recorded.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Incomplete and non-working banking portal design that uses unencrypted HTTP to the container tier despite the 'TLS everywhere' mandate, omits any database or log storage, and leaves KMS, CloudTrail, and backend authentication disconnected."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Both designs are sound and cost-effective, but Design B explicitly models Origin Access Control (OAC), S3 versioning and encryption, DNS resolution from the client, and least-privilege IAM access for bakery staff to update the menu and hours."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "Design A accurately models the Kubernetes data plane (routing ALB traffic to worker nodes and connecting worker nodes to Aurora MySQL, ElastiCache, CloudWatch, and X-Ray), includes KMS encryption and IRSA, and avoids Design B's unrequested Cognito gate, despite missing NAT Gateways in the diagram."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "Design A is a thorough, secure banking architecture with end-to-end TLS, KMS-encrypted RDS and S3 audit storage, Secrets Manager, and Cognito token validation, whereas Design B uses unencrypted HTTP to containers, omits databases and S3 storage entirely, and cannot function as drawn."
+    }
+  ]
+}

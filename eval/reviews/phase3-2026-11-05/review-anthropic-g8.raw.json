@@ -1,0 +1,224 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Client authentication (R16) is not backed by any service such as Cognito or JWT validation. It is left to the application, yet the node is marked as satisfying R16.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Secrets Manager rotation needs a rotation Lambda and network path to the database, which are not shown. Tasks must also refresh cached credentials after rotation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Edge semantics are loose. The client-to-WAF edge is drawn as an invoke, although WAF is attached to the ALB. The ECR edge points from ECR to the tasks, but tasks pull from ECR. CloudWatch edges exist only for the AZ A tasks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There are no VPC endpoints for ECR, S3 or Secrets Manager, so image pulls and secret fetches go through the NAT gateways. This adds cost, and the NAT path is a dependency.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A conventional, correct design: internet-facing ALB with WAF and ACM in front of private Fargate tasks in two AZs, Multi-AZ RDS and ElastiCache, per-AZ NAT, Secrets Manager rotation, ECR and CloudWatch. It is complete and coherent, but leaves client authentication to the application."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "API Gateway REST API is connected directly to an internal ALB with no VPC link modeled. Private integrations for REST APIs are made through a VPC link, historically to an NLB. The path from the public API to the private ALB is therefore not buildable as drawn. There is also no ALB HTTPS certificate story, although the edge says HTTPS.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "RDS Proxy has no connection to Secrets Manager. A proxy needs secrets for the database credentials, but the only secret edge goes from Secrets Manager to Aurora. The tasks also have no path to the secret. The rotated-credential flow through the proxy is therefore undefined.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-setup.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No container registry (ECR) is included for the Docker images. Fargate tasks are drawn as a single node placed in subnet A, and the task-to-NAT edge is omitted.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito, API Gateway and RDS Proxy add components that were not requested. Their value for authentication and pooling is real, but the design is more complex and more costly than needed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong on authentication (Cognito, API Gateway, WAF) and uses an internal ALB. The integration wiring is incomplete (no VPC link, no Secrets Manager link to RDS Proxy) and ECR is missing."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Presigned URLs are created by a Fargate task using temporary role credentials, so they expire when those credentials expire (hours at most). Reports are kept for a year, but the emailed link will stop working soon after delivery. This undermines the 'download link' requirement for managers who read the email later.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Fargate task sits in a public subnet with an assumed public IP so it can reach AWS APIs without NAT. This is cheap, but it is a wider network exposure than a private subnet with endpoints. No ECR image source is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 lifecycle is mentioned only in text. SES sandbox and sender identity verification are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cheap design: EventBridge Scheduler to Fargate, then S3, DynamoDB recipient list, SES and CloudWatch alarms, with idempotent re-runs. It correctly fits the 25-minute runtime, but the short-lived presigned links limit usefulness."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Fargate task runs in a private subnet, but no NAT gateway or VPC endpoints are modeled. The task could not pull its image or reach S3, SES or CloudWatch Logs, so the job would fail as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No Secrets Manager or credential handling for the Aurora connection. No recipient list source for the 40 managers. No retry, idempotency or failure alarm is described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito, API Gateway and a Lambda handler for authenticated downloads go beyond the 'keep it simple and cheap' request. It is also unclear how the emailed link maps to the API, and the 40 managers must be provisioned in the Cognito user pool.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A secure download model with Cognito, API Gateway and a Lambda that issues fresh presigned URLs, but it is more complex than asked. The private-subnet task has no egress path and the design omits database credential handling."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Duplicate placeholder; see the previous B entry."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Giving non-technical bakery staff IAM credentials for uploads is clumsy, and no cache invalidation step is described for the menu and hours updates (R10).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, low-cost design: Route 53, ACM in us-east-1, CloudFront with a private S3 bucket behind OAC, IAM-scoped staff upload, versioning and CloudWatch alarms."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ACM certificate and CloudWatch are placed in an unspecified 'Primary Region'. CloudFront requires the certificate in us-east-1 and publishes its metrics there, so this could lead to a non-working setup if the primary region differs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No mechanism for staff authentication or authorization on bucket uploads. OAC is not named, there is no versioning for rollback, and no cache invalidation is described.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The same core architecture (Route 53, ACM, CloudFront, private S3, CloudWatch), but less specific about the certificate region, the OAC access mechanism and the staff upload path."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "A is complete and coherently wired (ALB to private Fargate, per-AZ NAT, ECR, Multi-AZ data stores, Secrets Manager rotation). B has better client authentication but leaves the API Gateway to ALB link and the RDS Proxy secret path undefined and omits ECR."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "A",
+      "why": "A is simpler and cheaper, includes recipient list, idempotency and alarms, and is deployable. B's private-subnet task has no egress path and it adds unrequested complexity, even though its link-issuing model is more durable."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "A",
+      "why": "A is explicit about us-east-1 for the certificate, OAC, versioning and least-privilege staff access, while B leaves these ambiguous."
+    }
+  ]
+}

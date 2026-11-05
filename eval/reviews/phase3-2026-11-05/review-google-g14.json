@@ -1,0 +1,208 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Customer and Adjuster sign-in edges to the Cognito User Pools are omitted (only JWT edges from the User Pools to the Claims API are shown), and the email delivery edge from SES to the Customer is omitted.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single Lambda function (Claims API Function) handles both customer claim intake and adjuster decision endpoints; splitting these into separate functions would allow tighter least-privilege IAM roles per persona.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Web Assets Bucket is configured with KMS encryption, but no edge is drawn from Customer Managed Key to Web Assets Bucket.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A thorough, well-structured serverless workflow design with separate customer and adjuster user pools, CMK encryption, tamper-evident CloudTrail storage, idempotent state handling, and an EventBridge-to-SQS dead-letter mechanism for failed or timed-out executions."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Claims Orchestrator passes the 14-day waitForTaskToken callback token directly to Automated Checks Function, conflating the automated check step and the 14-day human approval wait into a single Step Functions task state. In Step Functions, a .waitForTaskToken state stays in progress until SendTaskSuccess or SendTaskFailure is called, which obscures step-level audit history between automated checks and adjuster review and complicates task-level retry configuration.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token"
+        },
+        {
+          "severity": "major",
+          "description": "Audit Trail (AWS CloudTrail) only connects to CloudWatch (Logs & Alarms) and omits an Amazon S3 bucket for durable, tamper-evident trail log storage with log file integrity validation.",
+          "evidence": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No dead-letter queue or EventBridge rule is included to capture failed or timed-out workflow executions for recovery, relying only on CloudWatch logs and alarms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean serverless architecture that separates intake and adjuster Lambda functions, but conflates the automated check invocation with the 14-day waitForTaskToken callback state and omits an S3 destination for CloudTrail logs."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "EKS worker nodes are placed in Private subnet A and Private subnet B without NAT Gateways or VPC interface endpoints, leaving private nodes with no outbound network path to pull container images or send telemetry to CloudWatch and X-Ray.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No managed secret store (such as AWS Secrets Manager or Systems Manager Parameter Store) is included for storing MySQL and Redis credentials outside Helm values.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Edges from the EKS worker nodes to Aurora MySQL and ElastiCache use the read interaction type even though services also write data, and the IRSA edge is only connected to AZ A worker nodes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An appropriate EKS architecture using EC2 Managed Node Groups, Aurora MySQL, and ElastiCache across two AZs that preserves Helm chart and DaemonSet compatibility, but omits NAT Gateways or VPC endpoints for the private subnets."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Microservice pods are run on AWS Fargate while claiming existing Helm charts, Fluent Bit, and Container Insights work with minimal change. EKS Fargate does not support DaemonSets, which breaks standard DaemonSet-based Fluent Bit and Container Insights deployments and requires modifying pod specifications to use sidecars or Fargate-specific logging.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No Route 53 DNS node is included to resolve the public domain name associated with the ACM TLS certificate on the Public ALB.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Enforcing a Cognito User Pool on the ALB listener introduces a new authentication layer that was not requested and may conflict with existing application authentication during a minimal-change migration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-connected multi-AZ EKS design with per-AZ NAT Gateways and Secrets Manager, but its choice of EKS Fargate conflicts with the minimal-change requirement and its own claim of using standard Fluent Bit and Container Insights agents."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Despite defining subnets in two Availability Zones and requiring Multi-AZ resilience (R12), AWS Fargate tasks, the Application Load Balancer, and the single NAT Gateway are placed only in Availability Zone A, leaving Availability Zone B empty and creating a single-AZ point of failure.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "Four nodes (AWS KMS, AWS Shield, AWS Certificate Manager, and Amazon ECS) have zero edges in the graph, leaving the customer-managed KMS key completely disconnected from RDS, S3, Secrets Manager, and CloudWatch despite the requirement to encrypt all data at rest with customer-controlled keys.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Retail customer to Amazon Route 53 specifies HTTPS as the protocol rather than DNS.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the core service catalog for a regulated bank portal, but leaves Availability Zone B completely unpopulated and leaves KMS, ACM, Shield, and ECS disconnected in the architecture graph."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Portal tasks AZ2 omits the outbound edges to Secrets Manager, Cognito user pool, Container registry, IAM roles and policies, and CloudWatch that are present on Portal tasks AZ1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "KMS customer managed keys states in its rationale that it encrypts secrets and logs, but edges from KMS to Secrets Manager and CloudWatch are omitted.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A comprehensive, well-connected Multi-AZ architecture with CloudFront and S3 for static web assets, ALB and Fargate tasks across two AZs with independent NAT Gateways, Aurora Multi-AZ, Cognito MFA, and explicit KMS and CloudTrail controls."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "Design A cleanly separates the automated checks step from the 14-day adjuster callback wait in Step Functions, includes an EventBridge-to-SQS dead-letter queue for failed or timed-out executions, isolates customer and adjuster Cognito pools, and stores CloudTrail logs in a KMS-encrypted S3 bucket."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "Design A uses EKS with EC2 Managed Node Groups, which preserves compatibility with existing Helm charts and DaemonSet-based observability agents (Fluent Bit, Container Insights, OpenTelemetry), whereas Design B chooses EKS Fargate where DaemonSets are unsupported."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "Design B properly deploys Fargate tasks, ALB presence, and NAT Gateways across both Availability Zones, serves static web assets via CloudFront and S3 with OAC, and connects KMS, ACM, Shield, and ECS, whereas Design A leaves AZ B empty and leaves four services disconnected."
+    }
+  ]
+}

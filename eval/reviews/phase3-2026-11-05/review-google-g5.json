@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Order Intake Function [N4] writes to Order Store [N5] and separately publishes to Order Events Topic [N6] without a transactional outbox; if the SNS publish fails or the function crashes after the DynamoDB write succeeds, downstream order steps are silently lost.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "Order API [N3] is configured as an API Gateway HTTP API (apiType: HTTP) with a direct read edge to Order Store [N5] (DynamoDB), but API Gateway HTTP APIs do not support direct DynamoDB service integrations.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services.html"
+        },
+        {
+          "severity": "major",
+          "description": "Order API [N3] sets authorizer: n17, which references Observability [N17] (Amazon CloudWatch) instead of User Pool [N2] (Amazon Cognito), leaving the Cognito User Pool node completely disconnected.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "major",
+          "description": "Payment DLQ [N8], Inventory DLQ [N11], Email DLQ [N14], and Observability [N17] have no edges in the diagram, leaving the dead-letter queues disconnected from their source SQS queues and unmonitored by CloudWatch alarms.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8, R9, and R10 are left as raw clarifying questions instead of stated assumptions, and Payment Processor [N9] and Inventory Processor [N12] lack outbound edges to payment or inventory targets.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A uses an appropriate SNS-to-SQS fan-out pattern for independent order processing, but suffers from a dual-write reliability gap at order intake, an unsupported direct HTTP API-to-DynamoDB integration, a misreferenced API authorizer ID, and disconnected DLQ and observability nodes."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Orders API [N2] specifies a Cognito authorizer in its configuration and rationale, but no Amazon Cognito node is modeled in the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The SNS topic [N7] and SQS queues [N6, N8-N13] do not explicitly specify encryption at rest in their node configurations, and the downstream workers do not update order status back in Orders table [N4].",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a resilient, production-grade event-driven architecture that prevents silent event loss using DynamoDB Streams as a transactional outbox with an on-failure queue, isolates downstream steps with SQS queues and DLQs, enforces idempotency, and alarms on all failure queues."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Requirements R6 and R7 are written as raw clarifying questions in the requirements list rather than declarative requirement statements, although the chosen targets (500 TPS and 99.95% availability) are stated in the node rationales.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No data pipeline is shown to export or curate historical transactions from Transactions Table [N6] into Model Artifacts & Training Data Bucket [N7] for monthly retraining, and Retraining Workflow [N9] does not explicitly mention a model evaluation gate before updating the live endpoint.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A presents a clean, well-connected serverless checkout and SageMaker real-time inference architecture with automated monthly retraining via EventBridge and Step Functions."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Checkout scoring function [N5] is placed inside a private VPC subnet (Private subnet AZ1 [C6]) and must reach Transactions table [N7] (DynamoDB), CloudWatch [N13], and Fraud model endpoint [N6], but Checkout VPC [C3] has no NAT Gateway and no VPC Endpoints (for DynamoDB, SageMaker Runtime, or CloudWatch Logs), leaving the function unable to reach regional AWS services.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Checkout scoring function [N5] is placed only in Private subnet AZ1 [C6] and Fraud model endpoint [N6] is placed only in Private subnet AZ2 [C7], creating a single-AZ failure domain for Lambda that violates R12 and AWS multi-AZ best practices.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Read edges from ML artifacts and training data bucket [N9] to SageMaker training job [N12] and Fraud model endpoint [N6] are inverted (depicting S3 initiating connections to SageMaker), and requirements R9 and R10 are left as raw questions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B adds good security controls such as WAF and KMS customer-managed keys, but places the checkout Lambda function into a single-AZ private subnet without VPC endpoints or a NAT Gateway, breaking connectivity to DynamoDB and CloudWatch and undermining multi-AZ availability."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Although Portal VPC [C3] defines Public subnet B [C7] and Private subnet B [C9] in Availability Zone B [C5], Application Load Balancer [N6], NAT Gateway [N7], and AWS Fargate tasks [N10] are placed exclusively in AZ A, leaving AZ B empty; ALBs require subnets in at least two AZs and single-AZ NAT/compute placement violates R12.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-application-load-balancer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Under R4 (all data encrypted at rest with customer-controlled keys), Amazon RDS [N14] and Audit and log archive bucket [N17] configure KMS encryption, but Amazon ECR [N11], AWS Secrets Manager [N12], and Amazon CloudWatch [N15] do not explicitly specify KMS encryption in their configurations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Supporting nodes AWS Shield [N3], AWS Certificate Manager [N5], Amazon ECS [N9], and AWS KMS [N13] have no edges in the diagram, and the edge from Retail customer [N1] to Amazon Route 53 [N2] is labeled HTTPS instead of DNS.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers the full regulated banking portal stack—including WAF, Shield, ACM, ALB, Cognito with MFA, Fargate in private subnets with NAT egress, Secrets Manager, RDS Multi-AZ with KMS, and CloudTrail—with its main flaw being that compute and network nodes are placed only in AZ A while leaving AZ B subnets empty."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "API tasks [N11, N12] run on AWS Fargate in private subnets [C6, C7] and send logs to Amazon CloudWatch [N16], but Portal VPC [C3] has no NAT Gateway, no VPC Endpoints (for ECR, S3, or CloudWatch Logs), and no ECR repository, so tasks cannot pull container images or publish logs.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/private-subnets.html"
+        },
+        {
+          "severity": "critical",
+          "description": "Design B states that customers sign in directly to Amazon Cognito [N8] and pass customer identity tokens on API requests through CloudFront [N2] to HTTPS application load balancer [N9] for ALB Cognito/OIDC authentication; however, ALB authenticate-cognito uses browser redirects and session cookies rather than validating bearer tokens on stateless API requests.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The architecture completely omits any database or persistent application data store for customer accounts and portal API data, despite R1 (self-service portal API), R4 (encrypt all data at rest with bank-controlled keys), and R10 (customer data retention).",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_data_at_rest.html"
+        },
+        {
+          "severity": "major",
+          "description": "HTTPS application load balancer [N9] is internet-facing in a public subnet while AWS WAF [N3] is only attached to CloudFront [N2], with no origin access restriction (such as CloudFront VPC origins, prefix lists, or custom header validation with ALB WAF) to stop attackers from bypassing CloudFront and WAF.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html"
+        },
+        {
+          "severity": "major",
+          "description": "HTTPS application load balancer [N9] is placed only in Public subnet A [C4] while leaving Public subnet B [C5] empty, whereas an Application Load Balancer requires subnets across at least two Availability Zones.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-application-load-balancer.html"
+        },
+        {
+          "severity": "major",
+          "description": "AWS WAF [N3] and ACM certificates [N6] associated with CloudFront [N2] are placed in Bank selected AWS Region [C2], whereas CloudFront WAF web ACLs and ACM certificates must be provisioned in us-east-1.",
+          "evidence": "https://docs.aws.amazon.com/acm/latest/userguide/acm-regions.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8, R9, and R10 are left as raw clarifying questions, and there are two duplicate edges from CloudFront [N2] to HTTPS application load balancer [N9].",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B omits any database for customer portal data, isolates private-subnet Fargate tasks without NAT Gateways or VPC endpoints so they cannot pull images or ship logs, and relies on an unworkable ALB Cognito bearer-token authentication pattern behind CloudFront."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "Design B avoids the dual-write event-loss risk of Design A by using DynamoDB Streams with an on-failure queue as a transactional outbox, properly connects all DLQs and downstream targets, and models idempotency and DLQ alarms."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "A",
+      "why": "Design A provides a complete, working serverless and SageMaker architecture, whereas Design B places the checkout Lambda function in a single-AZ private subnet without VPC endpoints or a NAT Gateway, breaking DynamoDB and CloudWatch connectivity and multi-AZ availability."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "A",
+      "why": "Design A includes the complete application and data stack (including RDS Multi-AZ, Secrets Manager, ECR, and NAT Gateway), whereas Design B omits a database entirely, lacks NAT/VPC endpoints for private Fargate tasks, and misuses ALB Cognito authentication for bearer-token API calls."
+    }
+  ]
+}

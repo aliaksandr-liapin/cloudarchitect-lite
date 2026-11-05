@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Training job launcher Lambda (N10) has a read edge to the S3 training data bucket (N8), whereas SageMaker (N6) has no read edge from S3. In SageMaker, the launcher only passes the S3 URI to the CreateTrainingJob API and SageMaker training instances read the training data directly from S3.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-training.html"
+        },
+        {
+          "severity": "major",
+          "description": "The monthly retraining workflow starts a training job and writes artifacts to S3, but lacks any mechanism or connection to deploy the newly trained model artifact to the real-time endpoint after the asynchronous training job finishes.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Application monitoring (CloudWatch) node (N12) is completely disconnected with no edges from any compute or ML service.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no data pipeline or connection showing how historical transaction records and scores in DynamoDB (N7) are exported to S3 (N8) for monthly retraining.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB (N7) and S3 (N8) do not specify encryption or backup/versioning configurations for payment transaction and model audit data.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects appropriate core AWS services for real-time scoring and training, but leaves the model deployment step incomplete, misroutes S3 training data reads through the launcher Lambda, and leaves CloudWatch disconnected."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "There is no edge showing how historical transactions stored in DynamoDB (N6) are exported into the S3 training data bucket (N7) for monthly retraining.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EventBridge (N9) connects directly to the combined SageMaker training and Model Registry node (N10) without explicitly naming SageMaker Pipelines or Step Functions to orchestrate the multi-step training, registration, and endpoint update workflow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Checkout API (N3) specifies a Lambda authorizer in its configuration, but the authorizer Lambda function is not represented as a node.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a production-ready architecture that separates real-time inference from the training and registry lifecycle, includes KMS encryption and backups, and protects checkout availability with a 200 ms timeout and fallback rule."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "All compute and ingress/egress nodes (ALB, NAT Gateway, Fargate Tasks) are placed only in Availability Zone 1 while Availability Zone 2 subnets are completely empty, and only a single zonal NAT Gateway is provisioned. Because a NAT Gateway is a zonal resource, an outage in AZ 1 will break outbound calls to the third-party payments API, violating the requirement to survive the loss of one Availability Zone.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate Tasks (N6) have no connection to Secrets Manager (N8) to retrieve the automatically rotated database credentials, and the rotation edge is drawn backwards from RDS to Secrets Manager.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The NAT Gateway node (N4) has no edges connecting it to Fargate Tasks or the external Payments API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Secrets Manager (N8) is a regional service but is placed inside Private Subnet 1 without specifying an Interface VPC Endpoint.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R8 asks what authentication method is used for API clients, and N1 claims to satisfy it, but no authentication mechanism, TLS certificate manager (ACM), or WAF is defined.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A picks the right core container and data services, but fails the multi-AZ resilience requirement by placing a single NAT Gateway and all tasks in one AZ, leaves the NAT Gateway disconnected, and omits the edge from Fargate to Secrets Manager."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Only API tasks in AZ A (N7) have an edge to CloudWatch (N15); the corresponding logging edge from API tasks in AZ B (N8) to CloudWatch is omitted.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R16 asks how API clients and tenant users authenticate and maps it to the Fargate tasks, but the specific authentication scheme is not explained in the node rationale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a resilient, well-connected multi-AZ container architecture with redundant NAT Gateways, ALB nodes, and Fargate tasks across both AZs, backed by Multi-AZ RDS and ElastiCache, Secrets Manager rotation, WAF, and ACM."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 0,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The architecture uses a single AWS Lambda function (N2) to run a batch job that takes approximately 25 minutes (R5). AWS Lambda has a hard maximum execution timeout of 15 minutes (900 seconds), so the report job will time out and fail every night.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+        },
+        {
+          "severity": "major",
+          "description": "The existing Aurora PostgreSQL database required by R2 is completely missing from the nodes and edges, leaving the PDF generator with no data source.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Chap_AuroraOverview.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Lambda function (N2) is placed in a private subnet and calls Amazon SES (N4) and Amazon S3 (N3) over HTTPS, but the VPC has no NAT Gateway or VPC endpoints, so the function cannot reach SES or S3.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        }
+      ],
+      "summary": "Design A has a critical defect because it runs a 25-minute batch job inside a single AWS Lambda function (which has a hard 15-minute timeout limit), omits the Aurora database node entirely, and isolates the function in a private subnet without egress to SES or S3."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Placing the Fargate report job (N2) in a public subnet avoids NAT Gateway and VPC endpoint costs, but exposes the task to the public subnet network tier (requiring strict security group rules to block inbound traffic) rather than keeping database clients in a private subnet.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Amazon ECR is not included to show where the Fargate report job pulls its container image from.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B accurately recognizes the 15-minute Lambda limit and uses a scheduled Fargate task to run the 25-minute report job cheaply and serverlessly, complete with Aurora connectivity, Secrets Manager, S3 presigned URLs, DynamoDB recipient storage, and SES."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "Design B properly models the end-to-end ML lifecycle including Model Registry and endpoint deployment, adds a 200 ms timeout with rules-based fallback to protect checkout availability, and includes KMS encryption and backups, whereas Design A leaves CloudWatch disconnected and lacks post-training deployment."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "Design B genuinely survives an Availability Zone outage by deploying redundant NAT Gateways, ALB nodes, and Fargate tasks in both AZs and properly wiring Fargate to Secrets Manager, whereas Design A puts a single NAT Gateway and all tasks into AZ 1 and leaves the NAT Gateway and Secrets Manager improperly connected."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "Design B uses an EventBridge-scheduled Fargate task that supports the 25-minute job duration at minimal cost, whereas Design A has a critical defect by attempting to run a 25-minute workload in a single AWS Lambda function (which times out at 15 minutes) and omits the Aurora database node."
+    }
+  ]
+}

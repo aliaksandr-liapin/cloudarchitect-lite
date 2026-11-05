@@ -1,0 +1,268 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Private worker nodes have no specified NAT or VPC endpoint connectivity for image pulls, AWS API calls, and telemetry export; the design needs an explicit private-cluster connectivity plan.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the AWS Load Balancer Controller, Kubernetes Ingress/Service resources, target type, and health checks that implement the ALB-to-frontend connection.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database security is incomplete: MySQL TLS, database/cache credentials, and security-group rules restricting access from workloads are not specified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "HPA and node scaling are requirements but lack an implementation choice; also identify how application instrumentation and trace-context propagation will feed the OpenTelemetry collector.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-matched EKS migration preserves Helm and covers the requested data services and observability, but private-network connectivity and several deployment details need completion."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design does not identify worker-node or Fargate capacity, workload placement, or the controller and Kubernetes resources implementing ingress; an EKS cluster node alone does not establish a runnable, load-balanced deployment.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html ; https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html"
+        },
+        {
+          "severity": "major",
+          "description": "Distributed tracing is asserted but not implemented: the only observability edge carries logs and metrics, with no application instrumentation, collector, trace propagation, or trace export configuration.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/eks-otel.html"
+        },
+        {
+          "severity": "major",
+          "description": "No NAT or VPC endpoint strategy is defined for private workloads to pull images and reach required AWS services, including observability endpoints.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "major",
+          "description": "Workload AWS permissions and encrypted cache connections are unspecified; define least-privilege pod identity and Redis in-transit encryption rather than relying only on private placement and encryption at rest.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html ; https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/in-transit-encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Resolve the availability assumption explicitly: multi-AZ workload placement, Redis replicas/failover, scaling, and actionable alarms are not described; the HTTPS certificate attachment is also unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed service choices fit the migration, but compute, ingress, tracing, private connectivity, and workload security remain too underspecified for implementation."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The publisher failure queue does not establish durable event replay as specified. A native Lambda DynamoDB-stream SQS failure destination contains batch metadata rather than the original records, and stream records expire after 24 hours; define full-payload preservation or reconciliation from durable order/outbox state.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html ; https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html"
+        },
+        {
+          "severity": "major",
+          "description": "Consumer DLQs cover processing failures but not SNS-to-SQS delivery failures. Configure subscription delivery DLQs and alarms so a failed subscription delivery cannot disappear after SNS exhausts its delivery policy.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Conditional insertion by a newly generated order ID does not establish idempotency across repeated POST requests. Specify a stable client idempotency key and durable mapping to the original order ID to prevent duplicate orders and downstream work.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_prevent_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege Lambda roles, source-restricted SNS-to-SQS policies, and authorization that limits order lookup to the appropriate customer rather than merely requiring authentication.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Independent queues provide strong failure isolation, but publisher recovery, subscription delivery failures, and request deduplication leave the no-silent-loss guarantee incomplete."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The one-year failure-retention procedure is incomplete: SQS retains messages for at most 14 days, and no archival consumer is defined for the intake or failure-record DLQs. DynamoDB can retain workflow outcomes for a year, but that does not automatically preserve payloads stranded in those queues.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The intake DLQ has no explicit source-queue redrive connection or policy, and the failure-record DLQ lacks an explicit alarm; connect and monitor both recovery paths.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make branch-local Retry/Catch placement explicit so an exhausted task failure is recorded within its branch rather than escaping and failing the entire Parallel state.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document stable client request identifiers and the recovery sequence when persisting the order succeeds but StartExecution fails; an existing order record must not cause a retry to skip workflow startup.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege execution roles and customer ownership checks for order lookup; Cognito authentication alone does not describe record-level authorization.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Durable Standard workflows and persisted per-step outcomes provide a strong recovery foundation, but queue archival, redrive wiring, and retry-boundary details require clarification."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail output is written to the triggering bucket without a specified input-prefix filter or equivalent exclusion, creating a potential recursive invocation loop and unnecessary cost; separate original and thumbnail prefixes or buckets.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "Durable replay of failed welcome-email events is not established. For a DynamoDB stream event source mapping, a native SQS failure destination contains batch metadata rather than the original subscriber records; define full-event preservation or a durable pending-email reconciliation mechanism.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The photo bucket has no reader delivery path; add a private CloudFront media origin or another explicit authorized read mechanism for photos and thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define cache behaviors for public post reads separately from authenticated or subscriber-specific routes, including authorization forwarding, cache keys, TTLs, and write invalidation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A RESTful interface does not itself require the API Gateway REST API product, and WAF can also protect a CloudFront distribution in front of an HTTP API; direct WAF association with API Gateway REST APIs is the valid justification here.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Edge caching, private static hosting, asynchronous welcome emails, and managed storage fit the blog well, but thumbnail filtering and stream-failure recovery need correction."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes to the same bucket that emits ObjectCreated events, but no input-prefix filter or output exclusion is specified; generated thumbnails can trigger further invocations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "Subscriber persistence and synchronous SES sending form a dual write without a durable retry boundary. If subscriber creation succeeds and email sending fails, no outbox, stream consumer, or recovery process ensures that the welcome email is eventually sent.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail failure DLQ is unconnected and no Lambda dead-letter or failure-destination configuration is specified; creating a queue alone does not preserve events after asynchronous retries are exhausted.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "API requests bypass CloudFront and its global cache, leaving readers dependent on a us-east-1 API round trip. API Gateway stage caching is regional and provisioned, with charges even when idle; justify that tradeoff or cache public API reads at CloudFront to better meet global latency and low-cost goals.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify CloudFront OAC and bucket access policies, author-only write permissions, and the actual browser-to-S3 presigned upload connection; issuing a presigned URL is not itself a Lambda-to-S3 upload.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is listed without explicit failure alarms or operational connections, and there is no defined global delivery path for uploaded photos and thumbnails.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core serverless services are appropriate, but regional API caching, synchronous email delivery, recursive thumbnail risk, and an unconfigured failure queue weaken the latency, cost, and reliability goals."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A preserves Kubernetes tooling while explicitly covering multi-AZ compute, pod identity, tracing, data-tier failover, and backups; B leaves several of those implementation foundations unresolved."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B's durable workflow and persisted per-step outcomes provide a stronger recovery ledger, whereas A leaves both publisher replay and SNS subscription delivery failures insufficiently protected; B still needs explicit queue archival and redrive details."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "A better addresses global API-read latency through edge caching and decouples welcome emails from signup, while also specifying private static hosting and failure monitoring; both designs need thumbnail trigger filtering."
+    }
+  ]
+}

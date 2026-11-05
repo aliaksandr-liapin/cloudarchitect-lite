@@ -1,0 +1,188 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Customer and Adjuster external nodes have no sign-in edges to the Customer User Pool and Adjuster User Pool nodes, and the Customer Managed Key node omits edges to the KMS-encrypted Web Assets Bucket and Failed Steps DLQ.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Claims API Function writes to Claims Table and invokes Claim Workflow in separate non-transactional steps without an outbox or reconciliation mechanism, which can leave claims stuck if the function fails between the database write and the Step Functions API call.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Step Functions Standard Workflows retain execution history for only 90 days, so relying on workflow history rather than exporting business step transitions to the long-term Audit Log Bucket does not cover the assumed 7-year audit retention period.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid serverless claims workflow using Step Functions task tokens, separate Cognito user pools, and KMS encryption, though it lacks transactional outbox recovery for dual writes and long-term business-event archiving."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Consolidating API handlers, automated checks, and notification tasks into a single Lambda node simplifies the diagram but requires careful per-function IAM role separation in implementation to maintain least privilege.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A comprehensive, production-grade design that guarantees failure resumption and auditability using a DynamoDB transactional outbox, stream processing with scheduled reconciliation, encrypted callback tokens, and S3 Object Lock archives."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Authors have no direct upload edge to the Static site and media bucket using the presigned URL and no sign-in edge to the Author user pool; additionally, issuing a presigned S3 URL is a local SDK signing operation rather than an HTTPS write call from the API handler to S3.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Routing DynamoDB Streams through a Subscriber stream relay Lambda into a Welcome email queue SQS and then a Welcome email sender Lambda adds an unnecessary Lambda and queue hop for infrequent subscriber sign-ups when Lambda can consume the stream directly with an on-failure destination.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-rounded serverless blog architecture that properly caches static assets, media, and API GET requests at CloudFront while protecting async thumbnail and welcome email pipelines with SQS queues and DLQs."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Photo bucket storing uploaded photos and generated thumbnails has no origin connection to the CloudFront distribution and no read path for readers, so uploaded blog images and thumbnails cannot be served to users.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Blog API Lambda states that it issues presigned photo upload URLs, but it has no connection or IAM relationship modeled to the Photo bucket.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The REST API configures a Cognito user pool authorizer without specifying that public blog read and subscriber sign-up routes bypass Cognito authentication.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A concise serverless blog design that uses DynamoDB Streams and S3 events with an SQS dead-letter queue, but omits any read or CloudFront origin path to serve photos and thumbnails from the photo bucket."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Checkout scoring function is placed inside a private VPC subnet (Private subnet AZ1) with no NAT Gateway and no VPC endpoints for DynamoDB or CloudWatch Logs, meaning it cannot reach the Transactions table or CloudWatch and every checkout request will fail.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Despite requirement R12 mandating high availability across two Availability Zones, Checkout scoring function is deployed in a single subnet (Private subnet AZ1) and the SageMaker endpoint is placed solely in Private subnet AZ2, creating single-AZ failure points.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The monthly Retraining workflow updates the production SageMaker endpoint directly after training without an explicit model evaluation and approval step or a dead-letter queue for failed schedule triggers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design selects appropriate AWS services for real-time scoring and monthly retraining, but contains a critical VPC networking flaw that prevents the checkout Lambda from reaching DynamoDB and places compute in single Availability Zones."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Point-in-time recovery on the DynamoDB table and object versioning on the S3 bucket are not explicitly enabled in the node configuration fields, although immutable S3 prefixes are noted in the rationale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An accurate, resilient architecture that pairs synchronous SageMaker real-time inference and idempotent DynamoDB conditional writes with an evaluation-gated SageMaker Pipelines monthly retraining workflow and DLQ-backed trigger handling."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "B",
+      "why": "Design B eliminates dual-write failure windows between DynamoDB and Step Functions using a transactional outbox with stream processing and scheduled reconciliation, and archives business audit events into S3 with Object Lock."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "Design A properly serves static assets, photos, and thumbnails through CloudFront and clearly separates public read/subscribe API routes from Cognito-protected author routes, whereas Design B leaves the photo bucket with no read path or CloudFront origin."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "Design B provides a working, idempotent checkout scoring path and an evaluation-gated SageMaker Pipelines retraining workflow, whereas Design A places its checkout Lambda in a single-AZ private subnet without the VPC endpoints or NAT needed to reach DynamoDB."
+    }
+  ]
+}

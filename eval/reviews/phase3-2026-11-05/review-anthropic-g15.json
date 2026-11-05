@@ -1,0 +1,193 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Running all 12 services on Fargate may force changes to existing charts and tooling. Fargate pods do not support DaemonSets, so the usual node-level log, metric and trace agents must become sidecars or built-in log routing, which weakens the 'minimal change' goal compared with managed EC2 nodes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito authentication is enforced on the public frontend ALB although the user never asked for it. This could force a login on a public web site. Together with WAF, a customer managed KMS key and two NAT gateways, it adds cost and complexity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB is placed in public subnet A only, although the rationale says it spans two AZs. Secrets Manager rotation is claimed but no rotation function is shown. TLS on the Redis connection depends on in-transit encryption, which is not set in the cache configuration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A secure, highly available EKS design with managed MySQL and Redis, WAF, KMS and Secrets Manager. The Fargate-only choice and the unrequested extras are a questionable fit for 'minimal tooling change' and add cost."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No managed secret store is shown for MySQL credentials, so credentials would likely end up in Helm values or Kubernetes Secrets. There is also no WAF on the public ALB.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The single-node Redis in one AZ has no snapshots or replica. This is justified as a disposable cache but is a zonal single point of failure. The RDS Multi-AZ pair is drawn as two nodes, which is redundant.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A pragmatic EKS plus managed node groups design that fits Helm and kubectl tooling, with a data migration plan and good observability. It leaves out credential management and WAF."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "ALB Cognito authentication is designed for interactive browser sign-in using session cookies. It is a weak fit for B2B machine clients that call the API with bearer tokens. API Gateway with an authorizer would be a better fit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Fargate is shown without an ECS service or cluster node, so orchestration is implicit. No ACM certificate is shown for the HTTPS listener. Secrets Manager rotation is claimed without a rotation function. Edge 'read' labels on DB and cache writes are inconsistent. The single ALB is split into two nodes, and the public ALB has no WAF.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ECR is flagged UNRESOLVED in the node list, so the registry is not fully specified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A workable ALB, private Fargate, Aurora and ElastiCache layout with NAT per AZ. Authentication choice, missing ECS, ACM and rotation components, and loose edge semantics weaken it."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "API Gateway REST API VPC links have traditionally targeted an NLB, and ALB targets are only supported in newer configurations. The VPC Link to an internal ALB should be verified, or an NLB or HTTP API used instead.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no ECR node for image pulls. The rotation Lambda is not shown inside the VPC, so it could not reach a private Aurora cluster. API Gateway plus WAF plus NAT is moderately costly.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-structured B2B design using API Gateway with a Cognito authorizer and WAF, a VPC Link to an internal ALB, ECS Fargate in private subnets, and Aurora with an explicit Secrets Manager rotation Lambda."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "CloudWatch is wired only to the SNS topic. No edges from the DLQs to alarms are drawn, although the text says DLQ-depth alarms exist. The edge direction CloudWatch to topic is odd.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Label inconsistencies: queue-to-Lambda triggers are labelled 'AWS API'. Calling DynamoDB Streams an outbox pattern is loose. No WAF or throttling is mentioned on the HTTP API.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A complete serverless fan-out design: HTTP API with a JWT authorizer, a DynamoDB Streams publisher, SNS to three SQS queues with DLQs, and idempotent workers. It includes an inventory table and secrets handling for payment credentials."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No inventory data store is modelled, so the inventory handler writes only to the Orders table and stock levels have no home. Payment provider credentials have no secret store.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A REST API plus WAF costs more than an HTTP API. The redrive thresholds and retry settings are not specified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound fan-out design with REST API, WAF, Cognito, a DynamoDB outbox, per-step queues and DLQs, and DLQ alarms wired explicitly. It omits the inventory table and credential storage."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A covers secrets, WAF, CMK encryption and a Multi-AZ cache, while B lacks a secret store and has a single-AZ cache. A's Fargate-only choice and added cost make the margin small."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "B",
+      "why": "API Gateway with a Cognito authorizer suits B2B API authentication better than ALB Cognito auth. B also has an internal ALB, explicit ECS and a rotation Lambda, and keeps containers private. A does not match the B2B authentication need."
+    },
+    {
+      "scenario": "order-events",
+      "better": "A",
+      "why": "A models inventory storage and payment credentials and has a more complete worker and DLQ layout. B has better alarm wiring and WAF but leaves inventory reservation without a data store."
+    }
+  ]
+}

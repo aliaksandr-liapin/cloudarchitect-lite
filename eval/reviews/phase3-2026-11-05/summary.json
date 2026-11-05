@@ -1,0 +1,149 @@
+{
+  "seed": 1,
+  "maxUsd": 1.14,
+  "spentUsd": 0.673706,
+  "cutShort": false,
+  "reviewers": [
+    "anthropic",
+    "openai",
+    "google"
+  ],
+  "failures": [
+    {
+      "reviewer": "anthropic",
+      "packetId": "g10",
+      "error": "Error: missing review brochure-site/A"
+    },
+    {
+      "reviewer": "anthropic",
+      "packetId": "g14",
+      "error": "Error: missing review k8s-microservices/A"
+    },
+    {
+      "reviewer": "anthropic",
+      "packetId": "g16",
+      "error": "Error: missing review saas-containers/A"
+    }
+  ],
+  "models": {
+    "gemini-argon": {
+      "blindScore": 2.4285714285714284,
+      "designs": 9,
+      "minReviewers": 2,
+      "criticalDefectRate": 0.1111111111111111,
+      "majorDefects": 11
+    },
+    "gemini-flash-lite": {
+      "blindScore": 1.6428571428571428,
+      "designs": 12,
+      "minReviewers": 2,
+      "criticalDefectRate": 0.3333333333333333,
+      "majorDefects": 30
+    },
+    "gpt-luna": {
+      "blindScore": 2.142857142857143,
+      "designs": 12,
+      "minReviewers": 2,
+      "criticalDefectRate": 0.16666666666666666,
+      "majorDefects": 21
+    },
+    "gpt-sol": {
+      "blindScore": 2.857142857142857,
+      "designs": 9,
+      "minReviewers": 2,
+      "criticalDefectRate": 0,
+      "majorDefects": 1
+    },
+    "haiku": {
+      "blindScore": 2.5238095238095237,
+      "designs": 12,
+      "minReviewers": 2,
+      "criticalDefectRate": 0,
+      "majorDefects": 8
+    },
+    "sonnet": {
+      "blindScore": 2.5476190476190474,
+      "designs": 9,
+      "minReviewers": 2,
+      "criticalDefectRate": 0,
+      "majorDefects": 9
+    }
+  },
+  "preferences": {
+    "sonnet over gemini-argon": 5,
+    "sonnet over haiku": 6,
+    "haiku over gemini-flash-lite": 12,
+    "haiku over gpt-luna": 11,
+    "gpt-sol over sonnet": 9,
+    "haiku over sonnet": 3,
+    "gemini-argon over sonnet": 4,
+    "gpt-luna over haiku": 1
+  },
+  "ties": 0,
+  "complete": false,
+  "reviewersPerDesign": {
+    "gemini-argon#1@saas-containers": 3,
+    "sonnet#1@saas-containers": 3,
+    "sonnet#1@product-search": 2,
+    "haiku#1@product-search": 3,
+    "haiku#1@claims-approval-workflow": 3,
+    "gemini-flash-lite#1@claims-approval-workflow": 3,
+    "gpt-luna#1@regulated-portal-security": 3,
+    "haiku#1@regulated-portal-security": 3,
+    "gpt-luna#1@product-search": 3,
+    "haiku#1@saas-containers-multi-az": 3,
+    "gemini-flash-lite#1@saas-containers-multi-az": 3,
+    "haiku#1@k8s-microservices": 2,
+    "gemini-flash-lite#1@k8s-microservices": 3,
+    "haiku#1@order-events": 3,
+    "gpt-luna#1@order-events": 3,
+    "haiku#1@myblog": 3,
+    "gemini-flash-lite#1@myblog": 3,
+    "gemini-flash-lite#1@product-search": 3,
+    "sonnet#1@myblog": 3,
+    "gpt-sol#1@myblog": 3,
+    "sonnet#1@fraud-model-serving": 3,
+    "haiku#1@fraud-model-serving": 2,
+    "gemini-flash-lite#1@order-events": 3,
+    "gemini-argon#1@fraud-model-serving": 3,
+    "haiku#1@regulated-portal": 2,
+    "gpt-luna#1@regulated-portal": 3,
+    "gemini-argon#1@product-search": 3,
+    "sonnet#1@brochure-site": 3,
+    "gpt-sol#1@brochure-site": 3,
+    "gpt-luna#1@myblog": 3,
+    "gpt-luna#1@claims-approval-workflow": 3,
+    "gemini-argon#1@myblog": 3,
+    "gemini-argon#1@regulated-portal": 3,
+    "sonnet#1@regulated-portal": 2,
+    "sonnet#1@claims-approval-workflow": 2,
+    "gpt-sol#1@claims-approval-workflow": 3,
+    "gpt-sol#1@fraud-model-serving": 3,
+    "gpt-luna#1@brochure-site": 3,
+    "haiku#1@brochure-site": 2,
+    "gpt-luna#1@k8s-microservices": 3,
+    "gemini-flash-lite#1@regulated-portal": 3,
+    "gemini-argon#1@k8s-microservices": 3,
+    "sonnet#1@k8s-microservices": 2,
+    "gemini-flash-lite#1@regulated-portal-security": 3,
+    "gpt-sol#1@k8s-microservices": 3,
+    "gpt-luna#1@saas-containers-multi-az": 3,
+    "gemini-argon#1@order-events": 3,
+    "sonnet#1@order-events": 3,
+    "haiku#1@saas-containers": 2,
+    "gpt-sol#1@regulated-portal": 3,
+    "gpt-sol#1@order-events": 3,
+    "gpt-luna#1@saas-containers": 3,
+    "haiku#1@nightly-reports-serverless": 2,
+    "gpt-luna#1@nightly-reports-serverless": 3,
+    "gemini-flash-lite#1@fraud-model-serving": 2,
+    "gemini-flash-lite#1@brochure-site": 2,
+    "gpt-sol#1@product-search": 2,
+    "gemini-argon#1@claims-approval-workflow": 2,
+    "gpt-luna#1@fraud-model-serving": 2,
+    "gemini-flash-lite#1@saas-containers": 2,
+    "gemini-flash-lite#1@nightly-reports-serverless": 2,
+    "gpt-sol#1@saas-containers": 3,
+    "gemini-argon#1@brochure-site": 3
+  }
+}

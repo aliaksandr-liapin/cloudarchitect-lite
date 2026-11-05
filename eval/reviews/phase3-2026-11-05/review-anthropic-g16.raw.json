@@ -1,0 +1,80 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Monthly retraining only starts a training job and writes the artifact to S3. Nothing creates a model or endpoint config from it or updates the live endpoint, so the retrained model never reaches production. R8 mentions a deployment process, but the design has none.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/realtime-endpoints-deploy-models.html"
+        },
+        {
+          "severity": "major",
+          "description": "The scoring path has no timeout, fallback or error-handling behaviour. If the SageMaker endpoint is slow or unavailable, checkout is blocked, which weakens the 99.9% target the design set itself. There are also no alarms on endpoint latency or errors, and no edges to CloudWatch from the endpoint or Lambda.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-your-workload-service-architecture.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The training job launcher is shown reading training inputs from S3, but SageMaker reads the inputs itself. The Cognito authorizer suits end users, so machine-to-machine checkout clients may need a different auth choice. No KMS or CMK is specified, and no multi-instance or multi-AZ endpoint configuration is stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A workable synchronous scoring path with managed training, but it never deploys retrained models and has no fallback or endpoint alarms."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The EventBridge schedule is wired straight to a node that combines SageMaker training jobs and Model Registry. EventBridge targets SageMaker Pipelines rather than raw training jobs, so the trigger and deployment mechanism (for example a pipeline) is unspecified. There is no edge from training to CloudWatch for failed runs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The 200 ms timeout and the multi-AZ instance count for the endpoint are not justified or specified. The rules-based fallback means some payments are approved without a model score, which should be an explicit business decision.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the full lifecycle: a timeout and fallback on the scoring path, KMS and PITR on the data, a registry-based deploy to a stable endpoint, and alarms."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [],
+      "summary": "Duplicate placeholder; see the B review above."
+    }
+  ],
+  "preference": []
+}

@@ -1,0 +1,208 @@
+{
+  "reviews": [
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The dedicated Audit table is described as tamper-evident, but IAM deny on update and delete only restricts writes. It does not make the data tamper-evident, and no Object Lock, hash chain or export to immutable storage is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "File validation results are written to the Claims table, but nothing shows the workflow waiting for or checking them before automated checks. Rejected files could still reach the checks.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Textract is flagged as UNRESOLVED/not in the catalog. The CloudTrail edge originates from API Gateway, although CloudTrail is account-level. CloudFront is described as an 'API entry' but has no edge to the API. A customer managed KMS key is required but not modelled as a node.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong, auditable Step Functions design with a separate append-only audit table, upload validation with a DLQ, a timeout/escalation path and idempotency. The tamper-evidence claim is overstated and a few connections are loose."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Per-step auditability relies on Step Functions execution history and CloudWatch logs, plus CloudTrail for API activity. There is no durable, queryable per-claim audit record of workflow steps and decisions. CloudTrail does not capture business-level steps, and step history is not retained indefinitely.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No file type or size validation on uploads. Lifecycle and deletion after 7 years are asserted but not specified. The timeout path is only generically described. Audit bucket immutability (Object Lock) is not configured.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The workflow-failure DLQ is fed by an EventBridge rule, which is valid, but it only surfaces failed executions and does not replay or resume them.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Lean, serverless and secure, with separate customer and adjuster pools, a CMK, and an EventBridge-to-DLQ failure path. Audit of workflow steps is thin and there is no upload validation."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The single logical ALB is split into two nodes (AZ-A and AZ-B) and RDS Multi-AZ is split into primary and standby nodes. This can mislead readers into thinking there are duplicate resources and costs. Route 53 has no edge to the ALB (alias record missing).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption uses AWS-managed keys and there are no VPC endpoints for Secrets Manager, CloudWatch or X-Ray, so all of that traffic goes via NAT. The claim that X-Ray traces MySQL and Redis calls requires explicit instrumentation.",
+          "evidence": ""
+        }
+      ],
+      "summary": "EKS managed node groups preserve Helm and DaemonSet workflows well, with Multi-AZ RDS and Redis, per-AZ NAT, ALB with ACM, WAF and Cognito, and full CloudWatch and X-Ray coverage. The diagram duplicates some nodes."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Running all 12 existing Helm-deployed services on Fargate conflicts with the 'minimal change to tooling' goal. Fargate does not support DaemonSets or privileged pods, and logging and metrics collection differ from the node-based model. The rationale that Fluent Bit and Container Insights ship logs from all services is therefore inaccurate as stated. No OpenTelemetry collector is modelled.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/fargate.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no separate data subnet tier. RDS is placed in private subnet A and Redis in private subnet B, alongside the app. EKS control-plane logs are not covered, and the single ALB node is placed in only one subnet in the diagram.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Secure and tidy design with CMKs, TLS and Secrets Manager. The Fargate choice puts Helm compatibility at risk and weakens the observability explanation."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 1,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "API Gateway HTTP API is connected directly to ECS tasks in private subnets. There is no VPC link, no load balancer and no Cloud Map service. HTTP API private integrations require a VPC link to an ALB, NLB or Cloud Map, so the integration is not workable as drawn.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "WAF is attached only to CloudFront, while the API Gateway HTTP API endpoint remains publicly invokable. AWS WAF cannot be attached to HTTP APIs, so the API can be reached directly, bypassing WAF. Authenticated access on every interface depends on the authorizer alone.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-aws-waf.html"
+        },
+        {
+          "severity": "major",
+          "description": "The VPC has only private subnets, with no NAT gateway or VPC endpoints. Tasks cannot pull container images or reach Cognito, CloudWatch or KMS, so the app tier could not start.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "The web app has no origin. CloudFront only forwards to API Gateway and there is no S3 bucket or container origin for the web tier. Nothing connects KMS to RDS or other data, CloudTrail has no log bucket, and CloudWatch has no edges.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html"
+        }
+      ],
+      "summary": "Lists the right security services, but the wiring is broken: no VPC link to the containers, no egress for private tasks, API Gateway reachable around WAF, and no web origin."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Each tier runs in a single AZ: the web tasks are only in private app subnet A and the API tasks only in subnet B. The Aurora writer is in data subnet A, and only one NAT gateway is in public subnet A. An AZ failure removes a tier, contradicting the R17 availability requirement.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_fault_isolation_multiaz_region_system.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The API tasks have no NAT edge; only the web tasks are connected to the NAT gateway. The API-to-Aurora edge is labelled read although the API writes. No ECS or EKS cluster node is shown for Fargate, and KMS has no edges to resources. WAF is placed ahead of the ALB in the flow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Shield Standard is automatic, so the node adds no extra control. Shield Advanced is not considered for a bank. Only ALB-level WAF is used, with no CloudFront.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Coherent hardened design: WAF and Shield, ALB with ACM, private Fargate tasks, Cognito with TOTP MFA, Aurora with a CMK, and CloudTrail to an Object Lock bucket. Per-tier AZ placement and single NAT weaken its availability claim."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "A provides a dedicated append-only audit store, upload validation with a DLQ, document analysis and an explicit escalation path, covering auditability and resumability better than B's thinner step audit."
+    },
+    {
+      "scenario": "k8s-microservices",
+      "better": "A",
+      "why": "A's EC2 managed node groups preserve existing Helm and DaemonSet-based tooling and the observability add-on model, whereas B's Fargate choice undermines 'minimal change' and its observability rationale."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "better": "B",
+      "why": "B's ALB, WAF, private Fargate and Cognito chain is workable and meets the security priority. A's API Gateway-to-ECS integration cannot work as drawn, the tasks have no egress, and the API can be reached around WAF."
+    }
+  ]
+}

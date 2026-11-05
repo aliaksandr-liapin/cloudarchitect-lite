@@ -1,0 +1,288 @@
+{
+  "reviews": [
+    {
+      "scenario": "regulated-portal-security",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The bank-controlled-key requirement is not fully satisfied. Cognito user-pool storage uses service-controlled encryption, while customer-managed encryption is not specified for CloudWatch logs or Fargate ephemeral storage. Obtain an explicit identity-data exception or change the identity architecture, and configure customer-managed keys for supported storage.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/data-protection.html\nhttps://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html\nhttps://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+        },
+        {
+          "severity": "major",
+          "description": "OAC authenticates CloudFront's access to S3, not customers accessing CloudFront. Only API routes have an authentication mechanism; the static web entry point lacks viewer authentication or an explicitly approved exception for public sign-in and bootstrap assets.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PrivateContent.html"
+        },
+        {
+          "severity": "major",
+          "description": "Private Fargate tasks have no specified NAT or service-endpoint connectivity for image pulls, logging, and Cognito access. Define the required endpoints and internet egress rather than assuming private-subnet placement supplies connectivity.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "The CloudFront behavior in front of Cognito-authenticated ALB routes lacks the required authentication-header, cookie, and query-string forwarding configuration and a safe caching policy. These settings are necessary to preserve authentication behavior and prevent inappropriate caching of authenticated responses.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly configure an account-wide, multi-Region trail covering read and write management events and global-service activity, with log-file validation and delivery-failure alarms; the regional CloudTrail node alone does not establish that coverage.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudFront certificate is placed in the application Region even though its rationale correctly requires us-east-1. Make the placement consistent, and specify a CloudFront-scope WAF web ACL.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A provides a strong TLS, private-container, and immutable-audit foundation, but bank-controlled encryption, viewer authentication, private-task connectivity, and authenticated caching remain unresolved."
+    },
+    {
+      "scenario": "regulated-portal-security",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Customer-managed encryption is established for Aurora and S3, but not all stored data. Cognito user-pool encryption is service-controlled, and customer-managed keys are not specified for CloudWatch logs or Fargate ephemeral storage. The literal all-data requirement needs an approved identity exception or a different identity architecture.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/data-protection.html\nhttps://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html\nhttps://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+        },
+        {
+          "severity": "major",
+          "description": "API token validation does not authenticate the separately exposed web routes. No ALB authentication action or application-side web authentication is specified, so the enabled requirement for authenticated public interfaces is not demonstrated.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The only NAT gateway is in Availability Zone A. Losing that zone removes outbound connectivity for surviving private tasks that depend on it, contradicting the design's chosen single-AZ-failure availability goal.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Web tasks are shown only in Zone A and API tasks only in Zone B. Explicitly deploy each service across both zones; placing different application tiers in different zones does not establish application-tier failover.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The client-to-WAF HTTPS hop is misleading: WAF should be represented as a web ACL associated with the ALB, while clients connect to the ALB itself.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The audit configuration leaves multi-Region management-event coverage, global-service activity, log validation, retention duration, and Object Lock retention mode unspecified despite the architect being asked to decide retention.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B selects appropriate managed security and data services, but it leaves public web authentication and comprehensive key control unresolved and does not substantiate its chosen AZ-resilience goal."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "EventBridge scheduled polling cannot guarantee the hard one-minute commit-to-search deadline. Scheduled rules have one-minute minimum granularity and delivery delay, before worker execution and search-index visibility are considered. Use continuous or genuinely sub-minute processing with an explicit end-to-end latency budget.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no initial population or rebuild procedure for the existing two million products. Processing future outbox records alone will not index unchanged catalog rows; define a full backfill and a coordinated transition to incremental updates.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/gsgupload-data.html"
+        },
+        {
+          "severity": "major",
+          "description": "The regional Lambda indexer needs explicit VPC attachment and security-group access to the private RDS Proxy. Private API tasks also need NAT or service endpoints for required AWS-service connectivity; neither network arrangement is specified.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html\nhttps://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design promises continued search availability through an AZ failure but specifies no multi-AZ OpenSearch deployment or cross-AZ replica configuration. The search tier needs an explicit resilient domain and index layout.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Mandatory Cognito sign-in for browsing and searching is an unrequested customer-experience assumption and adds authentication complexity. Confirm that requirement or allow anonymous catalog access, and represent the ALB authentication flow rather than Cognito directly invoking the ALB.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify OpenSearch network exposure, access policies, encryption, and the actual Lambda failure-destination attachment; service nodes and an unconnected failure queue do not establish these controls.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A has a sound transactional-outbox consistency foundation, but its scheduled indexing cannot guarantee the freshness requirement and it lacks catalog bootstrap and several deployment details."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design explicitly describes two separate zonal ALBs, each occupying only one Availability Zone. Application Load Balancers require subnets in at least two Availability Zones, so the stated entry-tier layout cannot be deployed. Use one logical multi-AZ ALB, or make each separate ALB multi-AZ.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "A Kinesis event-source mapping's SQS on-failure destination does not retain the failed change payloads as claimed; it receives failure metadata and stream references. Replay requires reading records before stream retention expires, or using a payload-preserving destination such as S3 and a defined recovery process.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html"
+        },
+        {
+          "severity": "major",
+          "description": "Per-product ordering and stale-update prevention are asserted but not implemented. Specify DMS partition mapping and source-version-checked index writes, and coordinate the direct full-load writer with CDC before cutover. Ordinary upserts and Kinesis alone do not prevent older or replayed changes from overwriting newer prices.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Kinesis.html\nhttps://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Lambda updater must access a private ElastiCache cluster, but no VPC attachment, subnet selection, or security-group access is specified. Placement only at Region level does not establish the required private connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Only Valkey invalidation is described. Define CloudFront product-page TTLs or invalidation and ensure search responses are uncached or appropriately bounded; otherwise the design's additional one-minute read-path freshness promise is not established.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Route 53 is incorrectly drawn as an HTTPS request-forwarding hop. Show DNS resolution separately from the shopper's HTTPS connection to CloudFront.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B covers CDC, initial loading, search, and caching comprehensively, but its undeployable zonal ALBs and incomplete ordering and failure-replay mechanisms prevent production readiness."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Rotating a Secrets Manager value does not refresh credentials already injected into running Fargate containers. Define runtime secret retrieval and connection refresh, or coordinated task replacement, so database rotation does not leave the API using stale credentials.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html"
+        },
+        {
+          "severity": "major",
+          "description": "The chosen B2B client authentication flow is incomplete. ALB Cognito authentication uses browser redirects and an authentication session cookie, not generic validation of bearer tokens supplied by machine clients. Establish compatible client behavior or validate access tokens in the API or an API Gateway authorizer.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "ALB-to-task connections explicitly use HTTP despite the design's inferred encryption-in-transit requirement. Use HTTPS target groups or narrow and document that inferred requirement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The statement that cache failover preserves sessions should acknowledge asynchronous replication and possible recent-session loss; define the acceptable session recovery behavior rather than implying zero data loss.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A provides a coherent multi-AZ Fargate, database, cache, and payment-egress architecture, with credential refresh and B2B authentication still needing concrete implementation."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The API Gateway-to-internal-ALB connection lacks a VPC link and private-integration configuration. An ordinary HTTP integration cannot reach an internal ALB; specify a supported REST API private integration and an ALB-capable VPC-link configuration.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-private-integration.html"
+        },
+        {
+          "severity": "major",
+          "description": "The single NAT gateway in Availability Zone 1 makes payment access dependent on that zone. Surviving tasks lose their outbound payment path if the zone fails; provide a NAT gateway and appropriate routing in each zone.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "No mechanism is specified for Fargate tasks to obtain database credentials or refresh them after rotation. Add authorized secret retrieval or injection and a runtime refresh or task-redeployment strategy; rotation alone does not update running containers.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Database and cache transport encryption and access controls are unspecified. Explicitly require TLS, restrict security groups to application clients, and define task permissions for secrets and other AWS dependencies.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is listed without concrete health, failover, payment-error, or rotation-failure alarms. Define those signals and test the intended cross-AZ application and stateful-service recovery.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B chooses suitable managed compute and Multi-AZ stateful services, but its private API integration, single-zone payment egress, and credential-consumption lifecycle need substantial clarification."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "regulated-portal-security",
+      "better": "A",
+      "why": "A more explicitly defines end-to-end TLS, API authentication, and seven-year immutable audit retention; both designs still need comprehensive customer-key coverage and public-interface authentication fixes."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "A has a more coherent transactional consistency and retry foundation, while B contains an undeployable ALB layout and misleading failure-retention semantics; A still requires a catalog backfill and genuinely sub-minute indexing."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "A",
+      "why": "A explicitly provides per-AZ payment egress and replicated application, database, and cache tiers, whereas B leaves payment access dependent on one zone and its private API integration incomplete."
+    }
+  ]
+}

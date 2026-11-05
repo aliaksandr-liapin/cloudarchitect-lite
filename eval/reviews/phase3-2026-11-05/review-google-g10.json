@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "fraud-model-serving",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R4 requires retraining the model monthly, but the design includes only an S3 bucket for model artifacts and omits any training compute, orchestration, or scheduling service (such as Amazon SageMaker training jobs/pipelines and Amazon EventBridge Scheduler) to actually perform the monthly retraining and update the endpoint.",
+          "evidence": "https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-training.html"
+        },
+        {
+          "severity": "major",
+          "description": "The checkout path synchronously invokes the SageMaker endpoint on every payment without a timeout/fallback strategy or resiliency controls, meaning endpoint latency spikes or failures can block payment processing; DynamoDB also lacks point-in-time recovery (PITR) and S3 lacks versioning for model rollback.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_mitigate_interaction_failure_graceful_degradation.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch Observability node (N8) is an orphan node with no edges connecting it to the API, Lambda function, or SageMaker endpoint.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no data pipeline or export path from the Transactions Table (N7) to S3 (N6) to supply labeled transaction data for the monthly retraining pipeline.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers the basic real-time inference path with API Gateway, Lambda, SageMaker, and DynamoDB, but completely omits the compute and scheduling architecture needed to satisfy the monthly retraining requirement."
+    },
+    {
+      "scenario": "fraud-model-serving",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Although N7 states that S3 holds historical transactions and training exports from DynamoDB, there is no edge showing how transaction records in DynamoDB (N6) are exported to the S3 training bucket (N7).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Checkout API (N3) is configured with a Lambda authorizer, but the authorizer Lambda function itself is not represented as a node or connected via an edge.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a complete, production-ready architecture covering both low-latency real-time fraud scoring with graceful fallback and an automated monthly retraining and deployment pipeline using EventBridge, SageMaker Training, and Model Registry."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The diagram leaves TLS Certificate (N5) and CloudWatch Logs (N6) as disconnected orphan nodes and omits the Route 53 Alias record edge to the CloudFront distribution (N3).",
+          "evidence": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-to-cloudfront-distribution.html"
+        },
+        {
+          "severity": "major",
+          "description": "TheWebsite Bucket (N2) and CDN Distribution (N3) do not specify CloudFront Origin Access Control (OAC) or block public access settings to ensure the S3 origin remains private.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Visitor Browser to Custom Domain DNS labels the DNS lookup protocol as HTTPS, whereas standard Route 53 public authoritative DNS resolution uses UDP/TCP port 53.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 bucket does not enable object versioning to allow simple rollback of static site changes.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects the right core serverless services for a low-cost static website, but suffers from incomplete graph connections, missing Origin Access Control security details, and an inaccurate DNS protocol label."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "While R10 notes that menu and opening-hours updates should appear shortly after upload without stale cache issues, the design does not specify short Cache-Control TTLs or a CloudFront cache invalidation step when staff upload updated files to S3.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a well-connected, secure, and low-cost static website architecture using Route 53, ACM in us-east-1, CloudFront with a private S3 origin via OAC, S3 versioning, and scoped IAM access for content updates."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "For a catalog of 2 million products with read-heavy traffic across multipleautoscaled Fargate tasks, relying solely on a 30-second per-task local memory cache without a shared cache (such as Amazon ElastiCache) or RDS read replicas results in low cache hit ratios and directs most read traffic to the primary RDS instance.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/caching.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Derived product search index (N8) and Private AWS service endpoints (N9) are placed in the Region container rather than inside the Catalog VPC and private subnets, despite their rationales specifying VPC-access placement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edges from the Fargate tasks (N5, N6) to RDS PostgreSQL (N7) are labeled as read-only even though claiming and acknowledging transactional outbox leases requires database writes, and no write path for incoming product/price updates is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database credential management (such as AWS Secrets Manager or IAM database authentication) and edge protection (AWS WAF) are not explicitly included.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Embedding the outbox polling worker inside the web API Fargate tasks couples synchronization worker concurrency to HTTP request autoscaling.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A presents a strong, cost-conscious architecture that solves the 1-minute search freshness requirement reliably via a transactional outbox pattern and monotonic OpenSearch versioning, though it would benefit from a shared cache layer for 2 million products."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Requirement R14 mandates Multi-AZ resilience if one Availability Zone fails, but the design deploys only a single NAT Gateway in Public subnet AZ2 (N4) to provide outbound connectivity for both AZs; if AZ2 fails, Fargate tasks in AZ1 lose access to ECR, SQS, Secrets Manager, and OpenSearch.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "Reconcile and bulk load Lambda (N16) is tasked with scanning all 2 million products from Aurora and bulk-indexing/diffing them in OpenSearch on a schedule, which risks exceeding AWS Lambda's hard 15-minute execution timeout without distributed batching or AWS Step Functions orchestration.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html"
+        },
+        {
+          "severity": "major",
+          "description": "Index sync Lambda (N14) and Reconcile and bulk load Lambda (N16) are placed in the Region container outside the Commerce VPC while directly querying Aurora PostgreSQL (N9) in a private subnet; additionally, OpenSearch traffic is routed through a public NAT Gateway (N4 -> N11) instead of VPC placement.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Web API tasks write product updates to Aurora and subsequently publish change messages to SQS (dual-write without a transactional outbox or CDC stream); if a container fails or times out after the DB commit but before SQS SendMessage succeeds, the price update is missed until the periodic reconciliation job runs, violating the 1-minute freshness SLA.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Web API tasks only have read edges to Product page cache (N10) with no cache-aside population write path on cache misses and no cache invalidation/update path when product prices change.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only Web API tasks in AZ1 (N7) have an edge to fetch credentials from Secrets Manager (N17), omitting Web API tasks in AZ2 (N8) and the two Lambda functions (N14, N16) that also connect to Aurora.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B includes useful caching and security components (ElastiCache, WAF, Secrets Manager), but has major reliability and networking flaws including a single-AZ NAT Gateway bottleneck, dual-write race conditions on price updates, and a monolithic Lambda function scanning 2 million rows."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "fraud-model-serving",
+      "better": "B",
+      "why": "Design B fully addresses the monthly model retraining and deployment requirement with EventBridge and SageMaker Training/Model Registry and protects checkout availability with a 200 ms timeout and fallback rule, whereas Design A omits the training pipeline entirely."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Design B has complete and accurate graph connections, explicitly secures the S3 bucket behind CloudFront Origin Access Control (OAC), and accounts for safe content updates by bakery staff using IAM and S3 versioning."
+    },
+    {
+      "scenario": "product-search",
+      "better": "A",
+      "why": "Design A guarantees sub-minute search index consistency using a transactional outbox pattern with external versioning and avoids single-AZ bottlenecks with multi-AZ VPC endpoints, whereas Design B introduces a single-AZ NAT Gateway point of failure, dual-write consistency bugs, and an unscalable single-Lambda full scan of 2 million products."
+    }
+  ]
+}

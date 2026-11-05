@@ -1,0 +1,253 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "No caller-authentication or application-authorization mechanism is selected for the public B2B API, despite listing authentication as an architect-decided requirement; WAF does not establish caller identity or tenant access rights.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify security groups permitting task ingress only from the ALB and database/cache ingress only from application tasks, together with separate least-privilege task and execution roles.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The two Fargate task groups do not identify the ECS service, minimum task count, placement policy, health checks, or replacement behavior that will maintain application capacity across both AZs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose an explicit credential-rotation implementation, such as RDS-managed master credentials or Secrets Manager Lambda rotation, and describe how running applications refresh credentials and recover their connection pools.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The statement that sessions survive an AZ loss is too absolute: asynchronous cache replication can lose recent writes, and automatic failover still requires client reconnection; define acceptable session loss and failover behavior.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The availability, scale, and authentication clarification entries remain questions rather than actual assumptions or decisions, leaving the intended capacity and recovery targets unclear.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed, two-AZ foundation fits the workload well, but authentication, workload maintenance, and rotation/failover behavior need concrete decisions before implementation."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The image-pull edge terminates at the ECS cluster/control plane; image retrieval should be associated with the Fargate task startup and task execution role.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarify whether applications retrieve secrets through the SDK or receive startup-injected values, and define refresh behavior after rotation; startup injection alone does not update an already running container.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Least-privilege task/execution policies and ALB-to-task, application-to-database, and application-to-cache security-group rules are not specified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define minimum surviving-AZ capacity, application retries and reconnection during database/cache failover, and an availability target that allows for failover interruptions rather than implying uninterrupted service.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design covers the requested managed container platform and adds useful authentication and transport protection, with remaining gaps mainly in permissions and operational configuration."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 0,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "Cognito user-pool directory data cannot generally be encrypted at rest using a bank-controlled customer-managed KMS key. Consequently, this identity choice cannot satisfy the explicit requirement that all stored customer data use keys controlled by the bank; a separate KMS node does not resolve this limitation.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/data-protection.html"
+        },
+        {
+          "severity": "major",
+          "description": "Bank-controlled encryption is not configured for Fargate ephemeral storage. Default Fargate encryption uses AWS-owned keys, so customer-managed ephemeral-storage encryption must be explicitly configured to satisfy the stated key-control requirement.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+        },
+        {
+          "severity": "major",
+          "description": "The container registry has no customer-managed KMS encryption configuration. ECR's default encryption is not equivalent to encryption with a bank-controlled KMS key, leaving deployment artifacts outside the stated all-data key-control policy.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly configure a multi-Region CloudTrail trail with read and write management events and global-service events; the phrase 'across the account' does not specify these necessary coverage choices.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the CloudFront certificate's us-east-1 placement and the CloudFront-scoped WAF configuration, separately from any regional ALB certificate and resources.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The perimeter, private application tier, MFA, and audit architecture are strong, but the identity service and omitted storage-key configurations violate the bank's mandatory key-control requirement."
+    },
+    {
+      "scenario": "regulated-portal",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Select a mature identity implementation and document password hashing, TOTP-secret protection, recovery, session/token lifecycle, signing-key rotation, and authentication abuse controls; password plus TOTP alone does not establish a production-ready identity service.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The private HTTPS targets need a defined certificate provisioning and renewal mechanism, including HTTPS health checks and a minimum supported TLS policy.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Enumerate the required private endpoints, including ECR API/Docker endpoints and S3 access for image layers, and define their policies alongside task execution permissions and application/database security-group boundaries.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design substantially meets the bank's strict encryption, TLS, audit, and private-container requirements, with identity-service hardening the principal remaining implementation risk."
+    },
+    {
+      "scenario": "order-events",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 0,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The DynamoDB Streams SQS on-failure destination preserves failed-batch metadata, not the complete original stream payload. Once the underlying stream records expire, the queue alone cannot replay the failed publications, contradicting the claims that it holds the failed records and prevents their loss; use a full-payload S3 failure destination or an explicit durable reconciliation mechanism.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Worker DLQs do not cover failures delivering from SNS to its SQS subscriptions. Without subscription redrive policies and a delivery-failure DLQ, SNS can discard undeliverable notifications before any worker queue receives them.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms have no specified notification action or operator destination, and queue retention and replay procedures are unspecified; alarm state alone does not establish that operators will be notified before messages expire.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The inventory handler has no defined stock model or atomic reservation operation; clarify where available quantities and reservation markers reside and how conditional or transactional writes prevent overselling and duplicate reservations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define order-ownership checks for lookups and least-privilege Lambda, topic, queue, and destination permissions; authenticating a caller does not by itself authorize access to a particular order ID.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The independent SNS/SQS consumers are appropriate, but incomplete stream-failure preservation and missing SNS delivery-failure handling break the central no-silent-loss requirement."
+    },
+    {
+      "scenario": "order-events",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Specify worker and delivery-DLQ retention, archive retention, and operator response/redrive deadlines so failures are handled before finite SQS retention expires.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define least-privilege execution roles, SNS-to-SQS queue policies, failure-destination permissions, and encryption-key access where applicable; these are necessary deployment details not shown in the design.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Document lease expiry or reconciliation for the email processing claim so a worker crash after claiming an acknowledgement cannot leave it permanently unprocessed; preserve the stated acceptance of possible duplicate sends at the external boundary.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides well-isolated processing, durable publication-failure recovery, delivery and worker DLQs, explicit alerts, and realistic idempotency handling, with only deployment-policy and recovery-parameter details outstanding."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B explicitly includes ECS service orchestration, caller authentication, internal TLS, and broader secret handling while retaining the required private, two-AZ managed platform."
+    },
+    {
+      "scenario": "regulated-portal",
+      "better": "B",
+      "why": "B addresses bank-controlled encryption for identity storage, images, logs, and Fargate storage and explicitly defines all-Region auditing; A has a structural key-control conflict with Cognito."
+    },
+    {
+      "scenario": "order-events",
+      "better": "B",
+      "why": "B closes both the stream-payload recovery gap and the SNS subscription-delivery gap, while adding concrete idempotency, transactional inventory, ownership checks, and operator notifications."
+    }
+  ]
+}

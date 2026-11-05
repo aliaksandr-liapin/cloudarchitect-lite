@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design relies on Application Load Balancer native Cognito integration to validate JWT tokens for a B2B REST API, whereas ALB's authenticate-cognito action performs browser-based OAuth 2.0 redirects with session cookies rather than stateless Bearer JWT validation for programmatic API clients.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Application Load Balancer is modeled as two separate load balancer nodes (AZ A and AZ B) rather than a single multi-AZ regional load balancer resource.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Secrets Manager is only described as storing RDS PostgreSQL credentials and omits storing the third-party payments API credentials.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Omitted supporting production services such as ACM for TLS certificates, WAF for public ingress protection, ECR for container image hosting, and dedicated data subnets separate from application compute subnets.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers all core functional and Multi-AZ availability requirements using ECS Fargate, Multi-AZ RDS PostgreSQL, Multi-AZ ElastiCache, dual NAT Gateways, and Secrets Manager, but misapplies ALB native Cognito authentication for programmatic B2B REST API token validation."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The edge to validate JWTs via Cognito JWKS is only drawn from Fargate API tasks (AZ A) and is omitted for Fargate API tasks (AZ B).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The container image pull edge is drawn from ECR to the ECS cluster and service control plane rather than to the Fargate tasks that pull the images.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B delivers a comprehensive, well-segmented Multi-AZ container architecture with three-tier subnets, ECS Fargate, Multi-AZ RDS and ElastiCache, per-AZ NAT Gateways, Secrets Manager for both database rotation and payment API keys, KMS encryption, WAF, ACM, Route 53, and CloudTrail."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A single NAT Gateway is deployed only in Public subnet AZ2, creating a single point of failure that violates requirement R14 if AZ2 becomes unavailable and AZ1 private workloads need outbound connectivity.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "Product updates rely on uncoordinated dual-writes from the Web API containers to Aurora and SQS, and neither the Web API nor the Index sync Lambda invalidates or updates the ElastiCache Product page cache when prices change.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/caching-patterns.html"
+        },
+        {
+          "severity": "major",
+          "description": "The initial bulk load and periodic reconciliation of 2 million products between Aurora and OpenSearch are assigned to a single Lambda function, which risks exceeding AWS Lambda's hard 15-minute execution timeout.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from NAT Gateway directly to the OpenSearch domain is semantically inaccurate, and Secrets Manager read edges are missing for Web API tasks (AZ2) and the Lambda functions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects suitable core services with ECS Fargate, Aurora PostgreSQL, ElastiCache, and OpenSearch, but suffers from application dual-writes without cache invalidation, a single-AZ NAT Gateway, and a single Lambda function attempting to bulk-load and diff 2 million products."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only a single NAT Gateway is provisioned in Public subnet A (and is left disconnected in the graph), creating a single-AZ bottleneck if private workloads in AZ B require outbound internet/NAT access during an AZ A failure.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront caches product pages at the edge, but the Index updater Lambda only invalidates ElastiCache and does not invalidate CloudFront, requiring strict short TTL headers to meet the one-minute freshness window.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "RDS Proxy is included for connection pooling but AWS Secrets Manager (which RDS Proxy requires for database credentials) is omitted from the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Application Load Balancer is modeled as two separate per-AZ nodes and the Amazon ECS orchestration service node is omitted.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses an effective CDC pipeline with AWS DMS, Kinesis Data Streams, and Lambda to stream ordered updates from Aurora to OpenSearch and invalidate ElastiCache within the one-minute SLA while handling initial full loads without Lambda timeout issues."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "File validation runs asynchronously on S3 upload events while the Claim API handler starts the Step Functions workflow on submission, requiring workflow synchronization to ensure file validation completes before automated checks run.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Customers and adjusters share a single Cognito user pool and API Gateway REST API, so the Claim API handler Lambda must strictly enforce Cognito group claims on adjuster-only endpoints.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A provides a complete, auditable, and resilient serverless claims architecture using CloudFront, S3 presigned uploads, API Gateway, Lambda, Step Functions with task tokens and 14-day timeouts, Textract, DynamoDB claims and append-only audit tables, SES, CloudWatch, and CloudTrail."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design omits a database to store claim records or Step Functions task tokens and lacks any integration from Claims API to resume the paused workflow when an adjuster submits an approval or rejection.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html"
+        },
+        {
+          "severity": "major",
+          "description": "Customers upload documents to Claims Storage (S3) via presigned URLs and Automated Checks validates claims, but no compute service connects to S3 to generate presigned URLs and Automated Checks has no read connection to S3.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Audit Logs and Metrics (CloudWatch) node is completely disconnected with zero edges from any service, and CloudTrail is omitted, leaving the auditability requirement (R5) unimplemented in the data flow.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Claims API is configured with a Cognito authorizer tied to the Adjuster User Pool, leaving customer claim submissions either blocked by adjuster authentication or unauthenticated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No web hosting (such as S3 and CloudFront) is included to serve the customer web form required by R1.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B identifies the basic building blocks of S3, API Gateway, Step Functions, Lambda, and SES, but omits essential components and connections including a database for claims and task tokens, presigned URL generation, S3 reads for automated checks, web form hosting, and connected audit logging."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "Design B provides proper three-tier subnet isolation (public, private app, private data), validates Cognito JWTs appropriately for a B2B REST API instead of relying on ALB cookie redirects, and includes WAF, ACM, Route 53, ECR, KMS customer-managed keys, and CloudTrail."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "Design B uses CDC (DMS to Kinesis Data Streams to Lambda) to guarantee ordered, reliable index updates and ElastiCache invalidations within one minute while handling the 2-million-product initial load via DMS, avoiding Design A's dual-write race conditions, stale cache reads, and 15-minute Lambda timeout risk."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "Design A is a complete, working architecture with Step Functions task-token callbacks, DynamoDB tables for claims and tamper-evident auditing, Textract document analysis, S3 presigned URL generation, and web form hosting, whereas Design B lacks a database, leaves CloudWatch disconnected, and omits S3 connections for presigned URLs and automated checks."
+    }
+  ]
+}

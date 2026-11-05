@@ -1,0 +1,188 @@
+{
+  "reviews": [
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Amazon ECR (N9) is marked as an UNRESOLVED service node, and the edge from API tasks in AZ B (N8) to CloudWatch (N15) is omitted while present for AZ A (N7).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarifying questions R14, R15, and R16 are left phrased as questions rather than stating the architect's chosen target values and authentication mechanism.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, well-connected, Multi-AZ serverless container architecture using ALB, ECS on Fargate, Multi-AZ RDS PostgreSQL, Multi-AZ ElastiCache, Secrets Manager rotation, and per-AZ NAT Gateways."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "RDS Proxy (N10) states it uses managed database credentials, but there is no edge connecting AWS Secrets Manager (N11) to RDS Proxy; additionally, both NAT Gateways (N13, N14) are completely disconnected orphan nodes with no edges.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Stacking an API Gateway REST API in front of an internal Application Load Balancer, and adding RDS Proxy in front of long-lived Fargate tasks, introduces extra cost and latency compared to using an internet-facing ALB directly.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API container tasks (N8) are placed only in Private subnet A in the container tree while the ALB and NAT gateways are modeled per-AZ across both Availability Zones.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the functional and Multi-AZ requirements with Cognito OAuth 2.0 authentication, but leaves the NAT Gateways and Secrets Manager-to-RDS Proxy connections unlinked in the graph and adds unnecessary proxy layers."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Fargate task is placed in a public subnet (which avoids NAT Gateway and VPC endpoint costs), but the design should explicitly state that a zero-ingress security group is required so the task is not reachable from the internet.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "S3 presigned URLs generated at 02:00 using default Fargate task role temporary STS credentials may expire before managers open their emails in the morning unless the IAM role session duration is configured appropriately.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, very low-cost serverless batch architecture using EventBridge Scheduler, Fargate for the 25-minute job, Secrets Manager, DynamoDB, S3 with 1-year lifecycle expiration, and SES."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Fargate task (N3) is placed in an isolated private subnet with no NAT Gateway, no public subnet, and no VPC endpoints, meaning the task cannot pull its container image from ECR or reach S3, SES, and CloudWatch Logs.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Omits how database credentials for Aurora PostgreSQL are stored and retrieved (such as Secrets Manager) and where the list of 40 regional manager email addresses is maintained.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Provides strong report download security using Cognito, API Gateway, and Lambda on-demand presigned URLs, but places the Fargate task in a private subnet with no egress path to ECR, S3, or SES."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "R10 notes that menu updates should appear shortly after upload without serving stale cached content, but the CloudFront node description does not explicitly mention setting short Cache-Control TTLs or running cache invalidations.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An accurate, low-cost static website architecture using Route 53, CloudFront, a private S3 bucket with OAC and versioning, least-privilege IAM for staff uploads, and ACM/CloudWatch properly placed in us-east-1."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Places the ACM certificate for CloudFront in a generic Primary Region without noting that CloudFront requires public ACM certificates (and publishes standard metrics) specifically in us-east-1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Does not include an IAM access mechanism for bakery staff uploading to the private S3 bucket, nor S3 versioning to recover from accidental overwrites during manual uploads.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "States that replacing files in S3 updates the site content without addressing CloudFront cache invalidation or TTL settings.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Uses the right core stack of Route 53, CloudFront, ACM, and private S3, but misses the us-east-1 requirement for CloudFront ACM certificates, S3 versioning, and IAM access details for staff uploads."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "saas-containers",
+      "better": "A",
+      "why": "Design A uses a cleaner, more cost-effective internet-facing ALB to Fargate architecture and properly connects both NAT Gateways and Secrets Manager in the graph, whereas Design B leaves the NAT Gateways disconnected and stacks API Gateway, ALB, and RDS Proxy unnecessarily."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "A",
+      "why": "Design A is simpler, explicitly accounts for database credentials in Secrets Manager and recipient storage in DynamoDB, and has a working network path for the Fargate task without expensive NAT Gateways, whereas Design B places the Fargate task in a private subnet with no NAT or VPC endpoints to reach ECR, S3, or SES."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "A",
+      "why": "Design A accurately places the CloudFront ACM certificate and CloudWatch metrics in us-east-1, enables S3 versioning to protect against manual upload errors, and models least-privilege IAM access for bakery staff."
+    }
+  ]
+}
