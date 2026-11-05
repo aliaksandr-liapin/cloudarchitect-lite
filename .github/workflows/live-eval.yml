@@ -28,19 +28,21 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: live-eval-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   live-eval:
     # Pull requests run only with the `live-eval` label and not as drafts; manual dispatch always runs.
+    # Adding any other label to a labelled PR must not start (and so cancel) a paid run.
     # Fork PRs never get the secret, so they skip the job instead of running without it.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
       contains(github.event.pull_request.labels.*.name, 'live-eval') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'live-eval') &&
       github.event.pull_request.head.repo.full_name == github.repository)
+    # Job-level, so a run whose job is skipped (e.g. another label added) never cancels one in flight.
+    concurrency:
+      group: live-eval-${{ github.ref }}
+      cancel-in-progress: true
     name: Live generator evaluation (spends API budget)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -52,7 +54,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Without the secret (forks, Dependabot) the script skips and exits 0.
+      # --gate: a requested model whose key secret is missing fails the run instead of being skipped.
       - name: Run live eval with gate
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
