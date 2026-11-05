@@ -2,7 +2,7 @@ name: Live eval
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [labeled, synchronize, opened, reopened, ready_for_review]
     paths:
       - packages/generator/**
       - packages/catalog/data/**
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       models:
-        description: Comma-separated model choices (haiku, sonnet)
+        description: Comma-separated model choices (haiku, sonnet, gpt-luna, gpt-sol, gemini-flash-lite, gemini-argon)
         default: haiku
       repeats:
         description: Runs per scenario
@@ -34,11 +34,12 @@ concurrency:
 
 jobs:
   live-eval:
-    # Draft PRs skip the paid run; it runs when the PR is marked ready, and on manual dispatch.
+    # Pull requests run only with the `live-eval` label and not as drafts; manual dispatch always runs.
     # Fork PRs never get the secret, so they skip the job instead of running without it.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
+      contains(github.event.pull_request.labels.*.name, 'live-eval') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     name: Live generator evaluation (spends API budget)
     runs-on: ubuntu-latest
@@ -55,6 +56,8 @@ jobs:
       - name: Run live eval with gate
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MODELS: ${{ inputs.models || 'haiku' }}
           REPEATS: ${{ inputs.repeats || '1' }}
           MAX_USD: ${{ inputs.max_usd || '0.50' }}

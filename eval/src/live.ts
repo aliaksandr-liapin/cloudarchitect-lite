@@ -2,13 +2,20 @@
  * Live eval: the production generator (extraction, clarification answers, generation with repair)
  * on every benchmark scenario, scored by the harness and checked by the regression gate.
  *
- * Usage: pnpm eval:live [--models haiku,sonnet] [--repeats 1] [--scenarios id,id]
- *        [--concurrency 4] [--max-usd 0.50] [--gate]
- * Reads ANTHROPIC_API_KEY from the environment or the repo-root .env. Results go to
+ * Usage: pnpm eval:live [--models haiku,gpt-luna,gemini-flash-lite] [--repeats 1]
+ *        [--scenarios id,id] [--concurrency 4] [--max-usd 0.50] [--gate]
+ * Reads ANTHROPIC_API_KEY, OPENAI_API_KEY and GEMINI_API_KEY from the environment or the
+ * repo-root .env; a model whose provider key is missing is skipped. --max-usd is one shared cap. Results go to
  * eval/results/live/<runId>/. Console output carries ids, scores, cost and latency only.
  */
 import { awsCatalog } from '@cloudarchitect/catalog';
-import { ModelChoice, modelOption, validateProject, YOU_DECIDE } from '@cloudarchitect/domain';
+import {
+  ModelChoice,
+  modelOption,
+  validateProject,
+  YOU_DECIDE,
+  type Provider,
+} from '@cloudarchitect/domain';
 import {
   anthropicClient,
   costMicroUsd,
@@ -16,6 +23,8 @@ import {
   extractionModel,
   generateArchitecture,
   GenerationError,
+  googleClient,
+  openaiClient,
   type LlmClient,
 } from '@cloudarchitect/generator';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -26,12 +35,18 @@ import { Scenario, scoreCandidate, type ScenarioResult } from './harness.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const envFile = join(root, '..', '.env');
-if (!process.env.ANTHROPIC_API_KEY && existsSync(envFile)) process.loadEnvFile(envFile);
-const apiKey = process.env.ANTHROPIC_API_KEY;
-if (!apiKey) {
-  console.log('ANTHROPIC_API_KEY not set — live eval skipped');
-  process.exit(0);
-}
+const KEY_VAR: Record<Provider, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GEMINI_API_KEY',
+};
+const PROVIDER_CLIENT: Record<Provider, (apiKey: string) => LlmClient> = {
+  anthropic: anthropicClient,
+  openai: openaiClient,
+  google: googleClient,
+};
+if (Object.values(KEY_VAR).some((v) => !process.env[v]) && existsSync(envFile))
+  process.loadEnvFile(envFile);
 
 const { values: args } = parseArgs({
   options: {
@@ -49,7 +64,23 @@ const positiveInt = (name: string, v: string) => {
   if (!Number.isInteger(n) || n < 1) throw new Error(`--${name} must be a positive integer`);
   return n;
 };
-const models = args.models.split(',').map((m) => ModelChoice.parse(m));
+const requested = args.models.split(',').map((m) => ModelChoice.parse(m));
+// One client per provider that has a key; a model without its provider key is skipped.
+const clients: Partial<Record<Provider, LlmClient>> = {};
+for (const p of Object.keys(KEY_VAR) as Provider[]) {
+  const key = process.env[KEY_VAR[p]];
+  if (key) clients[p] = PROVIDER_CLIENT[p](key);
+}
+const models = requested.filter((m) => {
+  const varName = KEY_VAR[modelOption(m).provider];
+  if (clients[modelOption(m).provider]) return true;
+  console.log(`${m}: ${varName} not set — skipped`);
+  return false;
+});
+if (models.length === 0) {
+  console.log('No requested model has a provider key — live eval skipped');
+  process.exit(0);
+}
 const repeats = positiveInt('repeats', args.repeats);
 const concurrency = positiveInt('concurrency', args.concurrency);
 const maxUsd = Number(args['max-usd']);
@@ -84,7 +115,6 @@ interface LiveRecord {
 
 class SpendCapReached extends Error {}
 
-const real = anthropicClient(apiKey);
 let spentMicro = 0;
 const capMicro = maxUsd * 1e6;
 /** Set when the cap stopped a call or left jobs unscheduled; such a run fails the gate. */
@@ -97,6 +127,7 @@ async function runJob(s: Scenario, model: ModelChoice, repeat: number): Promise<
   let lastText = '';
   let questionTopics: string[] = [];
   // Each call's cost is counted as soon as it returns; the cap is checked before every call.
+  const real = clients[modelOption(model).provider]!;
   const llm: LlmClient = async (req) => {
     if (spentMicro >= capMicro) throw new SpendCapReached(`--max-usd ${maxUsd} reached`);
     const res = await real(req);
@@ -183,7 +214,7 @@ async function worker() {
     records.push(r);
     const status = r.ok ? (r.score?.passed ? 'PASS' : 'fail') : `ERROR ${r.error}`;
     console.log(
-      `${r.model.padEnd(7)} ${r.scenarioId.padEnd(28)} #${r.repeat} ${status} $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
+      `${r.model.padEnd(17)} ${r.scenarioId.padEnd(28)} #${r.repeat} ${status} $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
     );
   }
 }
