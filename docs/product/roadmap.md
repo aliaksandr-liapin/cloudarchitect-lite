@@ -17,7 +17,7 @@ four weeks, each with its own hook, a LinkedIn post and a dev.to article
 ([dev.to/aliaksandrliapin](https://dev.to/aliaksandrliapin)). Building-in-public posts (design
 decisions, ADRs, eval numbers, bug stories) fill the weeks between releases.
 
-**Now:** 0.3.0 is out (released 2026-11-xx). Next: 0.4, Second opinion.
+**Now:** 0.3.0 is out (released 2026-11-10). Next: 0.4, Second opinion.
 
 ```mermaid
 gantt
@@ -28,9 +28,9 @@ gantt
     section Done
     Prototype and AI, Gate A passed      :done,   p02, 2026-10-13, 2026-10-26
     0.2 Public MVP, released 2026-11-04  :done,   r02, 2026-10-27, 2026-11-04
-    0.3 Claude vs GPT vs Gemini          :done,   r03, 2026-11-05, 2026-11-30
+    0.3 Claude vs GPT vs Gemini          :done,   r03, 2026-11-05, 2026-11-10
     section Next
-    0.4 Second opinion                   :active, r04, 2026-12-16, 2027-01-20
+    0.4 Second opinion                   :active, r04, 2026-11-11, 2027-01-20
     0.5 Edit with AI                     :        r05, 2027-01-21, 2027-02-17
     0.6 Cost estimate                    :        r06, 2027-02-18, 2027-03-17
     section Later
@@ -51,9 +51,9 @@ hosted Privacy Policy and Terms).
 | Release | Target | Theme | Scope | Announcement hook / article |
 |---|---|---|---|---|
 | 0.2 | ✅ 2026-11-04 | **Public MVP** (released: 0.2.0, 0.2.1) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install (tested on macOS and Linux; Windows expected to work, not hand-tested yet); PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 25 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
-| 0.3 | ✅ 2026-11-xx | **Claude vs GPT vs Gemini** (released: 0.3.0) | Claude, OpenAI and Gemini, two models each (four listed after the owner's bar); public blind benchmark with a three-provider review panel ([report](phase3-provider-benchmark.md), [design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
+| 0.3 | ✅ 2026-11-10 | **Claude vs GPT vs Gemini** (released: 0.3.0) | Claude, OpenAI and Gemini, two models each (four listed after the owner's bar); public blind benchmark with a three-provider review panel ([report](phase3-provider-benchmark.md), [design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
 | 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
-| 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo | Diff-based AI editing of a graph |
+| 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo. OpenAI strict-mode schema conversion does not support `z.record` or unions, and the patch schema uses both: the OpenAI adapter needs work first | Diff-based AI editing of a graph |
 | 0.6 | Mar 2027 | **Cost estimate** | Monthly AWS cost estimate per diagram from traffic assumptions | "What will this architecture cost?" |
 | 0.7 | Apr 2027 | **Diagram to code** | CloudFormation / Terraform skeleton export | "From a sentence to deployable infrastructure" |
 | 0.8 | May 2027 | **Fully offline** | Local models via Ollama; benchmark update | "Free, private, no API key" |

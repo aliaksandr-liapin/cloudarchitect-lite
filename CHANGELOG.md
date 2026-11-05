@@ -4,7 +4,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-11-xx
+## [0.3.0] - 2026-11-10
 
 Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-provider benchmark.
 
@@ -22,6 +22,10 @@ Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-pr
 - Models whose provider has no key are not offered; the editor shows "Add a key in setup" for them.
 - Daily and monthly spending limits count all providers together.
 - README, installation guide and `.env.example` cover the three providers; the setup wizard's key step is now "AI providers".
+
+### Deprecated
+
+- Kept for 0.2 web clients; removal planned in 0.4: the setup status field `keyFromEnvironment` (use `providers`), a verify-key request body without `provider` (treated as Anthropic), and `apiKey` in the setup request (`SetupInput.apiKey`; use `apiKeys.anthropic`).
 
 ### Upgrade notes
 
