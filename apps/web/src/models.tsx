@@ -122,16 +122,6 @@ export function ModelGroups({
 
 const STORAGE_KEY = 'cloudarchitect.model';
 
-/** The model the user picked in the editor panel, if any and readable; the server default applies otherwise. */
-export function readModelChoice(): ModelChoice | undefined {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return listedModels().some((o) => o.id === saved) ? (saved as ModelChoice) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * The browser's saved choice if the server still enables it and has a key for it; otherwise the
  * server default. Without a default (no enabled model has a key) nothing is selected and
@@ -149,10 +139,26 @@ export function pickChoice(
   return m.enabled.includes(id) && m.available?.[id] !== false ? id : m.defaultModel;
 }
 
-/** Editor panel: pick the model for AI operations; models this instance does not enable are disabled. */
-export function AiModelPanel() {
-  const [enabled, setEnabled] = useState<readonly ModelChoice[]>();
-  const [available, setAvailable] = useState<Partial<Record<ModelChoice, boolean>>>();
+export interface ModelState {
+  enabled?: readonly ModelChoice[];
+  available?: Partial<Record<ModelChoice, boolean>>;
+  /** The model Generate sends and the panel shows as selected; undefined lets the server decide. */
+  choice?: ModelChoice;
+  offline: boolean;
+  select: (id: ModelChoice) => void;
+}
+
+const readSaved = (): string | null => {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null; // storage blocked: fall back to the server default
+  }
+};
+
+/** One resolved choice (saved pick checked against `/api/models`) shared by the panel and Generate. */
+export function useModelChoice(): ModelState {
+  const [info, setInfo] = useState<Pick<ModelState, 'enabled' | 'available'>>({});
   const [choice, setChoice] = useState<ModelChoice>();
   const [offline, setOffline] = useState(false);
 
@@ -160,15 +166,8 @@ export function AiModelPanel() {
     if (DEMO) return; // read-only benchmark table, nothing to fetch
     api.models().then(
       (m) => {
-        setEnabled(m.enabled);
-        setAvailable(m.available);
-        let saved: string | null = null;
-        try {
-          saved = localStorage.getItem(STORAGE_KEY);
-        } catch {
-          /* storage blocked: fall back to the server default */
-        }
-        setChoice(pickChoice(saved, m));
+        setInfo({ enabled: m.enabled, available: m.available });
+        setChoice(pickChoice(readSaved(), m));
       },
       () => setOffline(true),
     );
@@ -183,6 +182,12 @@ export function AiModelPanel() {
     }
   };
 
+  return { ...info, choice, offline, select };
+}
+
+/** Editor panel: pick the model for AI operations; models this instance does not enable are disabled. */
+export function AiModelPanel({ state }: { state: ModelState }) {
+  const { enabled, available, choice, offline, select } = state;
   return (
     <Collapsible id="model" title="AI model" defaultOpen={false}>
       {offline && !DEMO && (

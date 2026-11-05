@@ -84,6 +84,13 @@ describe('pickChoice', () => {
   it('falls back to the default when the saved model lost its key', () => {
     expect(pickChoice('gpt-luna', { ...server, available: all })).toBe('haiku');
   });
+  it('resolves the model Generate sends: a saved choice without a key gives the server default', () => {
+    const request = pickChoice('gpt-luna', { ...server, available: all });
+    expect(request).toBe(server.defaultModel);
+  });
+  it('falls back to the default when the saved model is no longer enabled', () => {
+    expect(pickChoice('sonnet', { ...server, available: all })).toBe('haiku');
+  });
   it('selects nothing when there is no default', () => {
     expect(pickChoice(null, { enabled: [] })).toBeUndefined();
   });

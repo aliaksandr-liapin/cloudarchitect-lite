@@ -307,8 +307,8 @@ export function SetupWizard() {
     const current = selection.models;
     const next = current.includes(id) ? current.filter((m) => m !== id) : [...current, id];
     setModels(next);
-    if (!next.includes(chosenDefault ?? id) && next[0]) setDefaultModel(next[0]);
-    else if (chosenDefault) setDefaultModel(chosenDefault);
+    const keep = chosenDefault && next.includes(chosenDefault) ? chosenDefault : next[0];
+    if (keep) setDefaultModel(keep);
   };
 
   const cost = chosenDefault && modelOption(chosenDefault).benchmark?.costPerOperationUsd;
