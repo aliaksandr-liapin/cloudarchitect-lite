@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { jsonOutputFormat } from './llm.js';
 import { openaiClient, restoreOptional, strictSchema, type JsonSchema } from './openai.js';
 import { z } from 'zod';
+import { awsCatalog } from '@cloudarchitect/catalog';
+import { generationSchema } from './contract.js';
 
 const original: JsonSchema = {
   type: 'object',
@@ -145,5 +147,31 @@ describe('openaiClient', () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).not.toContain('SECRET');
     expect((err as { status?: number }).status).toBe(401);
+  });
+});
+
+describe('strictSchema and $ref', () => {
+  function refsWithSiblings(node: unknown, path = ''): string[] {
+    if (Array.isArray(node)) return node.flatMap((n, i) => refsWithSiblings(n, `${path}/${i}`));
+    if (typeof node !== 'object' || node === null) return [];
+    const o = node as Record<string, unknown>;
+    const here = '$ref' in o && Object.keys(o).length > 1 ? [path] : [];
+    return here.concat(Object.entries(o).flatMap(([k, v]) => refsWithSiblings(v, `${path}/${k}`)));
+  }
+  it('keeps $ref bare and hoists the description of an optional ref property', () => {
+    const s = strictSchema({
+      type: 'object',
+      properties: { t: { $ref: '#/$defs/e', description: 'kind' } },
+      $defs: { e: { type: 'string' } },
+    }) as any;
+    expect(s.properties.t).toEqual({
+      description: 'kind',
+      anyOf: [{ $ref: '#/$defs/e' }, { type: 'null' }],
+    });
+  });
+  it('leaves no keyword beside $ref in the real generation schema', () => {
+    const fmt = jsonOutputFormat(generationSchema(awsCatalog)) as { schema: JsonSchema };
+    expect(refsWithSiblings(fmt.schema)).not.toEqual([]); // the premise: the input does have them
+    expect(refsWithSiblings(strictSchema(fmt.schema))).toEqual([]);
   });
 });

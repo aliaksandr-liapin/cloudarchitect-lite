@@ -14,13 +14,19 @@ function isObjectSchema(s: JsonSchema): boolean {
   return s.type === 'object' || isObj(s.properties);
 }
 
-function walk(s: unknown): unknown {
+/** Strict mode allows no keywords beside `$ref`; returns the bare ref and the description to hoist. */
+function bareRef(p: unknown): { node: unknown; description?: unknown } {
+  if (!isObj(p) || typeof p.$ref !== 'string') return { node: p };
+  return { node: { $ref: p.$ref }, description: p.description };
+}
+
+function walk(s: unknown, keepRefSiblings = false): unknown {
   if (Array.isArray(s)) return s.map(walk);
   if (!isObj(s)) return s;
   const out: JsonSchema = {};
   for (const [k, v] of Object.entries(s)) {
     if (k === 'properties' && isObj(v)) {
-      out[k] = Object.fromEntries(Object.entries(v).map(([n, p]) => [n, walk(p)]));
+      out[k] = Object.fromEntries(Object.entries(v).map(([n, p]) => [n, walk(p, true)]));
     } else if (k === '$defs' || k === 'definitions') {
       out[k] = isObj(v) ? Object.fromEntries(Object.entries(v).map(([n, p]) => [n, walk(p)])) : v;
     } else if (k === 'enum' || k === 'const' || k === 'default' || k === 'required') {
@@ -29,12 +35,17 @@ function walk(s: unknown): unknown {
       out[k] = walk(v);
     }
   }
+  if (!keepRefSiblings && typeof out.$ref === 'string' && Object.keys(out).length > 1)
+    return { $ref: out.$ref };
   if (isObjectSchema(out)) {
     const props = isObj(out.properties) ? out.properties : {};
     const required = new Set(Array.isArray(out.required) ? (out.required as string[]) : []);
     const next: JsonSchema = {};
     for (const [n, p] of Object.entries(props)) {
-      next[n] = required.has(n) ? p : { anyOf: [p, NULL_SCHEMA] };
+      const { node, description } = bareRef(p);
+      next[n] = required.has(n)
+        ? node
+        : { ...(description !== undefined ? { description } : {}), anyOf: [node, NULL_SCHEMA] };
     }
     out.properties = next;
     out.required = Object.keys(next);
