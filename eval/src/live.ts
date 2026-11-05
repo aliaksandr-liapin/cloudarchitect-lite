@@ -5,7 +5,8 @@
  * Usage: pnpm eval:live [--models haiku,gpt-luna,gemini-flash-lite] [--repeats 1]
  *        [--scenarios id,id] [--concurrency 4] [--max-usd 0.50] [--gate]
  * Reads ANTHROPIC_API_KEY, OPENAI_API_KEY and GEMINI_API_KEY from the environment or the
- * repo-root .env; a model whose provider key is missing is skipped. --max-usd is one shared cap. Results go to
+ * repo-root .env; a model whose provider key is missing is skipped, or with --gate fails the run before
+ * any call. --max-usd is one shared cap. Results go to
  * eval/results/live/<runId>/. Console output carries ids, scores, cost and latency only.
  */
 import { awsCatalog } from '@cloudarchitect/catalog';
@@ -30,16 +31,11 @@ import {
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { evaluateGate, type LiveSummary } from './gate.js';
+import { evaluateGate, KEY_VAR, modelsWithKeys, type LiveSummary } from './gate.js';
 import { Scenario, scoreCandidate, type ScenarioResult } from './harness.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const envFile = join(root, '..', '.env');
-const KEY_VAR: Record<Provider, string> = {
-  anthropic: 'ANTHROPIC_API_KEY',
-  openai: 'OPENAI_API_KEY',
-  google: 'GEMINI_API_KEY',
-};
 const PROVIDER_CLIENT: Record<Provider, (apiKey: string) => LlmClient> = {
   anthropic: anthropicClient,
   openai: openaiClient,
@@ -65,18 +61,19 @@ const positiveInt = (name: string, v: string) => {
   return n;
 };
 const requested = args.models.split(',').map((m) => ModelChoice.parse(m));
-// One client per provider that has a key; a model without its provider key is skipped.
+// One client per provider that has a key; a model without its provider key is skipped (gate: fails).
 const clients: Partial<Record<Provider, LlmClient>> = {};
 for (const p of Object.keys(KEY_VAR) as Provider[]) {
   const key = process.env[KEY_VAR[p]];
   if (key) clients[p] = PROVIDER_CLIENT[p](key);
 }
-const models = requested.filter((m) => {
-  const varName = KEY_VAR[modelOption(m).provider];
-  if (clients[modelOption(m).provider]) return true;
-  console.log(`${m}: ${varName} not set — skipped`);
-  return false;
-});
+const keyed = modelsWithKeys(requested, (p) => Boolean(clients[p]), args.gate);
+for (const w of keyed.warnings) console.log(w);
+if (keyed.failures.length) {
+  for (const f of keyed.failures) console.error(f);
+  process.exit(1);
+}
+const { models } = keyed;
 if (models.length === 0) {
   console.log('No requested model has a provider key — live eval skipped');
   process.exit(0);

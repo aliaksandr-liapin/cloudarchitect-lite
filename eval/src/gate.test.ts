@@ -1,6 +1,6 @@
 import { listedModels, modelOption } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
-import { evaluateGate, LISTING_BAR, LIVE_GATE, type LiveSummary } from './gate.js';
+import { evaluateGate, LISTING_BAR, LIVE_GATE, modelsWithKeys, type LiveSummary } from './gate.js';
 
 const benchmark = modelOption('haiku').benchmark!.costPerOperationUsd;
 const ok: LiveSummary = {
@@ -74,4 +74,27 @@ describe('listed models', () => {
         expect(b.blindMedianScore).toBeGreaterThanOrEqual(LISTING_BAR.blindMedianScore);
     },
   );
+});
+
+describe('models without a provider key', () => {
+  const has = (p: string) => p === 'anthropic';
+
+  it('are skipped with a warning without --gate', () => {
+    const r = modelsWithKeys(['haiku', 'gpt-sol'], has, false);
+    expect(r.models).toEqual(['haiku']);
+    expect(r.failures).toEqual([]);
+    expect(r.warnings).toEqual(['gpt-sol: OPENAI_API_KEY not set — skipped']);
+  });
+
+  it('fail the gate, so a missing CI secret cannot pass', () => {
+    const r = modelsWithKeys(['haiku', 'gemini-argon'], has, true);
+    expect(r.models).toEqual(['haiku']);
+    expect(r.failures).toEqual(['gemini-argon: GEMINI_API_KEY not set — gate failed']);
+    expect(modelsWithKeys(['gpt-sol'], () => false, true).failures).toHaveLength(1);
+    expect(modelsWithKeys(['haiku'], has, true)).toEqual({
+      models: ['haiku'],
+      warnings: [],
+      failures: [],
+    });
+  });
 });

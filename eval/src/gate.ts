@@ -1,3 +1,33 @@
+import { modelOption, type ModelChoice, type Provider } from '@cloudarchitect/domain';
+
+/** Env var holding each provider's API key. */
+export const KEY_VAR: Record<Provider, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GEMINI_API_KEY',
+};
+
+/**
+ * The requested models whose provider has a key. A missing key is a warning, except with `--gate`:
+ * there it fails the run, so a missing CI secret can never produce a green gate.
+ */
+export function modelsWithKeys(
+  requested: readonly ModelChoice[],
+  hasKey: (p: Provider) => boolean,
+  gate: boolean,
+): { models: ModelChoice[]; warnings: string[]; failures: string[] } {
+  const models: ModelChoice[] = [];
+  const warnings: string[] = [];
+  const failures: string[] = [];
+  for (const m of requested) {
+    const provider = modelOption(m).provider;
+    if (hasKey(provider)) models.push(m);
+    else if (gate) failures.push(`${m}: ${KEY_VAR[provider]} not set — gate failed`);
+    else warnings.push(`${m}: ${KEY_VAR[provider]} not set — skipped`);
+  }
+  return { models, warnings, failures };
+}
+
 /** Summary of one model's live generator runs, as written to `summary.json`. */
 export interface LiveSummary {
   model: string;
