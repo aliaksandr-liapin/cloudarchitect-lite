@@ -33,6 +33,7 @@ const message = (err: unknown) =>
 type CheckState = 'unchecked' | 'checking' | 'valid' | 'invalid' | 'unreachable';
 type Sources = Record<Provider, KeySource>;
 type Checks = Record<Provider, CheckState>;
+type Removed = Record<Provider, boolean>;
 
 const KEY_PAGES: Record<Provider, { href: string; text: string; placeholder: string }> = {
   anthropic: {
@@ -65,6 +66,23 @@ export function keySources(status?: {
     }
   );
 }
+
+/** Key sources once the saved keys marked for removal are gone; environment keys cannot be removed. */
+export const afterRemovals = (sources: Sources, removed: Removed): Sources =>
+  Object.fromEntries(
+    PROVIDERS.map((p) => [p, sources[p] === 'saved' && removed[p] ? 'none' : sources[p]]),
+  ) as Sources;
+
+/** Providers whose saved key the server deletes on finish (`removeKeys`). */
+export const removedKeys = (sources: Sources, removed: Removed) =>
+  PROVIDERS.filter((p) => sources[p] === 'saved' && removed[p]);
+
+/** Review line: saved keys removed and not replaced by a new checked key. */
+export const removalSummary = (sources: Sources, removed: Removed, checks: Checks) =>
+  names(
+    removedKeys(sources, removed).filter((p) => checks[p] !== 'valid'),
+    'and',
+  );
 
 /** A provider counts when its key is from the environment, saved, or checked as working in this session. */
 export const hasKey = (sources: Sources, checks: Checks, p: Provider) =>
@@ -121,21 +139,26 @@ export function ProvidersStep({
   sources,
   keys,
   checks,
+  removed,
   onKey,
   onCheck,
+  onRemove,
 }: {
   sources: Sources;
   keys: Record<Provider, string>;
   checks: Checks;
+  /** Saved keys marked for removal on finish. */
+  removed: Removed;
   onKey: (p: Provider, value: string) => void;
   onCheck: (p: Provider) => void;
+  onRemove: (p: Provider, remove: boolean) => void;
 }) {
   return (
     <section>
       <h1>AI providers</h1>
       <p>
         Add a key for at least one provider. Each key is used only for that provider&apos;s models,
-        and you can add more later by re-running setup.
+        and you can add, replace or remove keys later by re-running setup.
       </p>
       <div className="provider-cards">
         {PROVIDERS.map((p) => {
@@ -149,9 +172,21 @@ export function ProvidersStep({
                 <p className="ok">✓ Set by environment (.env). Nothing to enter here.</p>
               ) : (
                 <>
-                  {sources[p] === 'saved' && check !== 'valid' && (
-                    <p className="ok">✓ A key is saved. Enter a new one only to replace it.</p>
-                  )}
+                  {sources[p] === 'saved' &&
+                    check !== 'valid' &&
+                    (removed[p] ? (
+                      <p className="notice-inline">
+                        Will be removed when you finish setup.{' '}
+                        <button className="link" onClick={() => onRemove(p, false)}>
+                          Undo
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="ok">
+                        ✓ Saved key. Enter a new one only to replace it.{' '}
+                        <button onClick={() => onRemove(p, true)}>Remove saved key</button>
+                      </p>
+                    ))}
                   <p className="small">
                     Create a key at{' '}
                     <a href={page.href} target="_blank" rel="noreferrer">
@@ -214,6 +249,11 @@ export function SetupWizard() {
     openai: 'unchecked',
     google: 'unchecked',
   });
+  const [removed, setRemoved] = useState<Removed>({
+    anthropic: false,
+    openai: false,
+    google: false,
+  });
   const [models, setModels] = useState<ModelChoice[]>(['haiku']);
   const [defaultModel, setDefaultModel] = useState<ModelChoice>('haiku');
   const [dailyBudgetUsd, setDaily] = useState(5);
@@ -241,7 +281,9 @@ export function SetupWizard() {
   }, []);
 
   const sources = keySources(status);
-  const keyed = keyedProviders(sources, checks);
+  // Models, "Next" and the review use the keys left after the removals marked in step 2.
+  const remaining = afterRemovals(sources, removed);
+  const keyed = keyedProviders(remaining, checks);
   const offered = offeredModels(keyed);
   // The configured models may name providers without a key (raw settings); only offered ones count.
   const selection = effectiveSelection(models, defaultModel, offered);
@@ -283,9 +325,11 @@ export function SetupWizard() {
           keys[p].trim(),
         ]),
       );
+      const removeKeys = removedKeys(sources, removed);
       await api.completeSetup({
         code: code.trim(),
         ...(Object.keys(apiKeys).length ? { apiKeys } : {}),
+        ...(removeKeys.length ? { removeKeys } : {}),
         models: selection.models,
         defaultModel: chosenDefault,
         dailyBudgetUsd,
@@ -409,8 +453,10 @@ export function SetupWizard() {
             sources={sources}
             keys={keys}
             checks={checks}
+            removed={removed}
             onKey={setKey}
             onCheck={checkKey}
+            onRemove={(p, remove) => setRemoved((r) => ({ ...r, [p]: remove }))}
           />
         ) : step === 2 ? (
           <section>
@@ -499,7 +545,13 @@ export function SetupWizard() {
             <Locked status={status} keys={status?.lockedByEnvironment ?? []} />
             <dl className="detail">
               <dt>AI providers</dt>
-              <dd>{providerSummary(sources, checks)}</dd>
+              <dd>{providerSummary(remaining, checks)}</dd>
+              {removalSummary(sources, removed, checks) && (
+                <>
+                  <dt>Saved keys removed</dt>
+                  <dd>{removalSummary(sources, removed, checks)}</dd>
+                </>
+              )}
               <dt>Models served</dt>
               <dd>{selection.models.map((m) => modelOption(m).label).join(', ')}</dd>
               <dt>Default model</dt>

@@ -393,6 +393,92 @@ describe('setup wizard', () => {
     expect(down.saved().OPENAI_API_KEY).toBeUndefined();
   });
 
+  it('removes a saved key, drops nothing else and keeps at least one key', async () => {
+    const { app, saved, checked, service } = wizard({}, 'valid', {
+      ANTHROPIC_API_KEY: ANT,
+      OPENAI_API_KEY: OAI,
+    });
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const res = await app.request(
+      '/api/setup/complete',
+      post('', { ...noKey, removeKeys: ['openai'], models: ['haiku'], defaultModel: 'haiku' }),
+    );
+    expect(res.status).toBe(200);
+    expect(checked).toEqual([]);
+    expect(saved().OPENAI_API_KEY).toBeUndefined();
+    expect(saved().ANTHROPIC_API_KEY).toBe(ANT);
+    expect(service.status().providers).toEqual({
+      anthropic: 'saved',
+      openai: 'none',
+      google: 'none',
+    });
+  });
+
+  it('rejects removing the last key and models of a removed provider', async () => {
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const last = wizard({}, 'valid', { OPENAI_API_KEY: OAI });
+    const none = await last.app.request(
+      '/api/setup/complete',
+      post('', { ...noKey, removeKeys: ['openai'], models: ['gpt-sol'], defaultModel: 'gpt-sol' }),
+    );
+    expect(none.status).toBe(400);
+    expect(await none.json()).toEqual({ error: 'invalid_api_key' });
+    expect(last.saved().OPENAI_API_KEY).toBe(OAI);
+
+    const two = wizard({}, 'valid', { ANTHROPIC_API_KEY: ANT, OPENAI_API_KEY: OAI });
+    const res = await two.app.request(
+      '/api/setup/complete',
+      post('', {
+        ...noKey,
+        removeKeys: ['openai'],
+        models: ['haiku', 'gpt-sol'],
+        defaultModel: 'haiku',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_settings' });
+    expect(two.saved().OPENAI_API_KEY).toBe(OAI);
+  });
+
+  it('ignores removing an environment key, and a new key wins over removal', async () => {
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const env = wizard({ OPENAI_API_KEY: OAI });
+    const res = await env.app.request(
+      '/api/setup/complete',
+      post('', { ...noKey, removeKeys: ['openai'], models: ['gpt-sol'], defaultModel: 'gpt-sol' }),
+    );
+    expect(res.status).toBe(200);
+    expect(env.service.status().providers.openai).toBe('environment');
+    expect(env.saved().OPENAI_API_KEY).toBeUndefined();
+
+    const NEW = 'sk-openai-new-0123456789abcdef';
+    const both = wizard({}, 'valid', { OPENAI_API_KEY: OAI });
+    const replaced = await both.app.request(
+      '/api/setup/complete',
+      post('', {
+        ...noKey,
+        apiKeys: { openai: NEW },
+        removeKeys: ['openai'],
+        models: ['gpt-sol'],
+        defaultModel: 'gpt-sol',
+      }),
+    );
+    expect(replaced.status).toBe(200);
+    expect(both.checked).toEqual([['openai', NEW]]);
+    expect(both.saved().OPENAI_API_KEY).toBe(NEW);
+  });
+
+  it('rejects an unknown provider in removeKeys', async () => {
+    const res = await wizard().app.request(
+      '/api/setup/complete',
+      post('', { ...input, removeKeys: ['mistral'] }),
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('is absent when the gateway runs without a wizard', async () => {
     const res = await setup().app.request('/api/setup/complete', post('', input));
     expect(res.status).toBe(404);

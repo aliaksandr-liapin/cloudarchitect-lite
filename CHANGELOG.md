@@ -12,6 +12,7 @@ Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-pr
 
 - OpenAI (GPT-6.1 Sol) and Google Gemini (Gemini 4 Argon) next to Claude Haiku 5.5 and Claude Sonnet 5.5. GPT-6 Luna and Gemini 3.5 Flash-Lite are supported but not listed: they missed the listing bar (pass rate and no-critical-defect rate of at least 85%, blind median of at least 2.0).
 - One key from any of the three providers is enough. The setup wizard has an "AI providers" step with a card per provider and a link to its key page; `OPENAI_API_KEY` and `GEMINI_API_KEY` work like `ANTHROPIC_API_KEY`.
+- Re-running setup can replace or remove a saved provider key (**Remove saved key** on its card; at least one key must remain). Keys set in `.env` are not removable in the wizard.
 - Requirements extraction runs on the selected provider's economical model, so one operation never mixes providers.
 - Benchmark: six models measured on the same code, then a blind review by a panel of three reviewers, one per provider, scored by the median. GPT-6.1 Sol scored highest (2.86 of 3). See the [report](docs/product/phase3-provider-benchmark.md).
 - [ADR-0014](docs/adr/0014-multi-provider-ai.md): multiple AI providers.

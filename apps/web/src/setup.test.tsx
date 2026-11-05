@@ -3,24 +3,31 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ProvidersStep,
+  afterRemovals,
   effectiveSelection,
   hasKey,
+  keyedProviders,
   offeredModels,
   providerSummary,
+  removalSummary,
+  removedKeys,
   welcomeKeyLine,
 } from './SetupWizard';
 
 const none = { anthropic: 'none', openai: 'none', google: 'none' } as const;
 const idle = { anthropic: 'unchecked', openai: 'unchecked', google: 'unchecked' } as const;
 const empty = { anthropic: '', openai: '', google: '' };
+const kept = { anthropic: false, openai: false, google: false };
 const render = (over: Partial<Parameters<typeof ProvidersStep>[0]> = {}) =>
   renderToStaticMarkup(
     <ProvidersStep
       sources={none}
       keys={empty}
       checks={idle}
+      removed={kept}
       onKey={vi.fn()}
       onCheck={vi.fn()}
+      onRemove={vi.fn()}
       {...over}
     />,
   );
@@ -53,6 +60,21 @@ describe('AI providers step', () => {
     const out = render({ sources: { ...none, openai: 'environment' } });
     expect(out).toContain('Set by environment');
     expect(out.match(/type="password"/g)).toHaveLength(2);
+    expect(out).not.toContain('Remove saved key');
+  });
+
+  it('offers to remove a saved key, and to undo that', () => {
+    const saved = render({ sources: { ...none, openai: 'saved' } });
+    expect(saved).toContain('Saved key');
+    expect(saved.match(/Remove saved key/g)).toHaveLength(1);
+    expect(saved).not.toContain('Undo');
+    const marked = render({
+      sources: { ...none, openai: 'saved' },
+      removed: { ...kept, openai: true },
+    });
+    expect(marked).toContain('Will be removed when you finish setup');
+    expect(marked).toContain('Undo');
+    expect(marked).not.toContain('Remove saved key');
   });
 });
 
@@ -98,5 +120,23 @@ describe('provider helpers', () => {
     ).toBe(
       'Claude (from environment), OpenAI (saved key kept), Gemini (checked ✓, stored on the server)',
     );
+  });
+
+  it('treats a saved key marked for removal as gone unless a new key was checked', () => {
+    const sources = {
+      ...none,
+      anthropic: 'saved',
+      openai: 'saved',
+      google: 'environment',
+    } as const;
+    const removed = { anthropic: true, openai: true, google: true };
+    const after = afterRemovals(sources, removed);
+    // An environment key cannot be removed.
+    expect(after).toEqual({ anthropic: 'none', openai: 'none', google: 'environment' });
+    expect(keyedProviders(after, idle)).toEqual(['google']);
+    expect(keyedProviders(after, { ...idle, openai: 'valid' })).toEqual(['openai', 'google']);
+    expect(removedKeys(sources, removed)).toEqual(['anthropic', 'openai']);
+    expect(removalSummary(sources, removed, { ...idle, openai: 'valid' })).toBe('Claude');
+    expect(removalSummary(sources, kept, idle)).toBe('');
   });
 });

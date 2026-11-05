@@ -61,7 +61,7 @@ export const api = {
       providers?: Record<Provider, KeySource>;
       keyFromEnvironment?: boolean;
       lockedByEnvironment?: string[];
-      current?: Omit<SetupRequest, 'code' | 'apiKey' | 'apiKeys'>;
+      current?: Omit<SetupRequest, 'code' | 'apiKeys' | 'removeKeys'>;
     }>('/api/setup/status'),
   verifyKey: (code: string, provider: Provider, apiKey: string) =>
     request<{ result: 'valid' | 'invalid' | 'unreachable' }>('/api/setup/verify-key', {
@@ -97,6 +97,8 @@ export interface SetupRequest {
   code: string;
   /** Keys newly entered in the wizard; saved and environment keys are not sent. */
   apiKeys?: Partial<Record<Provider, string>>;
+  /** Providers whose saved key is deleted; environment keys cannot be removed. */
+  removeKeys?: Provider[];
   models: ModelChoice[];
   defaultModel: ModelChoice;
   dailyBudgetUsd: number;

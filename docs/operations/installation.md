@@ -140,7 +140,7 @@ docker compose restart gateway
 docker compose logs gateway   # open the new setup link
 ```
 
-The wizard starts from your current values; saved API keys and the client salt are kept unless you enter a new key. Run it again to add a key for another provider.
+The wizard starts from your current values; saved API keys and the client salt are kept unless you change them. Run it again to add a key for another provider, to replace a saved key (enter and check the new one), or to remove one: press **Remove saved key** on that provider's card (**Undo** takes it back). At least one key must remain, and the provider's models are no longer offered. A key set in `.env` cannot be removed in the wizard; delete it from `.env` and restart.
 
 ## Presetting or locking values
 
@@ -156,6 +156,7 @@ Values in a `.env` file override the wizard; the wizard shows which ones are loc
 | "Could not reach" a provider              | Check the internet connection or proxy of the machine running Docker                                                                                                                               |
 | Behind an HTTP(S) proxy                   | Add `HTTPS_PROXY=http://proxy.example:3128` (and `NO_PROXY` if needed) to `.env`, then `docker compose up -d`; the gateway image sets `NODE_USE_ENV_PROXY=1`, so its downloads and AI calls use it |
 | Gemini key rejected ("API key not valid") | The key must come from [Google AI Studio](https://aistudio.google.com/apikey). Google Cloud and Vertex AI keys are not supported                                                                   |
+| OpenAI key rejected ("Key rejected")      | A restricted OpenAI project key needs the **Models: read** permission (or **All**) for the setup key check, which lists models; without it the check gets 403 although generation would work       |
 | AWS icons do not appear                   | They need internet on first start. Once online, press **Retry** in the editor's icon notice, or run `docker compose restart gateway`                                                               |
 | Docker does not start on Windows          | Turn on WSL 2 (`wsl --install` in an administrator PowerShell, then restart). In a virtual machine, turn on nested virtualization in its settings first                                            |
 

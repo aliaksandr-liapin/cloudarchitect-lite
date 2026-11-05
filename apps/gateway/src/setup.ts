@@ -68,6 +68,11 @@ export const SetupInput = z.object({
     .optional(),
   /** @deprecated 0.2 body: the Anthropic key. Use `apiKeys.anthropic`; kept for one release. */
   apiKey: ApiKey.optional(),
+  /**
+   * Providers whose saved key is deleted. An environment key cannot be removed and is ignored here;
+   * a key entered in `apiKeys` for the same provider wins over its removal.
+   */
+  removeKeys: z.array(z.enum(PROVIDERS as [Provider, ...Provider[]])).optional(),
   models: z.array(ModelChoice).min(1),
   defaultModel: ModelChoice,
   dailyBudgetUsd: z.number().min(0).max(100_000),
@@ -196,7 +201,9 @@ export class SetupService {
     });
 
     const keys: Settings = Object.fromEntries(newKeys.map(([p, key]) => [KEY_SETTING[p], key]));
-    const after = this.keySources({ ...this.settings, ...keys });
+    const kept: Settings = { ...this.settings };
+    for (const p of input.removeKeys ?? []) delete kept[KEY_SETTING[p]];
+    const after = this.keySources({ ...kept, ...keys });
     if (PROVIDERS.every((p) => after[p] === 'none')) throw new SetupError('invalid_api_key', 400);
     if (input.models.some((m) => after[modelOption(m).provider] === 'none'))
       throw new SetupError('invalid_settings', 400);
@@ -206,7 +213,7 @@ export class SetupService {
     if (checks.includes('unreachable')) throw new SetupError('key_check_failed', 502);
 
     const next: Settings = {
-      ...this.settings,
+      ...kept,
       ...keys,
       AI_MODELS: input.models.join(','),
       DEFAULT_MODEL: input.defaultModel,
