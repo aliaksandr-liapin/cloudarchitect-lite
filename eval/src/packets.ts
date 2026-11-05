@@ -23,7 +23,11 @@ export const DIMENSIONS = [
   'explanationAccuracy',
 ] as const;
 
-const Score = z.number().int().min(0).max(3);
+/**
+ * Plain number: Anthropic rejects minimum/maximum on integers, and `.int()` emits safe-integer bounds.
+ * Integers in 0-3 are checked in `validateReviewOutput`.
+ */
+const Score = z.number();
 
 /** Closed objects, arrays, enums, numbers, strings and booleans only (OpenAI strict mode). */
 export const ReviewOutput = z.object({
@@ -503,6 +507,10 @@ export function validateReviewOutput(output: ReviewOutput, scenarios: string[]):
     if (!expected.has(r.scenario)) throw new Error(`unexpected review ${id}`);
     if (seen.has(id)) throw new Error(`duplicate review ${id}`);
     seen.add(id);
+    for (const d of DIMENSIONS) {
+      const v = r.scores[d];
+      if (!Number.isInteger(v) || v < 0 || v > 3) throw new Error(`score out of range ${id} ${d}`);
+    }
   }
   for (const s of scenarios)
     for (const d of ['A', 'B'])
@@ -534,3 +542,37 @@ export function estimateCallMicroUsd(
 /** Whether a call may start: spend so far plus calls in flight plus this call stays within the cap. */
 export const withinCap = (spent: number, reserved: number, estimate: number, cap: number) =>
   spent + reserved + estimate <= cap;
+
+// --- Resume ---
+
+/** Parses a saved review file; undefined unless it is a valid answer for the packet's scenarios. */
+export function acceptSaved(text: string, scenarios: string[]): ReviewOutput | undefined {
+  try {
+    const parsed = ReviewOutput.safeParse(JSON.parse(text));
+    if (!parsed.success) return undefined;
+    validateReviewOutput(parsed.data, scenarios);
+    return parsed.data;
+  } catch {
+    return undefined;
+  }
+}
+
+/** (reviewer, packet) pairs still to call, in reviewer order then packet order. */
+export function missingCalls(
+  reviewers: string[],
+  packetIds: string[],
+  have: Set<string>,
+): { reviewer: string; packetId: string }[] {
+  return reviewers.flatMap((reviewer) =>
+    packetIds
+      .filter((packetId) => !have.has(`${reviewer}/${packetId}`))
+      .map((packetId) => ({ reviewer, packetId })),
+  );
+}
+
+/** Packet ids whose saved text differs from the rebuilt one, or that exist on only one side. */
+export function packetMismatches(saved: Record<string, string>, built: Packet[]): string[] {
+  const ids = new Set([...Object.keys(saved), ...built.map((p) => p.id)]);
+  const byId = new Map(built.map((p) => [p.id, p.markdown]));
+  return [...ids].filter((id) => saved[id] !== byId.get(id)).sort();
+}

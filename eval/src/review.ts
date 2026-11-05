@@ -3,7 +3,10 @@
  * reviewers (one Claude, one OpenAI, one Gemini model) through the production adapters.
  *
  * Usage: pnpm --filter @cloudarchitect/eval review --runs <id,id,...> --max-usd <n> [--seed 1]
- *        [--repeat n] [--scenarios id,id] [--base-scenarios id,id] [--packets-only]
+ *        [--reviewers anthropic,openai,google] [--repeat n] [--scenarios id,id] [--base-scenarios id,id] [--packets-only]
+ * Resume: when today's output folder already has a key.json, packets are rebuilt and must match the
+ * saved ones byte for byte; valid saved reviews are kept and only missing (reviewer, packet) calls run.
+ * --packets-only then prints how many calls a resume would make per reviewer.
  * --repeat keeps one repeat number; --scenarios limits economical pairs (and best-quality pairs when
  * --base-scenarios is absent); --base-scenarios limits best-quality pairs (gpt-sol and gemini-argon
  * vs sonnet, haiku vs sonnet).
@@ -21,6 +24,7 @@ import {
   jsonOutputFormat,
   openaiClient,
   parseOutput,
+  redactKey,
   type CallUsage,
   type LlmClient,
 } from '@cloudarchitect/generator';
@@ -43,6 +47,9 @@ import {
   validateReviewOutput,
   withinCap,
   ReviewOutput,
+  acceptSaved,
+  missingCalls,
+  packetMismatches,
   type DesignRun,
   type PanelReview,
 } from './packets.js';
@@ -70,6 +77,7 @@ const { values: args } = parseArgs({
     repeat: { type: 'string' },
     scenarios: { type: 'string' },
     'base-scenarios': { type: 'string' },
+    reviewers: { type: 'string' },
     'packets-only': { type: 'boolean', default: false },
   },
 });
@@ -138,22 +146,71 @@ const instructionsSrc = join(
   'packets',
   'reviewer-instructions.md',
 );
-copyFileSync(instructionsSrc, join(outDir, 'packets', 'reviewer-instructions.md'));
-for (const p of packets) writeFileSync(join(outDir, 'packets', `${p.id}.md`), p.markdown);
-writeFileSync(join(outDir, 'key.json'), JSON.stringify(key, null, 2));
-console.log(`${packets.length} packets, ${runs.length} designs; written to ${outDir}`);
+const resuming = existsSync(join(outDir, 'key.json'));
+if (resuming) {
+  const dir = join(outDir, 'packets');
+  const saved: Record<string, string> = {};
+  for (const f of readdirSync(dir))
+    if (/^g\d+\.md$/.test(f)) saved[f.slice(0, -3)] = readFileSync(join(dir, f), 'utf8');
+  const bad = packetMismatches(saved, packets);
+  // Compared as data: a formatter may have reflowed the saved key.json.
+  const keyChanged =
+    JSON.stringify(JSON.parse(readFileSync(join(outDir, 'key.json'), 'utf8'))) !==
+    JSON.stringify(key);
+  if (bad.length || keyChanged)
+    throw new Error(
+      `Cannot resume: rebuilt packets differ from ${outDir} (${bad.length ? `packets ${bad.join(', ')}` : 'key.json'}). Use the same --runs, --seed, --repeat and scenario filters, or move the folder away.`,
+    );
+} else {
+  copyFileSync(instructionsSrc, join(outDir, 'packets', 'reviewer-instructions.md'));
+  for (const p of packets) writeFileSync(join(outDir, 'packets', `${p.id}.md`), p.markdown);
+  writeFileSync(join(outDir, 'key.json'), JSON.stringify(key, null, 2));
+}
+console.log(
+  `${packets.length} packets, ${runs.length} designs; ${resuming ? 'resuming' : 'written to'} ${outDir}`,
+);
+
+// Saved reviews that pass validation are kept; everything else is (re)requested.
+const panel: PanelReview[] = [];
+const have = new Set<string>();
+for (const r of REVIEWERS)
+  for (const p of packets) {
+    const file = join(outDir, `review-${r.provider}-${p.id}.json`);
+    if (!existsSync(file)) continue;
+    const output = acceptSaved(readFileSync(file, 'utf8'), p.scenarios);
+    if (!output) {
+      console.log(`${r.provider} ${p.id}: saved review is invalid, will be requested again`);
+      continue;
+    }
+    panel.push({ reviewer: r.provider, packetId: p.id, output });
+    have.add(`${r.provider}/${p.id}`);
+  }
+const selected = args.reviewers
+  ? args.reviewers.split(',').map((name) => {
+      const r = REVIEWERS.find((x) => x.provider === name);
+      if (!r) throw new Error(`Unknown reviewer ${name} (anthropic, openai, google)`);
+      return r;
+    })
+  : REVIEWERS;
+const todo = missingCalls(
+  selected.map((r) => r.provider),
+  packets.map((p) => p.id),
+  have,
+);
+console.log(
+  `saved reviews kept: ${panel.length}; calls to make: ${todo.length} (${selected
+    .map((r) => `${r.provider} ${todo.filter((t) => t.reviewer === r.provider).length}`)
+    .join(', ')})`,
+);
 if (packetsOnly) process.exit(0);
 
 // --- Reviewer calls ---
 
-if (REVIEWERS.some((r) => !process.env[r.keyVar]) && existsSync(envFile))
+if (selected.some((r) => !process.env[r.keyVar]) && existsSync(envFile))
   process.loadEnvFile(envFile);
-const missing = REVIEWERS.filter((r) => !process.env[r.keyVar]);
+const missing = selected.filter((r) => !process.env[r.keyVar]);
 if (missing.length) {
-  // A panel of fewer than three reviewers would not match the published method.
-  console.log(
-    `${missing.map((r) => r.keyVar).join(', ')} not set; the review panel needs all three`,
-  );
+  console.log(`${missing.map((r) => r.keyVar).join(', ')} not set`);
   process.exit(1);
 }
 
@@ -164,7 +221,6 @@ let spentMicro = 0;
 /** Worst-case cost of calls in flight, so parallel reviewers cannot overshoot the cap. */
 let reservedMicro = 0;
 let cutShort = false;
-const panel: PanelReview[] = [];
 const failures: { reviewer: string; packetId: string; error: string }[] = [];
 
 async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId: string) {
@@ -197,9 +253,14 @@ async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId
     panel.push({ reviewer: r.provider, packetId, output });
     console.log(`${r.provider.padEnd(9)} ${packetId} ok $${(cost / 1e6).toFixed(4)}`);
   } catch (err) {
-    // Only an error class is logged: provider messages may echo request details.
+    // The message is logged with the key masked, so a failure can be diagnosed.
+    const clean = redactKey(err, process.env[r.keyVar] ?? '');
     const error =
-      err instanceof GenerationError ? 'schema_invalid' : err instanceof Error ? err.name : 'error';
+      err instanceof GenerationError
+        ? 'schema_invalid'
+        : clean instanceof Error
+          ? `${clean.name}: ${clean.message}`.slice(0, 500)
+          : 'error';
     failures.push({ reviewer: r.provider, packetId, error });
     console.log(`${r.provider.padEnd(9)} ${packetId} FAILED ${error}`);
   } finally {
@@ -209,9 +270,10 @@ async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId
 
 // Reviewers run in parallel (each sees only its packet); one reviewer's packets run in order.
 await Promise.all(
-  REVIEWERS.map(async (r) => {
+  selected.map(async (r) => {
     const client = CLIENT[r.provider](process.env[r.keyVar]!);
-    for (const p of packets) await review(r, client, p.id);
+    for (const t of todo.filter((x) => x.reviewer === r.provider))
+      await review(r, client, t.packetId);
   }),
 );
 

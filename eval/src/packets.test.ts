@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Scenario } from './harness.js';
 import {
+  acceptSaved,
   aggregate,
+  missingCalls,
+  packetMismatches,
   buildPackets,
   estimateCallMicroUsd,
   validateReviewOutput,
@@ -407,5 +410,80 @@ describe('buildPackets filters', () => {
     expect(() =>
       buildPackets({ runs, scenarios, seed: 1, baseScenarios: ['alpha', 'zzz'] }),
     ).toThrow(/Unknown scenarios: zzz/);
+  });
+});
+
+describe('score range and resume', () => {
+  const dims = {
+    requirementCoverage: 2,
+    serviceFitness: 2,
+    connectionCorrectness: 2,
+    securityBaseline: 2,
+    reliabilityOperability: 2,
+    costAwareness: 2,
+    explanationAccuracy: 2,
+  };
+  const mk = (scores: Record<string, number>): ReviewOutput =>
+    ({
+      reviews: ['A', 'B'].map((design) => ({
+        scenario: 'alpha',
+        design,
+        scores,
+        criticalDefect: false,
+        defects: [],
+        summary: 's',
+      })),
+      preference: [{ scenario: 'alpha', better: 'A', why: 'w' }],
+    }) as unknown as ReviewOutput;
+
+  it('sends no minimum/maximum for scores to providers', async () => {
+    const { jsonOutputFormat } = await import('@cloudarchitect/generator');
+    const { ReviewOutput: schema } = await import('./packets.js');
+    const json = JSON.stringify(jsonOutputFormat(schema));
+    expect(json).not.toContain('"minimum"');
+    expect(json).not.toContain('"maximum"');
+  });
+
+  it('rejects scores outside 0-3 or not integers in validation', () => {
+    expect(() => validateReviewOutput(mk(dims), ['alpha'])).not.toThrow();
+    expect(() => validateReviewOutput(mk({ ...dims, costAwareness: 4 }), ['alpha'])).toThrow(
+      /out of range/,
+    );
+    expect(() => validateReviewOutput(mk({ ...dims, costAwareness: -1 }), ['alpha'])).toThrow(
+      /out of range/,
+    );
+    expect(() => validateReviewOutput(mk({ ...dims, costAwareness: 1.5 }), ['alpha'])).toThrow(
+      /out of range/,
+    );
+  });
+
+  it('accepts only valid saved reviews', () => {
+    expect(acceptSaved(JSON.stringify(mk(dims)), ['alpha'])).toBeDefined();
+    expect(
+      acceptSaved(JSON.stringify(mk({ ...dims, serviceFitness: 9 })), ['alpha']),
+    ).toBeUndefined();
+    expect(acceptSaved(JSON.stringify(mk(dims)), ['beta'])).toBeUndefined();
+    expect(acceptSaved('{not json', ['alpha'])).toBeUndefined();
+    expect(acceptSaved('{}', ['alpha'])).toBeUndefined();
+  });
+
+  it('selects only the missing (reviewer, packet) pairs', () => {
+    const have = new Set(['openai/g1', 'google/g1', 'google/g2']);
+    expect(missingCalls(['openai', 'google'], ['g1', 'g2'], have)).toEqual([
+      { reviewer: 'openai', packetId: 'g2' },
+    ]);
+    expect(missingCalls(['anthropic'], ['g1', 'g2'], have)).toHaveLength(2);
+    expect(missingCalls([], ['g1'], have)).toEqual([]);
+  });
+
+  it('detects changed, missing and extra packets', () => {
+    const built = [
+      { id: 'g1', scenarios: ['a'], markdown: 'one' },
+      { id: 'g2', scenarios: ['b'], markdown: 'two' },
+    ];
+    expect(packetMismatches({ g1: 'one', g2: 'two' }, built)).toEqual([]);
+    expect(packetMismatches({ g1: 'one', g2: 'TWO' }, built)).toEqual(['g2']);
+    expect(packetMismatches({ g1: 'one' }, built)).toEqual(['g2']);
+    expect(packetMismatches({ g1: 'one', g2: 'two', g3: 'x' }, built)).toEqual(['g3']);
   });
 });
