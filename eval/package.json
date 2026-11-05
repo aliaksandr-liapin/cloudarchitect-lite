@@ -9,6 +9,7 @@
     "spike": "tsx src/spike.ts",
     "rescore": "tsx src/rescore.ts",
     "live": "tsx src/live.ts",
+    "review": "tsx src/review.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc --noEmit"
