@@ -19,10 +19,10 @@ export const LIVE_GATE = {
   maxCostFactor: 1.5,
 } as const;
 
-/** `benchmarkCostUsd` is the model's `benchmark.costPerOperationUsd`. Every failed check is listed. */
+/** `benchmarkCostUsd` is the model's `benchmark.costPerOperationUsd`; the cost check is skipped when undefined. Every failed check is listed. */
 export function evaluateGate(
   s: LiveSummary,
-  benchmarkCostUsd: number,
+  benchmarkCostUsd: number | undefined,
 ): { passed: boolean; failures: string[] } {
   const failures: string[] = [];
   if (s.schemaValidRate < LIVE_GATE.schemaValidRate)
@@ -35,10 +35,12 @@ export function evaluateGate(
     failures.push(
       `${s.model}: ${s.forbiddenServiceHits} forbidden service hits > ${LIVE_GATE.forbiddenServiceHits}`,
     );
-  const maxCost = benchmarkCostUsd * LIVE_GATE.maxCostFactor;
-  if (s.meanCostUsd > maxCost)
-    failures.push(
-      `${s.model}: mean cost $${s.meanCostUsd.toFixed(4)} > $${maxCost.toFixed(4)} (${LIVE_GATE.maxCostFactor}x benchmark)`,
-    );
+  if (benchmarkCostUsd !== undefined) {
+    const maxCost = benchmarkCostUsd * LIVE_GATE.maxCostFactor;
+    if (s.meanCostUsd > maxCost)
+      failures.push(
+        `${s.model}: mean cost $${s.meanCostUsd.toFixed(4)} > $${maxCost.toFixed(4)} (${LIVE_GATE.maxCostFactor}x benchmark)`,
+      );
+  }
   return { passed: failures.length === 0, failures };
 }

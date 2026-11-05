@@ -1,5 +1,5 @@
 import { awsCatalog, awsIconPack, type IconSet } from '@cloudarchitect/catalog';
-import { MODEL_OPTIONS, ModelChoice } from '@cloudarchitect/domain';
+import { listedModels, ModelChoice } from '@cloudarchitect/domain';
 import { anthropicClient, type LlmClient } from '@cloudarchitect/generator';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -121,7 +121,7 @@ export function createApp({
     c.json({
       defaultModel: cfg().DEFAULT_MODEL,
       enabled: cfg().AI_MODELS,
-      options: MODEL_OPTIONS,
+      options: listedModels(),
     }),
   );
 

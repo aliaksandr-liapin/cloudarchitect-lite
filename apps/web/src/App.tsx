@@ -500,7 +500,7 @@ export function App() {
   // Typical wait for the chosen model (benchmark median), shown next to the timer.
   const typicalSeconds = Math.round(
     MODEL_OPTIONS.find((m) => m.id === (readModelChoice() ?? 'haiku'))?.benchmark
-      .medianLatencySeconds ?? 0,
+      ?.medianLatencySeconds ?? 0,
   );
 
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */

@@ -1,15 +1,18 @@
-import { MODEL_OPTIONS, type ModelChoice, type ModelOption } from '@cloudarchitect/domain';
+import { listedModels, type ModelChoice, type ModelOption } from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Collapsible } from './Collapsible';
 import { DEMO } from './demo';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+const NOT_MEASURED = 'Not yet measured';
+const orNot = (x: number | undefined, f: (x: number) => string) =>
+  x === undefined ? NOT_MEASURED : f(x);
 const usd = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(3)}`);
 
 /** Measured quality, cost and speed per model (ADR-0011), so the choice is informed. */
 export function ModelComparison({
-  options = MODEL_OPTIONS,
+  options = listedModels(),
   selected,
   enabled,
   onSelect,
@@ -25,12 +28,12 @@ export function ModelComparison({
 }) {
   const b = (o: ModelOption) => o.benchmark;
   const rows: [string, (o: ModelOption) => string][] = [
-    ['Blind review score (0–3)', (o) => b(o).blindMedianScore.toFixed(2)],
-    ['Automated checks passed', (o) => pct(b(o).passRate)],
-    ['Without critical defects', (o) => pct(b(o).noCriticalDefectRate)],
-    ['Major defects (15 designs)', (o) => String(b(o).majorDefects)],
-    ['Cost per generation', (o) => usd(b(o).costPerOperationUsd)],
-    ['Typical wait', (o) => `${Math.round(b(o).medianLatencySeconds)} s`],
+    ['Blind review score (0–3)', (o) => orNot(b(o)?.blindMedianScore, (x) => x.toFixed(2))],
+    ['Automated checks passed', (o) => orNot(b(o)?.passRate, pct)],
+    ['Without critical defects', (o) => orNot(b(o)?.noCriticalDefectRate, pct)],
+    ['Major defects (15 designs)', (o) => orNot(b(o)?.majorDefects, String)],
+    ['Cost per generation', (o) => orNot(b(o)?.costPerOperationUsd, usd)],
+    ['Typical wait', (o) => orNot(b(o)?.medianLatencySeconds, (x) => `${Math.round(x)} s`)],
   ];
   return (
     <table className="models">
@@ -77,9 +80,9 @@ export function ModelComparison({
         )}
       </tbody>
       <caption className="muted small">
-        Measured {options[0]?.benchmark.measuredAt} in live eval runs (
-        {options.map((o) => `${o.label}: ${o.benchmark.runs}`).join(', ')}); blind rubric review by
-        isolated AI reviewer sessions (PRD §14).{' '}
+        Measured {options[0]?.benchmark?.measuredAt} in live eval runs (
+        {options.map((o) => `${o.label}: ${o.benchmark?.runs ?? 0}`).join(', ')}); blind rubric
+        review by isolated AI reviewer sessions (PRD §14).{' '}
         {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
       </caption>
     </table>
@@ -92,7 +95,7 @@ const STORAGE_KEY = 'cloudarchitect.model';
 export function readModelChoice(): ModelChoice | undefined {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return MODEL_OPTIONS.some((o) => o.id === saved) ? (saved as ModelChoice) : undefined;
+    return listedModels().some((o) => o.id === saved) ? (saved as ModelChoice) : undefined;
   } catch {
     return undefined;
   }

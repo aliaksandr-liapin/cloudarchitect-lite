@@ -52,7 +52,7 @@ const llm: LlmClient = async (req) => {
   return res;
 };
 
-const ex = await extract(llm, { prompt, toggles });
+const ex = await extract(llm, { prompt, toggles }, 'claude-haiku-5-5');
 console.log(`questions: ${ex.questions.map((q) => q.topic).join(', ') || '(none)'}`);
 try {
   const r = await generateArchitecture(llm, awsCatalog, {

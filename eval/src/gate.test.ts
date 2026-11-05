@@ -2,7 +2,7 @@ import { modelOption } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import { evaluateGate, type LiveSummary } from './gate.js';
 
-const benchmark = modelOption('haiku').benchmark.costPerOperationUsd;
+const benchmark = modelOption('haiku').benchmark!.costPerOperationUsd;
 const ok: LiveSummary = {
   model: 'haiku',
   runs: 22,
@@ -17,6 +17,11 @@ const ok: LiveSummary = {
 describe('live regression gate', () => {
   it('passes at schema 1, pass rate 0.91 and cost 0.009', () => {
     expect(evaluateGate(ok, benchmark)).toEqual({ passed: true, failures: [] });
+  });
+
+  it('skips the cost check when the model has no benchmark cost', () => {
+    const r = evaluateGate({ ...ok, meanCostUsd: 5 }, undefined);
+    expect(r).toEqual({ passed: true, failures: [] });
   });
 
   it('fails below the schema-valid rate', () => {

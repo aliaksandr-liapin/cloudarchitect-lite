@@ -4,6 +4,7 @@ import {
   DesignToggles,
   GenerateRequest,
   ModelChoice,
+  modelOption,
   Question,
   Requirement,
   type GenerateResponse,
@@ -12,6 +13,7 @@ import {
 import {
   callUsage,
   extract,
+  extractionModel,
   generateArchitecture,
   GenerationError,
   type CallUsage,
@@ -236,7 +238,11 @@ export function registerGenerateRoutes(app: Hono<Env>, deps: GenerateDeps) {
     const llm = op.tracked(deps.llm(cfg().ANTHROPIC_API_KEY!));
     let project: Project;
     try {
-      const extracted = await extract(llm, { prompt: body.prompt, toggles: body.toggles });
+      const extracted = await extract(
+        llm,
+        { prompt: body.prompt, toggles: body.toggles },
+        extractionModel(modelOption(model).provider),
+      );
       if (extracted.questions.length || body.reviewRequirements) {
         const operationId = crypto.randomUUID();
         const state: OperationState = {

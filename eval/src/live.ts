@@ -13,6 +13,7 @@ import {
   anthropicClient,
   costMicroUsd,
   extract,
+  extractionModel,
   generateArchitecture,
   GenerationError,
   type LlmClient,
@@ -119,7 +120,11 @@ async function runJob(s: Scenario, model: ModelChoice, repeat: number): Promise<
     latencyMs: Date.now() - started,
   });
   try {
-    const ex = await extract(llm, { prompt: s.prompt, toggles: s.toggles });
+    const ex = await extract(
+      llm,
+      { prompt: s.prompt, toggles: s.toggles },
+      extractionModel(modelOption(model).provider),
+    );
     questionTopics = ex.questions.map((q) => q.topic);
     const answers = Object.fromEntries(
       ex.questions.map((q) => [q.topic, s.answers[q.topic] ?? YOU_DECIDE]),
@@ -212,7 +217,7 @@ const summary: LiveSummary[] = models.map((model) => {
 
 const gate = models.map((model, i) => {
   const expected = scenarios.length * repeats;
-  const result = evaluateGate(summary[i]!, modelOption(model).benchmark.costPerOperationUsd);
+  const result = evaluateGate(summary[i]!, modelOption(model).benchmark?.costPerOperationUsd);
   const failures = [...result.failures];
   if (cutShort || summary[i]!.runs < expected)
     failures.push(

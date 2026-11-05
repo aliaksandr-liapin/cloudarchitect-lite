@@ -5,8 +5,23 @@ import { z } from 'zod';
  * Benchmarks come from the Phase 2 Gate A live runs and blind review (docs/product/phase2-gate-a.md);
  * update them only from a new eval run.
  */
-export const ModelChoice = z.enum(['haiku', 'sonnet']);
+export const ModelChoice = z.enum([
+  'haiku',
+  'sonnet',
+  'gpt-luna',
+  'gpt-sol',
+  'gemini-flash-lite',
+  'gemini-argon',
+]);
 export type ModelChoice = z.infer<typeof ModelChoice>;
+
+export type Provider = 'anthropic' | 'openai' | 'google';
+export const PROVIDERS: readonly Provider[] = ['anthropic', 'openai', 'google'];
+export const PROVIDER_LABEL: Record<Provider, string> = {
+  anthropic: 'Claude',
+  openai: 'OpenAI',
+  google: 'Gemini',
+};
 
 export interface ModelBenchmark {
   measuredAt: string;
@@ -16,14 +31,14 @@ export interface ModelBenchmark {
   schemaValidRate: number;
   /** Share of runs passing all automated checks (eval harness). */
   passRate: number;
-  /** Median blind rubric score, 0–3 (PRD §14). */
-  blindMedianScore: number;
+  /** Median blind rubric score, 0–3 (PRD §14). Absent until a blind review has run. */
+  blindMedianScore?: number;
   /**
    * Share of blind-reviewed scenarios without a critical defect. Not the same population per model:
    * Haiku's covers 12 scenarios including 3 toggle scenarios, Sonnet's the 9 base scenarios.
    */
-  noCriticalDefectRate: number;
-  majorDefects: number;
+  noCriticalDefectRate?: number;
+  majorDefects?: number;
   /** Mean cost of one generation in USD, at the provider price list of the measurement date. */
   costPerOperationUsd: number;
   medianLatencySeconds: number;
@@ -31,13 +46,14 @@ export interface ModelBenchmark {
 
 export interface ModelOption {
   id: ModelChoice;
-  provider: 'anthropic';
+  provider: Provider;
   model: string;
   label: string;
   summary: string;
   /** Validator-driven repair turns after the first draft. */
   repairTurns: number;
-  benchmark: ModelBenchmark;
+  /** Absent until a live eval run exists; such a model is not listed (`listedModels`). */
+  benchmark?: ModelBenchmark;
 }
 
 const GATE_A = { measuredAt: '2026-10-18' };
@@ -83,9 +99,44 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
       medianLatencySeconds: 27,
     },
   },
+  {
+    id: 'gpt-luna',
+    provider: 'openai',
+    model: 'gpt-6-luna',
+    label: 'GPT-6 Luna',
+    summary: 'Economical OpenAI model.',
+    repairTurns: 1,
+  },
+  {
+    id: 'gpt-sol',
+    provider: 'openai',
+    model: 'gpt-6.1-sol',
+    label: 'GPT-6.1 Sol',
+    summary: 'Best-quality OpenAI model.',
+    repairTurns: 0,
+  },
+  {
+    id: 'gemini-flash-lite',
+    provider: 'google',
+    model: 'gemini-3.5-flash-lite',
+    label: 'Gemini 3.5 Flash-Lite',
+    summary: 'Economical Gemini model.',
+    repairTurns: 1,
+  },
+  {
+    id: 'gemini-argon',
+    provider: 'google',
+    model: 'gemini-4-argon',
+    label: 'Gemini 4 Argon (December price; $2/$10 until 2026-11-30)',
+    summary: 'Best-quality Gemini model.',
+    repairTurns: 0,
+  },
 ];
 
 export const modelOption = (id: ModelChoice) => MODEL_OPTIONS.find((m) => m.id === id)!;
+
+/** Options with a measured benchmark; a model with no run is not shown (spec §6). */
+export const listedModels = (): ModelOption[] => MODEL_OPTIONS.filter((m) => m.benchmark);
 
 /** Defaults: Haiku is enabled and the default model until the setup wizard changes it. */
 export const MODEL_POLICY = {

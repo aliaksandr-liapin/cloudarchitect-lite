@@ -7,7 +7,7 @@ import {
 } from '@cloudarchitect/domain';
 import { z } from 'zod';
 import { jsonOutputFormat, parseOutput, type CallUsage, type LlmClient } from './llm.js';
-import { callUsage, EXTRACTION_MODEL } from './prices.js';
+import { callUsage } from './prices.js';
 
 /** The topic enum depends on the enabled toggles, so the schema is built per call. */
 export function extractionSchema(topics: GapTopic[]) {
@@ -120,11 +120,15 @@ function systemPrompt(topics: GapTopic[], toggles: DesignToggles): string {
   ].join('\n');
 }
 
-export async function extract(llm: LlmClient, input: ExtractInput): Promise<ExtractResult> {
+export async function extract(
+  llm: LlmClient,
+  input: ExtractInput,
+  model: string,
+): Promise<ExtractResult> {
   const topics = allowedTopics(input.toggles);
   const schema = extractionSchema(topics);
   const res = await llm({
-    model: EXTRACTION_MODEL,
+    model,
     system: systemPrompt(topics, input.toggles),
     maxTokens: 4000,
     effort: 'low',
@@ -132,7 +136,7 @@ export async function extract(llm: LlmClient, input: ExtractInput): Promise<Extr
     messages: [{ role: 'user', content: input.prompt }],
     signal: input.signal,
   });
-  const usage: CallUsage[] = [callUsage(EXTRACTION_MODEL, res.usage)];
+  const usage: CallUsage[] = [callUsage(model, res.usage)];
   // Validate against the full topic list so one disallowed question is dropped, not fatal.
   const data = parseOutput(res.text, Extraction, usage);
 

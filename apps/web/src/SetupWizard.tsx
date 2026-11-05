@@ -111,8 +111,8 @@ export function SetupWizard() {
     if (!next.includes(defaultModel) && next[0]) setDefaultModel(next[0]);
   };
 
-  const cost = modelOption(defaultModel).benchmark.costPerOperationUsd;
-  const generationsPerMonth = Math.floor(monthlyBudgetUsd / cost);
+  const cost = modelOption(defaultModel).benchmark?.costPerOperationUsd;
+  const generationsPerMonth = cost === undefined ? undefined : Math.floor(monthlyBudgetUsd / cost);
 
   return (
     <div className="wizard">
@@ -316,9 +316,15 @@ export function SetupWizard() {
               <p className="alert">The monthly budget must be at least the daily budget.</p>
             )}
             <p className="estimate">
-              With {modelOption(defaultModel).label} at about ${cost} per generation, $
-              {monthlyBudgetUsd} a month covers about{' '}
-              <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
+              {generationsPerMonth === undefined ? (
+                <>Cost per generation with {modelOption(defaultModel).label}: Not yet measured.</>
+              ) : (
+                <>
+                  With {modelOption(defaultModel).label} at about ${cost} per generation, $
+                  {monthlyBudgetUsd} a month covers about{' '}
+                  <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
+                </>
+              )}
             </p>
           </section>
         ) : (
