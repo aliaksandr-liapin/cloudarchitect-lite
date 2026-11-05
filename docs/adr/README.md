@@ -17,3 +17,4 @@ Format: context → decision → consequences. Status is one of Proposed, Accept
 | [0011](0011-model-selection.md)                     | AI model selection and benchmark              | Accepted   |
 | [0012](0012-self-hosted-setup-wizard.md)            | Browser setup wizard for self-hosted installs | Accepted   |
 | [0013](0013-self-hosted-only.md)                    | Self-hosted only                              | Accepted   |
+| [0014](0014-multi-provider-ai.md)                   | Multiple AI providers                         | Accepted   |

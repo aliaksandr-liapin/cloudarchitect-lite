@@ -27,7 +27,7 @@ A good bug report lets someone reproduce the problem. Please include:
 
 - **What you did:** the steps, from a fresh start if you can.
 - **What happened and what you expected.**
-- **Version:** shown in `compose.yaml` (`CLOUDARCHITECT_VERSION`, for example `0.2.1`) or the commit you built from, or "demo".
+- **Version:** shown in `compose.yaml` (`CLOUDARCHITECT_VERSION`, for example `0.3.0`) or the commit you built from, or "demo".
 - **Where:** operating system, Docker version (`docker compose version`), browser.
 - **Logs:** the relevant lines of `docker compose logs gateway`, and any error in the browser console.
 
