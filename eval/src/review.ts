@@ -35,7 +35,10 @@ import { Scenario } from './harness.js';
 import {
   aggregate,
   buildPackets,
+  estimateCallMicroUsd,
   findLeaks,
+  validateReviewOutput,
+  withinCap,
   ReviewOutput,
   type DesignRun,
   type PanelReview,
@@ -142,16 +145,20 @@ const system = readFileSync(instructionsSrc, 'utf8');
 const format = jsonOutputFormat(ReviewOutput);
 const capMicro = maxUsd * 1e6;
 let spentMicro = 0;
+/** Worst-case cost of calls in flight, so parallel reviewers cannot overshoot the cap. */
+let reservedMicro = 0;
 let cutShort = false;
 const panel: PanelReview[] = [];
 const failures: { reviewer: string; packetId: string; error: string }[] = [];
 
 async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId: string) {
   const packet = packets.find((p) => p.id === packetId)!;
-  if (spentMicro >= capMicro) {
+  const estimate = estimateCallMicroUsd(r.model, system, packet.markdown, MAX_TOKENS);
+  if (!withinCap(spentMicro, reservedMicro, estimate, capMicro)) {
     cutShort = true;
     return;
   }
+  reservedMicro += estimate;
   try {
     const res = await client({
       model: r.model,
@@ -166,10 +173,7 @@ async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId
     spentMicro += cost;
     const usage: CallUsage[] = [{ model: r.model, usage: res.usage, costMicroUsd: cost }];
     const output = parseOutput(res.text, ReviewOutput, usage);
-    const got = new Set(output.reviews.map((x) => `${x.scenario}/${x.design}`));
-    for (const s of packet.scenarios)
-      for (const d of ['A', 'B'])
-        if (!got.has(`${s}/${d}`)) throw new Error(`missing review ${s}/${d}`);
+    validateReviewOutput(output, packet.scenarios);
     writeFileSync(
       join(outDir, `review-${r.provider}-${packetId}.json`),
       JSON.stringify(output, null, 2),
@@ -182,6 +186,8 @@ async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId
       err instanceof GenerationError ? 'schema_invalid' : err instanceof Error ? err.name : 'error';
     failures.push({ reviewer: r.provider, packetId, error });
     console.log(`${r.provider.padEnd(9)} ${packetId} FAILED ${error}`);
+  } finally {
+    reservedMicro -= estimate;
   }
 }
 
@@ -200,11 +206,12 @@ const summary = {
   cutShort,
   reviewers: REVIEWERS.map((r) => r.provider),
   failures,
-  ...aggregate(key, panel),
+  ...aggregate(key, panel, REVIEWERS.length),
 };
 writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
 console.table(summary.models);
 console.log(
   `total spent: $${(spentMicro / 1e6).toFixed(4)}${cutShort ? ' (stopped at --max-usd)' : ''}; results: ${outDir}`,
 );
+if (!summary.complete) console.log('warning: partial panel; summary.json has complete: false');
 if (cutShort || failures.length) process.exit(1);

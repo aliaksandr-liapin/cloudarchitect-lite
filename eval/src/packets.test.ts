@@ -3,6 +3,9 @@ import type { Scenario } from './harness.js';
 import {
   aggregate,
   buildPackets,
+  estimateCallMicroUsd,
+  validateReviewOutput,
+  withinCap,
   type DesignRun,
   type PanelReview,
   type ReviewOutput,
@@ -264,5 +267,86 @@ describe('aggregate', () => {
   it('returns no models when there are no reviews', () => {
     const s = aggregate({ g1: { alpha: key.g1.alpha } }, []);
     expect(s.models).toEqual({});
+  });
+});
+
+describe('review guards', () => {
+  const dims = {
+    requirementCoverage: 2,
+    serviceFitness: 2,
+    connectionCorrectness: 2,
+    securityBaseline: 2,
+    reliabilityOperability: 2,
+    costAwareness: 2,
+    explanationAccuracy: 2,
+  };
+  const one = (scenario: string, design: 'A' | 'B') => ({
+    scenario,
+    design,
+    scores: dims,
+    criticalDefect: false,
+    defects: [],
+    summary: 's',
+  });
+  const good: ReviewOutput = {
+    reviews: [one('alpha', 'A'), one('alpha', 'B')],
+    preference: [{ scenario: 'alpha', better: 'A', why: 'w' }],
+  };
+
+  it('does not point reviewers at ids that were renumbered', () => {
+    const { packets } = buildPackets({
+      runs,
+      scenarios: [scenario('alpha', { answers: { 'auth-methods': 'Email only' } as never })],
+      seed: 1,
+    });
+    expect(packets[0]!.markdown).not.toContain('starting with C-');
+    const plain = buildPackets({ runs, scenarios, seed: 1 }).packets[0]!.markdown;
+    expect(plain).not.toContain('starting with C-');
+  });
+
+  it('accepts a complete answer and rejects duplicate, missing or foreign entries', () => {
+    expect(() => validateReviewOutput(good, ['alpha'])).not.toThrow();
+    const dup = { ...good, reviews: [...good.reviews, one('alpha', 'A')] };
+    expect(() => validateReviewOutput(dup, ['alpha'])).toThrow(/duplicate review alpha\/A/);
+    expect(() =>
+      validateReviewOutput({ ...good, reviews: [one('alpha', 'A')] }, ['alpha']),
+    ).toThrow(/missing review alpha\/B/);
+    expect(() => validateReviewOutput(good, ['beta'])).toThrow(/unexpected/);
+    const dupPref = { ...good, preference: [...good.preference, ...good.preference] };
+    expect(() => validateReviewOutput(dupPref, ['alpha'])).toThrow(/duplicate preference/);
+  });
+
+  it('reserves worst-case cost and blocks a call that could cross the cap', () => {
+    // 3000 chars -> 1000 input tokens; sonnet $2/$10 per MTok: 1000*2 + 24000*10 micro-USD.
+    const est = estimateCallMicroUsd(
+      'claude-sonnet-5-5',
+      'x'.repeat(1000),
+      'y'.repeat(2000),
+      24000,
+    );
+    expect(est).toBe(1000 * 2 + 24000 * 10);
+    expect(withinCap(0, 0, est, est)).toBe(true);
+    // Another call in flight: the second may not start although nothing is spent yet.
+    expect(withinCap(0, est, est, est * 1.5)).toBe(false);
+    expect(withinCap(est, 0, 1, est)).toBe(false);
+    expect(() => estimateCallMicroUsd('nope', '', '', 1)).toThrow();
+  });
+
+  it('marks a partial panel and records the reviewer count per design', () => {
+    const key = {
+      g1: { alpha: { A: { model: 'gpt-sol', repeat: 1 }, B: { model: 'sonnet', repeat: 1 } } },
+    };
+    const two: PanelReview[] = ['r1', 'r2'].map((reviewer) => ({
+      reviewer,
+      packetId: 'g1',
+      output: good,
+    }));
+    const partial = aggregate(key, two);
+    expect(partial.complete).toBe(false);
+    expect(partial.reviewersPerDesign['gpt-sol#1@alpha']).toBe(2);
+    expect(partial.models['sonnet']!.minReviewers).toBe(2);
+    const full = aggregate(key, [...two, { reviewer: 'r3', packetId: 'g1', output: good }]);
+    expect(full.complete).toBe(true);
+    expect(full.reviewersPerDesign['sonnet#1@alpha']).toBe(3);
   });
 });

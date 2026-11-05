@@ -7,6 +7,7 @@
  */
 import { awsCatalog } from '@cloudarchitect/catalog';
 import { toggleRequirements, YOU_DECIDE, type Project } from '@cloudarchitect/domain';
+import { PRICES } from '@cloudarchitect/generator';
 import { z } from 'zod';
 import type { Scenario } from './harness.js';
 
@@ -219,7 +220,7 @@ function scenarioSection(s: Scenario, a: DesignInput, b: DesignInput): string {
   const priorities = toggleRequirements(s.toggles).map((r) => `- ${r.text}`);
   const given = Object.entries(s.answers).filter(([, v]) => v && v !== YOU_DECIDE);
   const answers = given.length
-    ? `The tool asked the user clarifying questions (listed among the requirements of each design, ids starting with C-). The user's answers (topic: answer), and "You decide" for every topic not listed:\n\n${given.map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+    ? `The tool asked the user clarifying questions (listed among the requirements of each design). The user's answers (topic: answer), and "You decide" for every topic not listed:\n\n${given.map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
     : 'The tool asked the user up to three clarifying questions (listed among the requirements of each design). The user answered "You decide" to every question, so the architect chose.';
   return [
     `## Scenario: ${s.id}`,
@@ -340,6 +341,8 @@ export interface ModelSummary {
   /** Median over the model's designs of each design's median-of-reviewers score. */
   blindScore: number;
   designs: number;
+  /** Fewest reviewers that scored any of the model's designs in any packet. */
+  minReviewers: number;
   /** Share of designs that a majority of their reviewers flagged with a critical defect. */
   criticalDefectRate: number;
   /** Sum over designs of the median (over reviewers) number of major defects. */
@@ -351,6 +354,10 @@ export interface PanelSummary {
   /** "<winner> over <loser>" -> number of pairings where a majority of reviewers preferred it. */
   preferences: Record<string, number>;
   ties: number;
+  /** False when any design was scored by fewer than `expectedReviewers` reviewers. */
+  complete: boolean;
+  /** Design id (`model#repeat@scenario`) -> fewest reviewers over its packets. */
+  reviewersPerDesign: Record<string, number>;
 }
 
 export const median = (xs: number[]) => {
@@ -372,7 +379,7 @@ export const designScore = (scores: Record<(typeof DIMENSIONS)[number], number>)
  * several packets (a model paired with more than one partner) is averaged across them. Per model:
  * median over its designs.
  */
-export function aggregate(key: Key, reviews: PanelReview[]): PanelSummary {
+export function aggregate(key: Key, reviews: PanelReview[], expectedReviewers = 3): PanelSummary {
   interface Slot {
     scores: number[];
     critical: boolean[];
@@ -408,10 +415,17 @@ export function aggregate(key: Key, reviews: PanelReview[]): PanelSummary {
     }
   }
 
-  const perModel = new Map<string, { scores: number[]; critical: number[]; majors: number }>();
-  for (const d of designs.values()) {
+  const perModel = new Map<
+    string,
+    { scores: number[]; critical: number[]; majors: number; minReviewers: number }
+  >();
+  const reviewersPerDesign: Record<string, number> = {};
+  for (const [designId, d] of designs) {
     const slots = [...d.slots.values()];
-    const m = perModel.get(d.model) ?? { scores: [], critical: [], majors: 0 };
+    const count = Math.min(...slots.map((s) => s.scores.length));
+    reviewersPerDesign[designId] = count;
+    const m = perModel.get(d.model) ?? { scores: [], critical: [], majors: 0, minReviewers: count };
+    m.minReviewers = Math.min(m.minReviewers, count);
     perModel.set(d.model, m);
     m.scores.push(mean(slots.map((s) => median(s.scores))));
     m.critical.push(
@@ -428,6 +442,7 @@ export function aggregate(key: Key, reviews: PanelReview[]): PanelSummary {
     models[model] = {
       blindScore: median(m.scores),
       designs: m.scores.length,
+      minReviewers: m.minReviewers,
       criticalDefectRate: mean(m.critical),
       majorDefects: m.majors,
     };
@@ -446,5 +461,52 @@ export function aggregate(key: Key, reviews: PanelReview[]): PanelSummary {
     const [win, lose] = a > b ? [entry.A.model, entry.B.model] : [entry.B.model, entry.A.model];
     preferences[`${win} over ${lose}`] = (preferences[`${win} over ${lose}`] ?? 0) + 1;
   }
-  return { models, preferences, ties };
+  const complete = Object.values(reviewersPerDesign).every((n) => n >= expectedReviewers);
+  return { models, preferences, ties, complete, reviewersPerDesign };
 }
+
+// --- Review validation and spend reservation ---
+
+/**
+ * Checks one reviewer answer against its packet: exactly one review per scenario and design, one
+ * preference per scenario, nothing for a scenario outside the packet. Throws otherwise.
+ */
+export function validateReviewOutput(output: ReviewOutput, scenarios: string[]): void {
+  const expected = new Set(scenarios);
+  const seen = new Set<string>();
+  for (const r of output.reviews) {
+    const id = `${r.scenario}/${r.design}`;
+    if (!expected.has(r.scenario)) throw new Error(`unexpected review ${id}`);
+    if (seen.has(id)) throw new Error(`duplicate review ${id}`);
+    seen.add(id);
+  }
+  for (const s of scenarios)
+    for (const d of ['A', 'B'])
+      if (!seen.has(`${s}/${d}`)) throw new Error(`missing review ${s}/${d}`);
+  const prefs = new Set<string>();
+  for (const p of output.preference) {
+    if (!expected.has(p.scenario)) throw new Error(`unexpected preference ${p.scenario}`);
+    if (prefs.has(p.scenario)) throw new Error(`duplicate preference ${p.scenario}`);
+    prefs.add(p.scenario);
+  }
+}
+
+/**
+ * Worst-case cost of one call in micro-USD, reserved while the call is in flight: the whole
+ * request at 3 characters per token (a conservative estimate) plus `maxTokens` at the output price.
+ */
+export function estimateCallMicroUsd(
+  model: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+): number {
+  const p = (PRICES as Record<string, { input: number; output: number }>)[model];
+  if (!p) throw new Error(`Unknown model ${model}`);
+  const inputTokens = Math.ceil((system.length + user.length) / 3);
+  return Math.ceil(inputTokens * p.input + maxTokens * p.output);
+}
+
+/** Whether a call may start: spend so far plus calls in flight plus this call stays within the cap. */
+export const withinCap = (spent: number, reserved: number, estimate: number, cap: number) =>
+  spent + reserved + estimate <= cap;
