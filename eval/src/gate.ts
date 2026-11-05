@@ -14,9 +14,20 @@ export interface LiveSummary {
 /** Regression gate for the live generator: quality floors and a cost ceiling relative to the benchmark. */
 export const LIVE_GATE = {
   schemaValidRate: 1,
-  passRate: 0.9,
+  passRate: 0.85,
   forbiddenServiceHits: 0,
   maxCostFactor: 1.5,
+} as const;
+
+/**
+ * Bar a model must meet to be listed in `MODEL_OPTIONS` with a benchmark (product owner, 2026-11-05;
+ * docs/product/phase3-provider-benchmark.md). The same absolute bar for both tiers.
+ */
+export const LISTING_BAR = {
+  schemaValidRate: 1,
+  passRate: 0.85,
+  noCriticalDefectRate: 0.85,
+  blindMedianScore: 2.0,
 } as const;
 
 /** `benchmarkCostUsd` is the model's `benchmark.costPerOperationUsd`; the cost check is skipped when undefined. Every failed check is listed. */

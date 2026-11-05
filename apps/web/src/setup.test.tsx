@@ -1,4 +1,4 @@
-import { listedModels } from '@cloudarchitect/domain';
+import { listedModels, PROVIDERS } from '@cloudarchitect/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -66,8 +66,10 @@ describe('provider helpers', () => {
   });
 
   it('offers only models of providers with a key', () => {
-    expect(offeredModels(['openai'])).toEqual([]);
-    expect(offeredModels(['anthropic']).map((o) => o.id)).toEqual(listedModels().map((o) => o.id));
+    expect(offeredModels([])).toEqual([]);
+    expect(offeredModels(['openai']).map((o) => o.id)).toEqual(['gpt-sol']);
+    expect(offeredModels(['anthropic']).map((o) => o.id)).toEqual(['haiku', 'sonnet']);
+    expect(offeredModels([...PROVIDERS]).map((o) => o.id)).toEqual(listedModels().map((o) => o.id));
   });
 
   it('drops configured models without a key and repairs the default', () => {

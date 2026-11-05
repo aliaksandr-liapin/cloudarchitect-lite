@@ -40,9 +40,9 @@ describe('ModelGroups', () => {
 
   it('renders one comparison table per provider, in provider order', () => {
     const out = html();
-    expect(out.match(/<table/g)).toHaveLength(2);
+    expect(out.match(/<table/g)).toHaveLength(3);
     expect(out.indexOf('Claude')).toBeLessThan(out.indexOf('OpenAI'));
-    expect(out).not.toContain('Gemini');
+    expect(out.indexOf('OpenAI')).toBeLessThan(out.indexOf('<h3>Gemini'));
   });
 
   it('shows Not yet measured for rows without a value', () => {

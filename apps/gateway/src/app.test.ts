@@ -42,7 +42,7 @@ describe('gateway', () => {
     expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
   });
 
-  it('defaults to Haiku and lists both models with benchmarks', async () => {
+  it('defaults to Haiku and lists the models with benchmarks', async () => {
     const res = await setup().app.request('/api/models');
     const body = (await res.json()) as {
       defaultModel: string;
@@ -60,7 +60,7 @@ describe('gateway', () => {
       'gemini-flash-lite': false,
       'gemini-argon': false,
     });
-    expect(body.options.map((o) => o.id)).toEqual(['haiku', 'sonnet']);
+    expect(body.options.map((o) => o.id)).toEqual(['haiku', 'sonnet', 'gpt-sol', 'gemini-argon']);
     expect(body.options[1]!.benchmark.costPerOperationUsd).toBeGreaterThan(
       body.options[0]!.benchmark.costPerOperationUsd,
     );

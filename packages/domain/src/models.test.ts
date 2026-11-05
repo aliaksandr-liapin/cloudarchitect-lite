@@ -20,6 +20,6 @@ describe('model options', () => {
   });
 
   it('lists only models with a benchmark', () => {
-    expect(listedModels().map((o) => o.id)).toEqual(['haiku', 'sonnet']);
+    expect(listedModels().map((o) => o.id)).toEqual(['haiku', 'sonnet', 'gpt-sol', 'gemini-argon']);
   });
 });

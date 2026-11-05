@@ -40,7 +40,7 @@ export function ModelComparison({
     ['Blind review score (0–3)', (o) => orNot(b(o)?.blindMedianScore, (x) => x.toFixed(2))],
     ['Automated checks passed', (o) => orNot(b(o)?.passRate, pct)],
     ['Without critical defects', (o) => orNot(b(o)?.noCriticalDefectRate, pct)],
-    ['Major defects (15 designs)', (o) => orNot(b(o)?.majorDefects, String)],
+    ['Major defects (reviewed designs)', (o) => orNot(b(o)?.majorDefects, String)],
     ['Cost per generation', (o) => orNot(b(o)?.costPerOperationUsd, usd)],
     ['Typical wait', (o) => orNot(b(o)?.medianLatencySeconds, (x) => `${Math.round(x)} s`)],
   ];
@@ -93,7 +93,8 @@ export function ModelComparison({
       <caption className="muted small">
         Measured {options[0]?.benchmark?.measuredAt} in live eval runs (
         {options.map((o) => `${o.label}: ${o.benchmark?.runs ?? 0}`).join(', ')}); blind rubric
-        review by isolated AI reviewer sessions (PRD §14).{' '}
+        review (PRD §14) of 12 designs per economical model and 9 per best-quality model by three AI
+        reviewers, one from each provider.{' '}
         {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
       </caption>
     </table>
