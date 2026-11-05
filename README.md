@@ -78,6 +78,26 @@ Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked
 - Operations: [installation](docs/operations/installation.md) · [deployment](docs/operations/deployment.md) · [runbook](docs/operations/runbook.md)
 - Engineering: [development](docs/engineering/development.md) · [testing](docs/engineering/testing.md)
 
+## FAQ
+
+**Which model should I use?**
+Claude Sonnet 5.5 if you want every automated check to pass (15 of 15 in the benchmark). GPT-6.1 Sol for the best-reviewed designs (highest blind score). Claude Haiku 5.5 to keep costs low, at about $0.007 per design. Gemini 4 Argon also passed every check but costs the most. See [Claude vs GPT vs Gemini](#claude-vs-gpt-vs-gemini).
+
+**What data leaves my machine?**
+Only what generation needs, and only to the AI provider of the model you picked: your description, the design priorities, your answers to the clarifying questions, the requirements and a list of catalog services. Your API keys stay in the gateway's data volume and are never sent to the browser. Projects are saved in your browser. On first start the gateway downloads the official AWS icons from aws.amazon.com. There is no telemetry and no account.
+
+**Why does the AI produce a typed graph instead of a picture?**
+The design is a JSON project (components, connections, containers such as VPCs and subnets) checked against a schema. That makes it possible to restrict services to a catalog, run deterministic rules on it, edit it on a canvas, and export it as JSON, PNG or SVG. A picture could only be looked at.
+
+**What do the rules check, and how is that different from an AI review?**
+25 deterministic rules (plain code, not the model) check the graph after generation, for example a database outside a VPC, a database in a public subnet, or a queue consumer without a dead-letter queue. They catch the same problems every time. An AI review that critiques the whole design is planned for 0.4; it will add judgement on top of the rules, not replace them.
+
+**Does it work offline?**
+Editing, validation and export work without internet or an API key. Generation needs your AI provider. Without internet on first start, diagrams use generic tiles instead of the AWS icons.
+
+**What does it cost?**
+The app is free and open source. You pay your AI provider directly for generations, about $0.007 per design with Claude Haiku 5.5 and $0.04–0.05 with Claude Sonnet 5.5 or GPT-6.1 Sol. Daily and monthly spending limits are set in the setup wizard.
+
 ## Contributing and support
 
 Found a bug or have an idea? [Report a bug](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=bug.yml) or [suggest an improvement](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=feature.yml). See [CONTRIBUTING.md](CONTRIBUTING.md), [SUPPORT.md](SUPPORT.md) and the [code of conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md). Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
