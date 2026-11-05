@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { redactKey } from './redact.js';
 
 export interface TokenUsage {
   input: number;
@@ -45,25 +46,39 @@ export class GenerationError extends Error {
   }
 }
 
-export function anthropicClient(apiKey: string): LlmClient {
-  const client = new Anthropic({ apiKey, maxRetries: 2 });
+/** The part of the Anthropic SDK the adapter uses; tests inject a fake. */
+export interface AnthropicLike {
+  messages: {
+    stream(
+      ...args: Parameters<Anthropic['messages']['stream']>
+    ): Pick<ReturnType<Anthropic['messages']['stream']>, 'finalMessage'>;
+  };
+}
+
+export function anthropicClient(apiKey: string, sdk?: AnthropicLike): LlmClient {
+  const client: AnthropicLike = sdk ?? new Anthropic({ apiKey, maxRetries: 2 });
   return async (req) => {
-    // Streaming, so a large max_tokens (room for adaptive thinking) stays clear of HTTP timeouts.
-    const res = await client.messages
-      .stream(
-        {
-          model: req.model,
-          max_tokens: req.maxTokens,
-          system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-          output_config: {
-            format: req.format as never,
-            ...(req.effort ? { effort: req.effort } : {}),
+    let res: Anthropic.Message;
+    try {
+      // Streaming, so a large max_tokens (room for adaptive thinking) stays clear of HTTP timeouts.
+      res = await client.messages
+        .stream(
+          {
+            model: req.model,
+            max_tokens: req.maxTokens,
+            system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
+            output_config: {
+              format: req.format as never,
+              ...(req.effort ? { effort: req.effort } : {}),
+            },
+            messages: req.messages,
           },
-          messages: req.messages,
-        },
-        { signal: req.signal },
-      )
-      .finalMessage();
+          { signal: req.signal },
+        )
+        .finalMessage();
+    } catch (err) {
+      throw redactKey(err, apiKey);
+    }
     const u = res.usage;
     return {
       text: res.content.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join(''),
