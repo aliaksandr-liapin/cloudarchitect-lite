@@ -3,7 +3,10 @@
  * reviewers (one Claude, one OpenAI, one Gemini model) through the production adapters.
  *
  * Usage: pnpm --filter @cloudarchitect/eval review --runs <id,id,...> --max-usd <n> [--seed 1]
- *        [--packets-only]
+ *        [--repeat n] [--scenarios id,id] [--base-scenarios id,id] [--packets-only]
+ * --repeat keeps one repeat number; --scenarios limits economical pairs (and best-quality pairs when
+ * --base-scenarios is absent); --base-scenarios limits best-quality pairs (gpt-sol and gemini-argon
+ * vs sonnet, haiku vs sonnet).
  * Reads ANTHROPIC_API_KEY, OPENAI_API_KEY and GEMINI_API_KEY from the environment or the repo-root
  * .env. --max-usd is one cap over all reviewer calls. Writes eval/reviews/phase3-<date>/
  * {packets/, key.json, review-<provider>-g<N>.json, summary.json}. Console output carries ids,
@@ -64,6 +67,9 @@ const { values: args } = parseArgs({
     runs: { type: 'string' },
     'max-usd': { type: 'string' },
     seed: { type: 'string', default: '1' },
+    repeat: { type: 'string' },
+    scenarios: { type: 'string' },
+    'base-scenarios': { type: 'string' },
     'packets-only': { type: 'boolean', default: false },
   },
 });
@@ -103,7 +109,17 @@ for (const runId of args.runs.split(',')) {
   }
 }
 
-const { packets, key } = buildPackets({ runs, scenarios, seed });
+const repeat = args.repeat === undefined ? undefined : Number(args.repeat);
+if (repeat !== undefined && (!Number.isInteger(repeat) || repeat < 1))
+  throw new Error('--repeat must be a positive integer');
+const { packets, key } = buildPackets({
+  runs,
+  scenarios,
+  seed,
+  repeat,
+  onlyScenarios: args.scenarios?.split(','),
+  baseScenarios: args['base-scenarios']?.split(','),
+});
 if (packets.length === 0) throw new Error('No design pairs found in the given runs');
 // A scenario prompt may legitimately name a vendor (e.g. "sign up with Google"); such mentions come
 // from the user's request, not from the generator, so they are reported rather than blocking.

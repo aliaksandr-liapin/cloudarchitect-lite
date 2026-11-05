@@ -350,3 +350,62 @@ describe('review guards', () => {
     expect(full.reviewersPerDesign['sonnet#1@alpha']).toBe(3);
   });
 });
+
+describe('buildPackets filters', () => {
+  const keyPairs = (r: ReturnType<typeof buildPackets>) =>
+    Object.values(r.key).flatMap((k) =>
+      Object.entries(k).map(([sc, e]) =>
+        [sc, ...[`${e.A.model}#${e.A.repeat}`, `${e.B.model}#${e.B.repeat}`].sort()].join('|'),
+      ),
+    );
+  const twice = [...runs, ...models.flatMap((m) => scenarios.map((s) => design(m, s.id, 2)))];
+
+  it('keeps only designs of the requested repeat and never pairs Haiku repeats with each other', () => {
+    const r = buildPackets({ runs: twice, scenarios, seed: 1, repeat: 2 });
+    const pairs = keyPairs(r);
+    expect(pairs).toHaveLength(20);
+    expect(pairs.every((p) => !p.includes('#1'))).toBe(true);
+    expect(pairs.some((p) => p.includes('haiku#1|haiku#2') || p.includes('haiku#2|haiku#2'))).toBe(
+      false,
+    );
+  });
+
+  it('limits economical pairs to --scenarios and best-quality pairs to --base-scenarios', () => {
+    const r = buildPackets({
+      runs,
+      scenarios,
+      seed: 1,
+      onlyScenarios: ['alpha', 'beta'],
+      baseScenarios: ['alpha'],
+    });
+    const pairs = keyPairs(r);
+    expect(pairs.filter((p) => p.includes('gpt-luna')).map((p) => p.split('|')[0])).toEqual(
+      expect.arrayContaining(['alpha', 'beta']),
+    );
+    expect(pairs.filter((p) => p.includes('gpt-luna'))).toHaveLength(2);
+    expect(pairs.filter((p) => p.includes('gemini-flash-lite'))).toHaveLength(2);
+    // best-quality: gpt-sol, gemini-argon and haiku-sonnet, alpha only
+    expect(pairs.filter((p) => p.includes('gpt-sol'))).toHaveLength(1);
+    expect(pairs.filter((p) => p.includes('gemini-argon'))).toHaveLength(1);
+    expect(pairs.filter((p) => p.includes('haiku#1|sonnet#1'))).toEqual(['alpha|haiku#1|sonnet#1']);
+    expect(pairs).toHaveLength(7);
+  });
+
+  it('uses --scenarios for every pair when --base-scenarios is absent', () => {
+    const pairs = keyPairs(buildPackets({ runs, scenarios, seed: 1, onlyScenarios: ['gamma'] }));
+    expect(pairs).toHaveLength(5);
+    expect(pairs.every((p) => p.startsWith('gamma|'))).toBe(true);
+  });
+
+  it('changes nothing without filters and rejects unknown scenario ids', () => {
+    expect(buildPackets({ runs, scenarios, seed: 1 })).toEqual(
+      buildPackets({ runs, scenarios, seed: 1, onlyScenarios: undefined }),
+    );
+    expect(() => buildPackets({ runs, scenarios, seed: 1, onlyScenarios: ['nope'] })).toThrow(
+      /Unknown scenarios: nope/,
+    );
+    expect(() =>
+      buildPackets({ runs, scenarios, seed: 1, baseScenarios: ['alpha', 'zzz'] }),
+    ).toThrow(/Unknown scenarios: zzz/);
+  });
+});

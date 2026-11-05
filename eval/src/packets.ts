@@ -248,13 +248,34 @@ function scenarioSection(s: Scenario, a: DesignInput, b: DesignInput): string {
   ].join('\n');
 }
 
+/** Models whose pairs (against Haiku) form the economical tier; every other pair is best-quality. */
+export const ECONOMICAL_MODELS = new Set(['gpt-luna', 'gemini-flash-lite']);
+
 export function buildPackets(input: {
   runs: DesignRun[];
   scenarios: Scenario[];
   seed: number;
   pairs?: Record<string, string>;
+  /** Use only designs from this repeat number. */
+  repeat?: number;
+  /** Scenario ids for economical pairs (and for best-quality pairs when `baseScenarios` is absent). */
+  onlyScenarios?: string[];
+  /** Scenario ids for best-quality pairs (best-quality models, and the Haiku-Sonnet pair). */
+  baseScenarios?: string[];
 }): { packets: Packet[]; key: Key } {
   const pairs = input.pairs ?? DEFAULT_PAIRS;
+  const known = new Set(input.scenarios.map((s) => s.id));
+  for (const list of [input.onlyScenarios, input.baseScenarios]) {
+    const unknown = list?.filter((id) => !known.has(id)) ?? [];
+    if (unknown.length) throw new Error(`Unknown scenarios: ${unknown.join(', ')}`);
+  }
+  const economicalIds = input.onlyScenarios ? new Set(input.onlyScenarios) : undefined;
+  const bestIds = input.baseScenarios ? new Set(input.baseScenarios) : economicalIds;
+  const allRuns = input.runs;
+  input = {
+    ...input,
+    runs: input.repeat === undefined ? allRuns : allRuns.filter((r) => r.repeat === input.repeat),
+  };
   const rand = rng(input.seed);
   const scenarioById = new Map(input.scenarios.map((s) => [s.id, s]));
   const find = (model: string, scenarioId: string, repeat: number) => {
@@ -279,6 +300,9 @@ export function buildPackets(input: {
     if (!partner || partner === x.model || !scenario) continue;
     const y = find(partner, x.scenarioId, x.repeat);
     if (!y) continue;
+    const tier =
+      ECONOMICAL_MODELS.has(x.model) || ECONOMICAL_MODELS.has(y.model) ? economicalIds : bestIds;
+    if (tier && !tier.has(x.scenarioId)) continue;
     const id = [x, y]
       .map((d) => `${d.model}#${d.repeat}`)
       .sort()
