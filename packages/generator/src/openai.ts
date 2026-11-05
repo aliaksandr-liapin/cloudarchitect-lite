@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { LlmClient } from './llm.js';
+import { redactKey } from './redact.js';
 
 export type JsonSchema = { [key: string]: unknown };
 
@@ -117,16 +118,6 @@ export interface OpenAIish {
   };
 }
 
-function redact(err: unknown, apiKey: string): unknown {
-  if (!(err instanceof Error) || err instanceof OpenAI.APIUserAbortError) return err;
-  if (!apiKey || !err.message.includes(apiKey)) return err;
-  const clean = new Error(err.message.replaceAll(apiKey, '[redacted]'));
-  clean.name = err.name;
-  const status = (err as { status?: unknown }).status;
-  if (status !== undefined) Object.assign(clean, { status });
-  return clean;
-}
-
 export function openaiClient(apiKey: string, sdk?: OpenAIish): LlmClient {
   const client: OpenAIish = sdk ?? (new OpenAI({ apiKey, maxRetries: 2 }) as unknown as OpenAIish);
   return async (req) => {
@@ -156,7 +147,7 @@ export function openaiClient(apiKey: string, sdk?: OpenAIish): LlmClient {
         )
         .finalResponse();
     } catch (err) {
-      throw redact(err, apiKey);
+      throw redactKey(err, apiKey);
     }
     const u = res.usage ?? {};
     const cached: number = u.input_tokens_details?.cached_tokens ?? 0;
