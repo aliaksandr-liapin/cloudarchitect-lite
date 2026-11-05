@@ -64,7 +64,7 @@ Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked
 - Editor: drag, resize, auto layout, light and dark theme, and versions that keep earlier diagrams.
 - Import and export JSON; export PNG and SVG.
 - Self-hosted with Docker on your own Anthropic, OpenAI or Gemini key (one is enough), with daily and monthly spending limits that count all providers together.
-- Choice of Claude Haiku 5.5 or Claude Sonnet 5.5. In the Gate A live runs, Haiku cost about $0.007 per generation and Sonnet about $0.045, and both passed the automated checks on 93% of runs. On the same nine base scenarios, blind reviewers scored Haiku 2.00 and Sonnet 2.57 out of 3. Method and caveats: [Gate A report](docs/product/phase2-gate-a.md).
+- Choice of four measured models from three providers: Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol and Gemini 4 Argon. Scores, cost and wait are in the [benchmark table](#claude-vs-gpt-vs-gemini); method and caveats: [benchmark report](docs/product/phase3-provider-benchmark.md).
 
 ## What's next
 
