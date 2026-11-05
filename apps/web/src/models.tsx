@@ -1,4 +1,10 @@
-import { listedModels, type ModelChoice, type ModelOption } from '@cloudarchitect/domain';
+import {
+  listedModels,
+  PROVIDER_LABEL,
+  PROVIDERS,
+  type ModelChoice,
+  type ModelOption,
+} from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Collapsible } from './Collapsible';
@@ -15,6 +21,7 @@ export function ModelComparison({
   options = listedModels(),
   selected,
   enabled,
+  available,
   onSelect,
   selectLabel = 'Use',
   disabledLabel = 'Own key',
@@ -22,6 +29,8 @@ export function ModelComparison({
   options?: readonly ModelOption[];
   selected?: ModelChoice;
   enabled?: readonly ModelChoice[];
+  /** Whether each model's provider has a key; a model without one cannot be used. */
+  available?: Partial<Record<ModelChoice, boolean>>;
   onSelect?: (id: ModelChoice) => void;
   selectLabel?: string;
   disabledLabel?: string;
@@ -62,16 +71,18 @@ export function ModelComparison({
           <tr>
             <th scope="row" />
             {options.map((o) => {
-              const allowed = !enabled || enabled.includes(o.id);
+              const keyed = available?.[o.id] !== false;
+              const allowed = keyed && (!enabled || enabled.includes(o.id));
+              const blocked = keyed ? disabledLabel : 'Add a key in setup';
               return (
                 <td key={o.id}>
                   <button
                     aria-pressed={selected === o.id}
                     disabled={!allowed}
-                    title={allowed ? undefined : disabledLabel}
+                    title={allowed ? undefined : blocked}
                     onClick={() => onSelect(o.id)}
                   >
-                    {selected === o.id ? 'Selected' : allowed ? selectLabel : disabledLabel}
+                    {selected === o.id ? 'Selected' : allowed ? selectLabel : blocked}
                   </button>
                 </td>
               );
@@ -89,6 +100,26 @@ export function ModelComparison({
   );
 }
 
+/** One comparison table per provider, so numbers are only compared where the choice is real. */
+export function ModelGroups({
+  options = listedModels(),
+  ...rest
+}: Omit<Parameters<typeof ModelComparison>[0], 'options'> & { options?: readonly ModelOption[] }) {
+  return (
+    <>
+      {PROVIDERS.map((p) => {
+        const group = options.filter((o) => o.provider === p);
+        return group.length ? (
+          <section key={p} className="model-group">
+            <h3>{PROVIDER_LABEL[p]}</h3>
+            <ModelComparison options={group} {...rest} />
+          </section>
+        ) : null;
+      })}
+    </>
+  );
+}
+
 const STORAGE_KEY = 'cloudarchitect.model';
 
 /** The model the user picked in the editor panel, if any and readable; the server default applies otherwise. */
@@ -101,9 +132,27 @@ export function readModelChoice(): ModelChoice | undefined {
   }
 }
 
+/**
+ * The browser's saved choice if the server still enables it and has a key for it; otherwise the
+ * server default. Without a default (no enabled model has a key) nothing is selected and
+ * generating answers setup_required.
+ */
+export function pickChoice(
+  saved: string | null,
+  m: {
+    enabled: readonly ModelChoice[];
+    defaultModel?: ModelChoice;
+    available?: Partial<Record<ModelChoice, boolean>>;
+  },
+): ModelChoice | undefined {
+  const id = saved as ModelChoice;
+  return m.enabled.includes(id) && m.available?.[id] !== false ? id : m.defaultModel;
+}
+
 /** Editor panel: pick the model for AI operations; models this instance does not enable are disabled. */
 export function AiModelPanel() {
   const [enabled, setEnabled] = useState<readonly ModelChoice[]>();
+  const [available, setAvailable] = useState<Partial<Record<ModelChoice, boolean>>>();
   const [choice, setChoice] = useState<ModelChoice>();
   const [offline, setOffline] = useState(false);
 
@@ -112,15 +161,14 @@ export function AiModelPanel() {
     api.models().then(
       (m) => {
         setEnabled(m.enabled);
+        setAvailable(m.available);
         let saved: string | null = null;
         try {
           saved = localStorage.getItem(STORAGE_KEY);
         } catch {
           /* storage blocked: fall back to the server default */
         }
-        setChoice(
-          m.enabled.includes(saved as ModelChoice) ? (saved as ModelChoice) : m.defaultModel,
-        );
+        setChoice(pickChoice(saved, m));
       },
       () => setOffline(true),
     );
@@ -140,9 +188,10 @@ export function AiModelPanel() {
       {offline && !DEMO && (
         <p className="muted small">AI service unavailable — manual editing still works.</p>
       )}
-      <ModelComparison
+      <ModelGroups
         selected={choice}
         enabled={enabled}
+        available={available}
         onSelect={offline || DEMO ? undefined : select}
       />
     </Collapsible>

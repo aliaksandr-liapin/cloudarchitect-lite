@@ -67,13 +67,26 @@ async function mockApi(
       : {
           available: true,
           configured: false,
+          providers: { anthropic: 'none', openai: 'none', google: 'none' },
           keyFromEnvironment: false,
           lockedByEnvironment: [],
           current: WIZARD_DEFAULTS,
         },
     '/api/setup/verify-key': { result: 'valid' },
     '/api/setup/complete': { ok: true },
-    '/api/models': { defaultModel: 'haiku', enabled: ['haiku', 'sonnet'], options: [] },
+    '/api/models': {
+      defaultModel: 'haiku',
+      enabled: ['haiku', 'sonnet'],
+      options: [],
+      available: {
+        haiku: true,
+        sonnet: true,
+        'gpt-luna': false,
+        'gpt-sol': false,
+        'gemini-flash-lite': false,
+        'gemini-argon': false,
+      },
+    },
   };
   return context.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -85,9 +98,9 @@ async function mockApi(
   });
 }
 
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, fullPage = false) {
   await page.waitForTimeout(400); // let transitions and fitView settle
-  await page.screenshot({ path: `${OUT}${name}.png` });
+  await page.screenshot({ path: `${OUT}${name}.png`, fullPage });
   console.log(`docs/images/${name}.png`);
 }
 
@@ -151,10 +164,10 @@ async function wizard(context: BrowserContext) {
   await page.getByRole('heading', { name: 'Welcome' }).waitFor();
   await shot(page, 'setup-1-welcome');
   await next();
-  await page.getByLabel('API key').fill(FAKE_KEY);
-  await page.getByRole('button', { name: 'Check key' }).click();
+  await page.getByLabel('Claude API key').fill(FAKE_KEY);
+  await page.getByRole('button', { name: 'Check key' }).first().click();
   await page.getByText('✓ Key works').waitFor();
-  await shot(page, 'setup-2-key');
+  await shot(page, 'setup-2-key', true);
   await next();
   await page.getByRole('heading', { name: 'Models' }).waitFor();
   await shot(page, 'setup-3-models');

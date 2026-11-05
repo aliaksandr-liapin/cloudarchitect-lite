@@ -7,6 +7,7 @@ import type {
   GenerateResponse,
   ModelChoice,
   ModelOption,
+  Provider,
 } from '@cloudarchitect/domain';
 
 /** Same origin by default (nginx and the Vite dev server proxy /api); set VITE_API_BASE for split hosting. */
@@ -56,21 +57,28 @@ export const api = {
     request<{
       available: boolean;
       configured: boolean;
+      /** Where each provider's key comes from; no key values. Absent on 0.2 servers. */
+      providers?: Record<Provider, KeySource>;
       keyFromEnvironment?: boolean;
       lockedByEnvironment?: string[];
-      current?: Omit<SetupRequest, 'code' | 'apiKey'>;
+      current?: Omit<SetupRequest, 'code' | 'apiKey' | 'apiKeys'>;
     }>('/api/setup/status'),
-  verifyKey: (code: string, apiKey: string) =>
+  verifyKey: (code: string, provider: Provider, apiKey: string) =>
     request<{ result: 'valid' | 'invalid' | 'unreachable' }>('/api/setup/verify-key', {
       method: 'POST',
-      body: JSON.stringify({ code, apiKey }),
+      body: JSON.stringify({ code, provider, apiKey }),
     }),
   completeSetup: (input: SetupRequest) =>
     request<{ ok: true }>('/api/setup/complete', { method: 'POST', body: JSON.stringify(input) }),
   models: () =>
-    request<{ defaultModel: ModelChoice; enabled: ModelChoice[]; options: ModelOption[] }>(
-      '/api/models',
-    ),
+    request<{
+      /** Absent when no enabled model has a key. */
+      defaultModel?: ModelChoice;
+      enabled: ModelChoice[];
+      options: ModelOption[];
+      /** Whether the model's provider has a key. */
+      available?: Partial<Record<ModelChoice, boolean>>;
+    }>('/api/models'),
   generate: (body: GenerateRequestInput, signal?: AbortSignal) =>
     request<GenerateResponse>('/api/ai/generate', {
       method: 'POST',
@@ -87,10 +95,13 @@ export const api = {
 
 export interface SetupRequest {
   code: string;
-  apiKey?: string;
+  /** Keys newly entered in the wizard; saved and environment keys are not sent. */
+  apiKeys?: Partial<Record<Provider, string>>;
   models: ModelChoice[];
   defaultModel: ModelChoice;
   dailyBudgetUsd: number;
   monthlyBudgetUsd: number;
   rateLimitPerMinute: number;
 }
+
+export type KeySource = 'environment' | 'saved' | 'none';
