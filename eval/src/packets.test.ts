@@ -4,6 +4,7 @@ import {
   acceptSaved,
   aggregate,
   missingCalls,
+  normalizeReviewOutput,
   packetMismatches,
   buildPackets,
   estimateCallMicroUsd,
@@ -485,5 +486,54 @@ describe('score range and resume', () => {
     expect(packetMismatches({ g1: 'one', g2: 'TWO' }, built)).toEqual(['g2']);
     expect(packetMismatches({ g1: 'one' }, built)).toEqual(['g2']);
     expect(packetMismatches({ g1: 'one', g2: 'two', g3: 'x' }, built)).toEqual(['g3']);
+  });
+});
+
+describe('normalizeReviewOutput', () => {
+  const dims = {
+    requirementCoverage: 2,
+    serviceFitness: 2,
+    connectionCorrectness: 2,
+    securityBaseline: 2,
+    reliabilityOperability: 2,
+    costAwareness: 2,
+    explanationAccuracy: 2,
+  };
+  const rv = (design: 'A' | 'B', summary: string, scores = dims) => ({
+    scenario: 'alpha',
+    design,
+    scores,
+    criticalDefect: false,
+    defects: [],
+    summary,
+  });
+  const base = (): ReviewOutput => ({
+    reviews: [rv('A', 'first'), rv('B', 'b')],
+    preference: [{ scenario: 'alpha', better: 'A', why: 'first' }],
+  });
+
+  it('keeps the first of repeated entries and warns', () => {
+    const o = base();
+    o.reviews.push(rv('A', 'second', { ...dims, costAwareness: 0 }));
+    o.preference.push({ scenario: 'alpha', better: 'B', why: 'second' });
+    const { output, warnings } = normalizeReviewOutput(o, ['alpha']);
+    expect(output.reviews.map((r) => r.summary)).toEqual(['first', 'b']);
+    expect(output.preference).toEqual([{ scenario: 'alpha', better: 'A', why: 'first' }]);
+    expect(warnings).toEqual(['duplicate review alpha/A', 'duplicate preference alpha']);
+  });
+
+  it('has no warnings for a clean answer and still rejects bad ones', () => {
+    expect(normalizeReviewOutput(base(), ['alpha']).warnings).toEqual([]);
+    const missing = { ...base(), reviews: [rv('A', 'x'), rv('A', 'dup')] };
+    expect(() => normalizeReviewOutput(missing, ['alpha'])).toThrow(/missing review alpha\/B/);
+    expect(() => normalizeReviewOutput(base(), ['beta'])).toThrow(/unexpected/);
+    const bad = { ...base(), reviews: [rv('A', 'x', { ...dims, costAwareness: 5 }), rv('B', 'b')] };
+    expect(() => normalizeReviewOutput(bad, ['alpha'])).toThrow(/out of range/);
+  });
+
+  it('accepts a saved answer with a repeated design as its normalized form', () => {
+    const o = base();
+    o.reviews.push(rv('B', 'again'));
+    expect(acceptSaved(JSON.stringify(o), ['alpha'])!.reviews).toHaveLength(2);
   });
 });

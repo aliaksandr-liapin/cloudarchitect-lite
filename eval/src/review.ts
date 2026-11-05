@@ -44,11 +44,11 @@ import {
   buildPackets,
   estimateCallMicroUsd,
   findLeaks,
-  validateReviewOutput,
   withinCap,
   ReviewOutput,
   acceptSaved,
   missingCalls,
+  normalizeReviewOutput,
   packetMismatches,
   type DesignRun,
   type PanelReview,
@@ -245,12 +245,19 @@ async function review(r: (typeof REVIEWERS)[number], client: LlmClient, packetId
     spentMicro += cost;
     const usage: CallUsage[] = [{ model: r.model, usage: res.usage, costMicroUsd: cost }];
     const output = parseOutput(res.text, ReviewOutput, usage);
-    validateReviewOutput(output, packet.scenarios);
+    // The raw answer is kept for audit; duplicates are dropped (first entry wins) with a warning.
     writeFileSync(
-      join(outDir, `review-${r.provider}-${packetId}.json`),
+      join(outDir, `review-${r.provider}-${packetId}.raw.json`),
       JSON.stringify(output, null, 2),
     );
-    panel.push({ reviewer: r.provider, packetId, output });
+    const normalized = normalizeReviewOutput(output, packet.scenarios);
+    for (const w of normalized.warnings)
+      console.log(`warning: ${r.provider} ${packetId}: ${w} (first entry kept)`);
+    writeFileSync(
+      join(outDir, `review-${r.provider}-${packetId}.json`),
+      JSON.stringify(normalized.output, null, 2),
+    );
+    panel.push({ reviewer: r.provider, packetId, output: normalized.output });
     console.log(`${r.provider.padEnd(9)} ${packetId} ok $${(cost / 1e6).toFixed(4)}`);
   } catch (err) {
     // The message is logged with the key masked, so a failure can be diagnosed.

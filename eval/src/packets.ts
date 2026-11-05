@@ -524,6 +524,34 @@ export function validateReviewOutput(output: ReviewOutput, scenarios: string[]):
 }
 
 /**
+ * Keeps the first review per (scenario, design) and the first preference per scenario, then
+ * validates. Returns the normalized answer and one warning per dropped duplicate; throws like
+ * `validateReviewOutput` for missing pairs, foreign scenarios and out-of-range scores.
+ */
+export function normalizeReviewOutput(
+  output: ReviewOutput,
+  scenarios: string[],
+): { output: ReviewOutput; warnings: string[] } {
+  const warnings: string[] = [];
+  const seen = new Set<string>();
+  const reviews = output.reviews.filter((r) => {
+    const id = `${r.scenario}/${r.design}`;
+    if (!seen.has(id)) return (seen.add(id), true);
+    warnings.push(`duplicate review ${id}`);
+    return false;
+  });
+  const prefs = new Set<string>();
+  const preference = output.preference.filter((p) => {
+    if (!prefs.has(p.scenario)) return (prefs.add(p.scenario), true);
+    warnings.push(`duplicate preference ${p.scenario}`);
+    return false;
+  });
+  const normalized = { reviews, preference };
+  validateReviewOutput(normalized, scenarios);
+  return { output: normalized, warnings };
+}
+
+/**
  * Worst-case cost of one call in micro-USD, reserved while the call is in flight: the whole
  * request at 3 characters per token (a conservative estimate) plus `maxTokens` at the output price.
  */
@@ -550,8 +578,7 @@ export function acceptSaved(text: string, scenarios: string[]): ReviewOutput | u
   try {
     const parsed = ReviewOutput.safeParse(JSON.parse(text));
     if (!parsed.success) return undefined;
-    validateReviewOutput(parsed.data, scenarios);
-    return parsed.data;
+    return normalizeReviewOutput(parsed.data, scenarios).output;
   } catch {
     return undefined;
   }
