@@ -145,9 +145,9 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
     id: 'gemini-argon',
     provider: 'google',
     model: 'gemini-4-argon',
-    label: 'Gemini 4 Argon (December price; $2/$10 until 2026-11-30)',
+    label: 'Gemini 4 Argon',
     summary:
-      'Passed every automated check; one critical defect in 9 reviewed designs. Highest cost, about 2.4× Sonnet at the December price.',
+      'Passed every automated check; one critical defect in 9 reviewed designs. Highest cost, about 2.4× Sonnet at the December price ($4/$20; $2/$10 until 2026-11-30).',
     repairTurns: 0,
     benchmark: {
       ...MEASURED,
