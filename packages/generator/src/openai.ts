@@ -21,7 +21,7 @@ function bareRef(p: unknown): { node: unknown; description?: unknown } {
 }
 
 function walk(s: unknown, keepRefSiblings = false): unknown {
-  if (Array.isArray(s)) return s.map(walk);
+  if (Array.isArray(s)) return s.map((x) => walk(x));
   if (!isObj(s)) return s;
   const out: JsonSchema = {};
   for (const [k, v] of Object.entries(s)) {
