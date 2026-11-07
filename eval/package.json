@@ -10,6 +10,7 @@
     "rescore": "tsx src/rescore.ts",
     "live": "tsx src/live.ts",
     "review": "tsx src/review.ts",
+    "rules": "tsx src/rule-report.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc --noEmit"

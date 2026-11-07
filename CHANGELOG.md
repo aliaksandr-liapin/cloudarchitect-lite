@@ -4,6 +4,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- Benchmark report: rule hits per model (which validation rules each model's designs trigger), and `pnpm --filter @cloudarchitect/eval rules` to print them from saved live runs.
+- The live eval also records findings on the first draft and the repair turns used, so the effect of the repair turn can be measured.
+
 ## [0.3.0] - 2026-11-10
 
 Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-provider benchmark.

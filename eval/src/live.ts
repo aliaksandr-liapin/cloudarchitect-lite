@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { evaluateGate, KEY_VAR, modelsWithKeys, type LiveSummary } from './gate.js';
 import { Scenario, scoreCandidate, type ScenarioResult } from './harness.js';
+import { countByRule, type FindingsByRule } from './rule-hits.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const envFile = join(root, '..', '.env');
@@ -106,7 +107,10 @@ interface LiveRecord {
   calls: { model: string; stopReason: string | null; outputTokens: number; costUsd: number }[];
   costUsd: number;
   latencyMs: number;
-  findingsByRule?: Record<string, number>;
+  findingsByRule?: FindingsByRule;
+  /** Findings on the first draft, before any repair turn. */
+  firstDraftFindingsByRule?: FindingsByRule;
+  repairTurnsUsed?: number;
   score?: ScenarioResult;
 }
 
@@ -171,12 +175,15 @@ async function runJob(s: Scenario, model: ModelChoice, repeat: number): Promise<
       join(outDir, 'outputs', `${model}-${s.id}-${repeat}.project.json`),
       JSON.stringify(r.project, null, 2),
     );
-    const findingsByRule: Record<string, number> = {};
-    for (const f of validateProject(r.project, awsCatalog)) {
-      const key = `${f.ruleId ?? 'structural'}:${f.severity}`;
-      findingsByRule[key] = (findingsByRule[key] ?? 0) + 1;
-    }
-    return { ...base, ok: true, ...done(), findingsByRule, score: scoreCandidate(s, r.project) };
+    return {
+      ...base,
+      ok: true,
+      ...done(),
+      findingsByRule: countByRule(validateProject(r.project, awsCatalog)),
+      firstDraftFindingsByRule: countByRule(r.firstDraftFindings),
+      repairTurnsUsed: r.repairTurnsUsed,
+      score: scoreCandidate(s, r.project),
+    };
   } catch (err) {
     if (err instanceof SpendCapReached) cutShort = true;
     // The rejected answer stays in the local, git-ignored results folder for diagnosis.
