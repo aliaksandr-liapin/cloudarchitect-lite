@@ -149,6 +149,20 @@ describe('generateArchitecture', () => {
     expect(validateProject(r.project, awsCatalog).map((f) => f.ruleId)).not.toContain('VR-004');
   });
 
+  it('reports the first draft findings and the repair turns used', async () => {
+    const repaired = await generateArchitecture(
+      fake(graph(false), graph(true)).llm,
+      awsCatalog,
+      input(),
+    );
+    expect(repaired.repairTurnsUsed).toBe(1);
+    expect(repaired.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-004');
+
+    const clean = await generateArchitecture(fake(graph(true)).llm, awsCatalog, input());
+    expect(clean.repairTurnsUsed).toBe(0);
+    expect(clean.firstDraftFindings.map((f) => f.ruleId)).not.toContain('VR-004');
+  });
+
   it('names the offending node ids and the remediation in the repair turn', async () => {
     // Trimmed from Haiku product-search-cost #1: the database came back without containerId,
     // and a repair turn that named only the label ("... must run inside a VPC") did not fix it.

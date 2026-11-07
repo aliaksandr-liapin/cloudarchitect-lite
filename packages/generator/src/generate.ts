@@ -7,6 +7,7 @@ import {
   YOU_DECIDE,
   type CatalogSnapshot,
   type DesignToggles,
+  type Finding,
   type GapTopic,
   type ModelChoice,
   type Question,
@@ -32,6 +33,9 @@ export interface GenerateInput {
 export interface GenerateResult {
   project: Project;
   usage: CallUsage[];
+  /** Validator findings on the first draft, before any repair turn (for the eval). */
+  firstDraftFindings: Finding[];
+  repairTurnsUsed: number;
 }
 
 /** Room for adaptive thinking plus the JSON answer, so thinking cannot truncate the output. */
@@ -113,8 +117,11 @@ export async function generateArchitecture(
   };
 
   let out = await build();
+  const firstDraftFindings = validateProject(out.project, catalog);
+  let repairTurnsUsed = 0;
   for (let turn = 0; turn < option.repairTurns; turn++) {
-    const issues = validateProject(out.project, catalog).filter((f) => f.severity !== 'info');
+    const findings = turn === 0 ? firstDraftFindings : validateProject(out.project, catalog);
+    const issues = findings.filter((f) => f.severity !== 'info');
     if (!issues.length) break;
     const list = issues
       // Ids, not only labels, so the model can find the element to change.
@@ -134,9 +141,10 @@ export async function generateArchitecture(
       { role: 'user', content: repairMessage(list) },
     );
     out = await build();
+    repairTurnsUsed++;
   }
 
   const project = out.project;
   project.generation = { ...project.generation!, contentHash: graphContentHash(project) };
-  return { project, usage };
+  return { project, usage, firstDraftFindings, repairTurnsUsed };
 }

@@ -82,6 +82,28 @@ Preferences per reviewer, from the saved review files. The Claude reviewer's ans
 
 All three reviewers agree on the direction of the economical pairs and of Sonnet vs Haiku. Sol vs Sonnet is unanimous for the OpenAI and Gemini reviewers and close for the Claude reviewer. Sonnet vs Argon is split. On the pair that best matches its own provider, each reviewer leaned toward its own provider's model more than the other two reviewers did (the Claude reviewer on Sol vs Sonnet, the OpenAI reviewer on Haiku vs Luna, the Gemini reviewer on Sonnet vs Argon). This does not hold for every pair: on Sonnet vs Haiku the Claude reviewer favoured Haiku as often as the OpenAI reviewer did. The majority and median of three limit the effect of one reviewer.
 
+### Rule hits per model
+
+Which validation rules ([PRD §11](prd.md)) each model's final designs still trigger. A cell is "runs with at least one finding of the rule / runs"; `·` means none. Rules that never fired in this benchmark are left out. Generated with `pnpm --filter @cloudarchitect/eval rules <run ids above>`.
+
+| Rule | Severity | Haiku | Luna | Flash-Lite | Sonnet | Sol | Argon |
+|---|---|---|---|---|---|---|---|
+| VR-002 S3 read directly while CloudFront serves it | warning | 1/44 | 1/44 | · | 1/15 | · | 1/15 |
+| VR-003 public API or ALB without stated auth | warning | 9/44 | 2/44 | 10/44 | 4/15 | 6/15 | 1/15 |
+| VR-004 async consumer without DLQ | warning | · | 3/44 | 3/44 | 1/15 | · | · |
+| VR-011 client upload to S3 without stated authorization | warning | 1/44 | · | · | 1/15 | 1/15 | · |
+| VR-012 requirement without a linked node or edge | warning | · | · | · | 8/15 | · | · |
+| VR-018 ALB in a single Availability Zone | warning | 5/44 | 7/44 | 12/44 | 4/15 | 4/15 | · |
+| VR-023 VPC resources in one AZ with HA/DR on | warning | · | · | 1/44 | · | · | · |
+| VR-005 Lambda to RDS without RDS Proxy | info | · | 2/44 | 1/44 | 1/15 | 1/15 | 1/15 |
+| VR-008 data store without stated encryption at rest | info | 10/44 | 32/44 | 1/44 | 1/15 | 1/15 | · |
+| VR-015 `unresolved` node | info | 15/44 | 5/44 | 3/44 | 7/15 | 6/15 | 3/15 |
+
+- No final design has an error-level finding.
+- The economical models get one repair turn and the best-quality models none, so the Sonnet, Sol and Argon columns are first drafts. The repair turn ran when the first draft had a warning or an error: in 34 of 44 Haiku runs, 34 of 44 Luna runs and 38 of 44 Flash-Lite runs. Findings on the first draft were not logged in this run; the live eval records them from 2026-11-07 (`firstDraftFindingsByRule`, `repairTurnsUsed` in `records.json`).
+- Patterns: Sonnet often leaves a requirement without a linked node (VR-012), which no other model does; Luna rarely states encryption at rest (VR-008); Flash-Lite most often puts an ALB in one AZ (VR-018) and leaves an API without stated auth (VR-003); Argon leaves the fewest findings.
+- The tiers ran different scenario sets (22 vs 15 scenarios), so compare columns within a tier. One run per design; small counts are noise.
+
 ## Listing bar
 
 **Product owner's decision, 2026-11-05 (replaces the Gate A bar for 0.3):** a model is listed when
