@@ -5,5 +5,5 @@
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["fake-ai", "src"]
+  "include": ["fake-ai", "src", "playwright.config.ts"]
 }
