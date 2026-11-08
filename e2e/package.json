@@ -1,0 +1,20 @@
+{
+  "name": "@cloudarchitect/e2e",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser end-to-end regression test: the production images in Docker, AI providers replaced by a fake server replaying recorded responses.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "record": "node src/record.ts"
+  },
+  "devDependencies": {
+    "@cloudarchitect/generator": "workspace:*",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "license": "Apache-2.0"
+}
