@@ -1,7 +1,7 @@
 /**
  * Records the fixtures the fake AI server replays: runs every prompt in `prompts.ts` through
  * the real generator against the real providers, with the fake server in record mode in
- * between, and writes `e2e/fixtures/fixtures.json`. Paid (about $0.30) — run it by hand only
+ * between, and writes `e2e/fixtures/fixtures.json`. Paid (about $0.20) — run it by hand only
  * after a catalog, schema or prompt change makes the freshness test fail.
  *
  *   pnpm --filter @cloudarchitect/e2e record

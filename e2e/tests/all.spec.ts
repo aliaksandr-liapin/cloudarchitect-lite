@@ -37,7 +37,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
   // A local image build on a cold cache takes several minutes.
   testInfo.setTimeout(600_000);
   const images = (process.env.E2E_IMAGES ?? 'local') as 'local' | 'ghcr';
-  stack = await startStack({ setup: 'all', images });
+  stack = await startStack({ setup: 'all', images, version: process.env.E2E_VERSION });
   // Once, before anything reaches the fake server; each provider's replay is used once.
   await resetFake(stack.control);
   page = await (await browser.newContext()).newPage();
@@ -74,7 +74,9 @@ for (const provider of ['anthropic', 'openai', 'google'] as const) {
     await generate(page, PROMPTS[provider][0]);
     await expect(page.getByRole('banner').getByText(expected!.name, { exact: true })).toBeVisible();
     await expectNodes(page, expected!);
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    // The generation error only: the icon and storage notices are alerts too.
+    const notices = /official AWS icons|Browser storage is unavailable/;
+    await expect(page.getByRole('alert').filter({ hasNotText: notices })).toHaveCount(0);
 
     const calls = (await fakeLog(stack.control)).slice(before).filter((c) => !isModelsList(c.path));
     await test.info().attach('fake-ai-log.json', {

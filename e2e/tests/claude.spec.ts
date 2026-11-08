@@ -38,7 +38,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
   testInfo.setTimeout(600_000);
   [dental, photos] = (await expectedDesigns('anthropic')) as [Project, Project];
   const images = (process.env.E2E_IMAGES ?? 'local') as 'local' | 'ghcr';
-  stack = await startStack({ setup: 'claude', images });
+  stack = await startStack({ setup: 'claude', images, version: process.env.E2E_VERSION });
   // Once, not per test: the Anthropic replay is ordered (design 1, then design 2) and the two
   // generations are in different tests.
   await resetFake(stack.control);
