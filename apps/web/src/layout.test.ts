@@ -2,6 +2,7 @@ import { samples } from '@cloudarchitect/catalog';
 import { migrateProject, type Project } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import {
+  keepFlowState,
   applyLayout,
   containerMinSize,
   dropRoutes,
@@ -260,5 +261,38 @@ describe('layout', () => {
       const allLegacy = { ...laid, nodes: laid.nodes.map((n) => ({ ...n, size: undefined })) };
       expect((await recoverRoutes(allLegacy)).size).toBe(0);
     });
+  });
+});
+
+describe('keepFlowState', () => {
+  const node = (id: string, width: number, extra: object = {}) => ({
+    id,
+    position: { x: 0, y: 0 },
+    data: {},
+    style: { width, height: 72 },
+    ...extra,
+  });
+
+  it('keeps the measured size of a node whose size did not change', () => {
+    // React Flow hides a node until it is measured, and a same-size element is never re-measured.
+    const current = [node('a', 220, { measured: { width: 220, height: 72 } })];
+    expect(keepFlowState(current, [node('a', 220)])[0]?.measured).toEqual({
+      width: 220,
+      height: 72,
+    });
+  });
+
+  it('drops the measured size when the node was resized', () => {
+    const current = [node('a', 220, { measured: { width: 220, height: 72 } })];
+    expect(keepFlowState(current, [node('a', 300)])[0]?.measured).toBeUndefined();
+  });
+
+  it('keeps the selection and leaves new nodes untouched', () => {
+    const current = [node('a', 220, { selected: true })];
+    const next = keepFlowState(current, [node('a', 220), node('b', 220)]);
+    expect(next.map((n) => [n.id, n.selected, n.measured])).toEqual([
+      ['a', true, undefined],
+      ['b', undefined, undefined],
+    ]);
   });
 });
