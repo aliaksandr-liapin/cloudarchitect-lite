@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-17
+
+Gemini retries transient errors, and the benchmark report shows which rules each model breaks.
+
 ### Added
 
 - Benchmark report: rule hits per model (which validation rules each model's designs trigger), and `pnpm --filter @cloudarchitect/eval rules` to print them from saved live runs.
@@ -107,7 +111,8 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0

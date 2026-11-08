@@ -27,13 +27,13 @@ Run one command in an empty folder. It downloads `compose.yaml` and starts the p
 **macOS and Linux**
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.1/compose.yaml && docker compose up
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.1/compose.yaml; docker compose up
 ```
 
 The images are multi-architecture (Intel/AMD and Arm). Tested on macOS (Apple silicon) and Linux (CI, on every release). Windows (Intel/AMD or Arm) runs the same Linux images through Docker Desktop and is expected to work, but has not been tested by hand yet; please [report](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/new?template=bug.yml) what you find. Docker Desktop on Windows needs WSL 2 and virtualization; inside a virtual machine (Parallels, VMware, Hyper-V) nested virtualization must be turned on.
@@ -116,7 +116,7 @@ Run these commands **in the same folder** as the original install. Docker names 
 
 ```bash
 cd path/to/your/install/folder
-VERSION=0.3.0   # the version you upgrade to
+VERSION=0.3.1   # the version you upgrade to
 curl -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$VERSION/compose.yaml"
 docker compose pull && docker compose up -d
 ```
@@ -125,7 +125,7 @@ docker compose pull && docker compose up -d
 
 ```powershell
 cd path\to\your\install\folder
-$Version = '0.3.0'   # the version you upgrade to
+$Version = '0.3.1'   # the version you upgrade to
 curl.exe -fsSLO "https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v$Version/compose.yaml"
 docker compose pull; docker compose up -d
 ```
