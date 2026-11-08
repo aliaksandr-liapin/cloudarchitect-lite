@@ -157,7 +157,7 @@ export async function startStack(opts: {
     if (!setupUrl)
       throw new Error('the gateway log has no setup link (http://localhost:8080/setup?code=…)');
     const ready = await poll(ICONS_TIMEOUT_MS, async () => {
-      const res = await fetch(`${BASE_URL}/api/icons`);
+      const res = await fetch(`${BASE_URL}/api/icons`, { signal: AbortSignal.timeout(5000) });
       return (await res.text()).includes('"state":"ready"') || undefined;
     });
     if (!ready) {
