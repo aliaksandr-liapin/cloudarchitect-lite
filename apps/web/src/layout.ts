@@ -272,6 +272,26 @@ export function fitsChildren(
   );
 }
 
+/**
+ * Carries React Flow state over a full node replacement (a commit): the selection, and the
+ * measured size of every node whose size did not change. React Flow hides a node until it is
+ * measured, and the browser reports an element's size only when it changes, so a same-size node
+ * whose measurement is dropped can stay hidden (seen after Restore and Import under CPU load).
+ */
+export function keepFlowState(current: Node[], next: Node[]): Node[] {
+  const byId = new Map(current.map((n) => [n.id, n]));
+  return next.map((n) => {
+    const old = byId.get(n.id);
+    if (!old) return n;
+    const sameSize = old.style?.width === n.style?.width && old.style?.height === n.style?.height;
+    return {
+      ...n,
+      ...(old.selected ? { selected: true } : {}),
+      ...(sameSize && old.measured ? { measured: old.measured } : {}),
+    };
+  });
+}
+
 /** Converts stored project geometry to React Flow nodes. Parents must precede children, so containers go depth-first. */
 export function toFlow(
   project: Project,
