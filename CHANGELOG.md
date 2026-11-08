@@ -16,6 +16,8 @@ Gemini retries transient errors, and the benchmark report shows which rules each
 ### Fixed
 
 - Gemini requests retry transient errors (408, 429, 5xx) up to twice, like Anthropic and OpenAI requests. Before, a single rate-limit or server error failed the generation ([#30](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/30)).
+- Setup wizard, Models step: when only one model is on offer (for example a Gemini-only install), it is selected; before, Next stayed disabled until you ticked it.
+- Setup wizard: the Gemini 4 Argon note no longer compares its cost with Claude Sonnet, which a Gemini-only install does not show; the Limits step rounds the cost per generation like the Models step ($0.120, not $0.1197).
 
 ## [0.3.0] - 2026-11-10
 
