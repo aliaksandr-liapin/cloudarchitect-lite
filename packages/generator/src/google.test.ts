@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { googleClient, geminiSchema } from './google.js';
+import { geminiSdk, googleClient, geminiSchema } from './google.js';
 import { jsonOutputFormat } from './llm.js';
 
 const schema = z.object({
@@ -150,5 +150,62 @@ describe('googleClient', () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).not.toContain('SECRET');
     expect((err as { status?: number }).status).toBe(400);
+  });
+});
+
+describe('geminiSdk retries (real SDK, fake fetch, no network)', () => {
+  const sse = (body: unknown) =>
+    new Response(`data: ${JSON.stringify(body)}\n\n`, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    });
+  const error = (status: number) =>
+    new Response(JSON.stringify({ error: { code: status, message: `status ${status}` } }), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  const fakeFetch = (...responses: Response[]) => {
+    const calls: string[] = [];
+    const fetch = (async (url: string) => {
+      calls.push(String(url));
+      return responses.shift() ?? error(599);
+    }) as unknown as typeof globalThis.fetch;
+    return { calls, fetch };
+  };
+  const ok = sse({
+    candidates: [{ content: { parts: [{ text: '{"kind":"a"}' }] }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+  });
+
+  it('retries once after a 503 and returns the answer', async () => {
+    const f = fakeFetch(error(503), ok);
+    const sdk = geminiSdk('AIza-SECRET', { fetch: f.fetch, initialDelay: 0.001 });
+    const res = await googleClient('AIza-SECRET', sdk)(baseReq);
+    expect(f.calls).toHaveLength(2);
+    expect(res.text).toBe('{"kind":"a"}');
+  });
+
+  it('retries a 429', async () => {
+    const f = fakeFetch(error(429), ok);
+    const sdk = geminiSdk('k', { fetch: f.fetch, initialDelay: 0.001 });
+    await googleClient('k', sdk)(baseReq);
+    expect(f.calls).toHaveLength(2);
+  });
+
+  it('does not retry a 400 and keeps the key out of the error', async () => {
+    const f = fakeFetch(error(400), ok);
+    const sdk = geminiSdk('AIza-SECRET', { fetch: f.fetch, initialDelay: 0.001 });
+    const err = await googleClient('AIza-SECRET', sdk)(baseReq).catch((e: unknown) => e);
+    expect(f.calls).toHaveLength(1);
+    expect((err as { status?: number }).status).toBe(400);
+    expect((err as Error).message).not.toContain('SECRET');
+  });
+
+  it('gives up after 2 retries', async () => {
+    const f = fakeFetch(error(503), error(503), error(503), ok);
+    const sdk = geminiSdk('k', { fetch: f.fetch, initialDelay: 0.001 });
+    const err = await googleClient('k', sdk)(baseReq).catch((e: unknown) => e);
+    expect(f.calls).toHaveLength(3);
+    expect((err as { status?: number }).status).toBe(503);
   });
 });

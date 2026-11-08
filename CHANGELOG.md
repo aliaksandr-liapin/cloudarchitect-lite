@@ -9,6 +9,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Benchmark report: rule hits per model (which validation rules each model's designs trigger), and `pnpm --filter @cloudarchitect/eval rules` to print them from saved live runs.
 - The live eval also records findings on the first draft and the repair turns used, so the effect of the repair turn can be measured.
 
+### Fixed
+
+- Gemini requests retry transient errors (408, 429, 5xx) up to twice, like Anthropic and OpenAI requests. Before, a single rate-limit or server error failed the generation ([#30](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/30)).
+
 ## [0.3.0] - 2026-11-10
 
 Claude vs GPT vs Gemini: OpenAI and Gemini next to Claude, and a public three-provider benchmark.
