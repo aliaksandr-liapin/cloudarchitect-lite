@@ -11,6 +11,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: after **Restore** or **Import JSON**, a diagram node could stay invisible until the page was reloaded (more likely on a busy computer). Found by the new browser end-to-end test.
 - Gemini requests retry transient errors (408, 429, 5xx) up to twice, like Anthropic and OpenAI requests. Before, a single rate-limit or server error failed the generation ([#30](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/30)).
 
 ## [0.3.0] - 2026-11-10

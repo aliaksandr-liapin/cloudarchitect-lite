@@ -38,6 +38,7 @@ import {
   fitsChildren,
   needsLayout,
   recoverRoutes,
+  keepFlowState,
   toFlow,
   type Routes,
 } from './layout';
@@ -181,11 +182,8 @@ export function App() {
       if (opts.fit) fitPendingRef.current = true;
       const flow = toFlow(laid, displayName, routes);
       setProject(laid);
-      // Keep the selection (and so the resize handles and Details) across a commit.
-      setNodes((current) => {
-        const selected = new Set(current.filter((n) => n.selected).map((n) => n.id));
-        return flow.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
-      });
+      // Keep the selection (and so the resize handles and Details) and measured sizes across a commit.
+      setNodes((current) => keepFlowState(current, flow.nodes));
       setEdges(flow.edges);
       if (opts.recover && !layout) {
         void recoverRoutes(laid).then(
