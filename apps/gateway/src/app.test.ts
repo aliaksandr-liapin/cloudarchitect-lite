@@ -14,7 +14,7 @@ import {
   type Settings,
 } from './config.js';
 import { IconStore } from './icons.js';
-import { SetupService, verifyKey, type KeyCheck } from './setup.js';
+import { keyCheckRequest, SetupService, verifyKey, type KeyCheck } from './setup.js';
 import { MemorySpendStore } from './store.js';
 
 const setup = (env: Record<string, string | undefined> = {}) => {
@@ -482,6 +482,29 @@ describe('setup wizard', () => {
   it('is absent when the gateway runs without a wizard', async () => {
     const res = await setup().app.request('/api/setup/complete', post('', input));
     expect(res.status).toBe(404);
+  });
+});
+
+describe('keyCheckRequest', () => {
+  it('uses the default provider URLs', () => {
+    expect(keyCheckRequest('anthropic', 'k', {})[0]).toBe(
+      'https://api.anthropic.com/v1/models?limit=1',
+    );
+    expect(keyCheckRequest('openai', 'k', {})[0]).toBe('https://api.openai.com/v1/models');
+    expect(keyCheckRequest('google', 'k', {})[0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models',
+    );
+  });
+
+  it('honors the SDK base-URL variables', () => {
+    const env = {
+      ANTHROPIC_BASE_URL: 'http://fake-ai:8790/',
+      OPENAI_BASE_URL: 'http://fake-ai:8790/v1',
+      GOOGLE_GEMINI_BASE_URL: 'http://fake-ai:8790',
+    };
+    expect(keyCheckRequest('anthropic', 'k', env)[0]).toBe('http://fake-ai:8790/v1/models?limit=1');
+    expect(keyCheckRequest('openai', 'k', env)[0]).toBe('http://fake-ai:8790/v1/models');
+    expect(keyCheckRequest('google', 'k', env)[0]).toBe('http://fake-ai:8790/v1beta/models');
   });
 });
 

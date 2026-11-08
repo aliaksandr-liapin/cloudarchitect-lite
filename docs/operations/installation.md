@@ -146,6 +146,8 @@ The wizard starts from your current values; saved API keys and the client salt a
 
 Values in a `.env` file override the wizard; the wizard shows which ones are locked. Copy `.env.example` to `.env` and uncomment only what you want to fix, for example `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` for automated installs. Set `SETUP_WIZARD=disabled` to configure only through `.env`.
 
+To send provider traffic through a proxy or a test server, set `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` or `GOOGLE_GEMINI_BASE_URL` in `.env`. Generation and the setup wizard's key check both use them; when unset, the providers' own hosts are used.
+
 ## Troubleshooting
 
 | Problem                                   | Fix                                                                                                                                                                                                |

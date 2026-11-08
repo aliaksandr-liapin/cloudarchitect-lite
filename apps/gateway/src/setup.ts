@@ -12,19 +12,35 @@ export interface SettingsPersistence {
 
 export type KeyCheck = 'valid' | 'invalid' | 'unreachable';
 
-/** Read-only "list models" call per provider; each key goes only to its own provider's host. */
-function keyCheckRequest(provider: Provider, apiKey: string): [string, Record<string, string>] {
+/** Provider endpoint: the SDK base-URL variable when set (one trailing slash dropped), else the default. */
+function baseUrl(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
+  const value = env[name]?.trim();
+  return (value || fallback).replace(/\/$/, '');
+}
+
+/**
+ * Read-only "list models" call per provider; each key goes only to its own provider's host.
+ * Honors the same base-URL variables as the provider SDKs, so proxies and tests can redirect it.
+ */
+export function keyCheckRequest(
+  provider: Provider,
+  apiKey: string,
+  env: NodeJS.ProcessEnv = process.env,
+): [string, Record<string, string>] {
   switch (provider) {
     case 'anthropic':
       return [
-        'https://api.anthropic.com/v1/models?limit=1',
+        `${baseUrl(env, 'ANTHROPIC_BASE_URL', 'https://api.anthropic.com')}/v1/models?limit=1`,
         { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       ];
     case 'openai':
-      return ['https://api.openai.com/v1/models', { authorization: `Bearer ${apiKey}` }];
+      return [
+        `${baseUrl(env, 'OPENAI_BASE_URL', 'https://api.openai.com/v1')}/models`,
+        { authorization: `Bearer ${apiKey}` },
+      ];
     case 'google':
       return [
-        'https://generativelanguage.googleapis.com/v1beta/models',
+        `${baseUrl(env, 'GOOGLE_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com')}/v1beta/models`,
         { 'x-goog-api-key': apiKey },
       ];
   }
