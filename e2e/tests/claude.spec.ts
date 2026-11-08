@@ -12,6 +12,7 @@ import {
   canvas,
   download,
   expectedDesigns,
+  CANVAS_TIMEOUT_MS,
   expectNodes,
   finishWizard,
   generate,
@@ -116,7 +117,9 @@ test('versions', async () => {
   await expect(page.getByRole('banner').getByText(photos.name, { exact: true })).toBeVisible();
   await expectNodes(page, photos);
   for (const label of onlyIn(dental, photos)) {
-    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
+    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0, {
+      timeout: CANVAS_TIMEOUT_MS,
+    });
   }
   await expect(versionsHeading(2)).toBeVisible();
 
@@ -124,7 +127,9 @@ test('versions', async () => {
   await page.getByRole('button', { name: 'Restore', exact: true }).first().click();
   await expectNodes(page, dental);
   for (const label of onlyIn(photos, dental)) {
-    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
+    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0, {
+      timeout: CANVAS_TIMEOUT_MS,
+    });
   }
   // The second design was kept when the first came back.
   await expect(versionsHeading(3)).toBeVisible();
@@ -145,7 +150,9 @@ test('import', async () => {
   await expect(page.getByRole('banner').getByText(dental.name, { exact: true })).toBeVisible();
   await expectNodes(page, dental);
   for (const label of onlyIn(photos, dental)) {
-    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
+    await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0, {
+      timeout: CANVAS_TIMEOUT_MS,
+    });
   }
 });
 

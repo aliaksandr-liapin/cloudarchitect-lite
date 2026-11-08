@@ -17,6 +17,12 @@ import { design, PROMPTS } from '../src/prompts.ts';
  */
 const GENERATION_TIMEOUT_MS = 90_000;
 
+/**
+ * Canvas nodes after a generate, import, restore or reload: React Flow hides nodes until it
+ * re-measures them, while the route recovery runs ELK on the main thread — slow under CPU load.
+ */
+export const CANVAS_TIMEOUT_MS = 30_000;
+
 /** Rewinds the fake AI server: replay cursors, injected faults, rejected keys and the call log. */
 export async function resetFake(control: string): Promise<void> {
   const res = await fetch(`${control}/reset`, { method: 'POST' });
@@ -177,7 +183,9 @@ export const canvas = (page: Page): Locator =>
 /** Asserts every node label of `project` is shown on the canvas. */
 export async function expectNodes(page: Page, project: Project): Promise<void> {
   for (const label of new Set(project.nodes.map((n) => n.label))) {
-    await expect(canvas(page).getByText(label, { exact: true }).first()).toBeVisible();
+    await expect(canvas(page).getByText(label, { exact: true }).first()).toBeVisible({
+      timeout: CANVAS_TIMEOUT_MS,
+    });
   }
 }
 

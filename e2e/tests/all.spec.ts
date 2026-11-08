@@ -74,9 +74,8 @@ for (const provider of ['anthropic', 'openai', 'google'] as const) {
     await generate(page, PROMPTS[provider][0]);
     await expect(page.getByRole('banner').getByText(expected!.name, { exact: true })).toBeVisible();
     await expectNodes(page, expected!);
-    // The generation error only: the icon and storage notices are alerts too.
-    const notices = /official AWS icons|Browser storage is unavailable/;
-    await expect(page.getByRole('alert').filter({ hasNotText: notices })).toHaveCount(0);
+    // The generation error (App.tsx `.alert`); the icon and storage notices are alerts too.
+    await expect(page.getByRole('alert').and(page.locator('.alert'))).toHaveCount(0);
 
     const calls = (await fakeLog(stack.control)).slice(before).filter((c) => !isModelsList(c.path));
     await test.info().attach('fake-ai-log.json', {
