@@ -93,8 +93,30 @@ export interface GenAIish {
 
 const THINKING_LEVEL = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' } as const;
 
+/** Like the Anthropic and OpenAI clients (`maxRetries: 2`): two retries on transient errors only. */
+const RETRY = {
+  attempts: 3,
+  initialDelay: 0.5,
+  maxDelay: 8,
+  httpStatusCodes: [408, 429, 500, 502, 503, 504],
+};
+
+/** The Gemini SDK with retries on. `fetch` and `initialDelay` (seconds) are for tests. */
+export function geminiSdk(
+  apiKey: string,
+  opts: { fetch?: typeof globalThis.fetch; initialDelay?: number } = {},
+): GenAIish {
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      retryOptions: { ...RETRY, initialDelay: opts.initialDelay ?? RETRY.initialDelay },
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+    },
+  }) as unknown as GenAIish;
+}
+
 export function googleClient(apiKey: string, sdk?: GenAIish): LlmClient {
-  const client: GenAIish = sdk ?? (new GoogleGenAI({ apiKey }) as unknown as GenAIish);
+  const client: GenAIish = sdk ?? geminiSdk(apiKey);
   return async (req) => {
     const original = (req.format as { schema: JsonSchema }).schema;
     let text = '';
