@@ -11,8 +11,11 @@ import { loadFixtures, type Provider } from '../fake-ai/fixtures.ts';
 import { startFakeAi } from '../fake-ai/server.ts';
 import { design, PROMPTS } from '../src/prompts.ts';
 
-/** A generation (extraction, questions, design, repair) through the fake server takes seconds. */
-const GENERATION_TIMEOUT_MS = 60_000;
+/**
+ * A generation (extraction, questions, design, repair) through the fake server takes seconds;
+ * the margin covers a slow CI machine. Below the per-test timeout in playwright.config.ts.
+ */
+const GENERATION_TIMEOUT_MS = 90_000;
 
 /** Rewinds the fake AI server: replay cursors, injected faults, rejected keys and the call log. */
 export async function resetFake(control: string): Promise<void> {
@@ -44,12 +47,17 @@ export async function enterKey(page: Page, p: Provider, key: string): Promise<vo
 
 /**
  * Walks the wizard from the page it is on (Welcome, opened with the setup link) to the editor:
- * AI providers (typing and checking `typeKeys`), Models (ticking `enable`), Limits, Review,
+ * AI providers (typing and checking `typeKeys`), Models (checking that exactly `offered` are
+ * listed, then ticking `enable`), Limits, Review,
  * Finish setup, Open the editor.
  */
 export async function finishWizard(
   page: Page,
-  opts: { typeKeys?: Partial<Record<Provider, string>>; enable?: string[] } = {},
+  opts: {
+    typeKeys?: Partial<Record<Provider, string>>;
+    offered?: string[];
+    enable?: string[];
+  } = {},
 ): Promise<void> {
   const next = page.getByRole('button', { name: 'Next', exact: true });
   await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
@@ -62,6 +70,12 @@ export async function finishWizard(
   await next.click();
 
   await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
+  if (opts.offered) {
+    await expect(page.getByRole('checkbox')).toHaveCount(opts.offered.length);
+    for (const label of opts.offered) {
+      await expect(page.getByRole('checkbox', { name: label, exact: true })).toBeVisible();
+    }
+  }
   for (const label of opts.enable ?? []) {
     await page.getByRole('checkbox', { name: label, exact: true }).check();
   }
@@ -78,11 +92,58 @@ export async function finishWizard(
   await expect(page.getByRole('button', { name: 'Import JSON' })).toBeVisible();
 }
 
+/** One call the fake server answered, as listed by its `/log`. */
+export interface FakeCall {
+  provider: Provider;
+  path: string;
+  status: number;
+}
+
+/** Makes the fake server answer the next generation call of `provider` with `status`. */
+export async function failNext(control: string, provider: Provider, status: number): Promise<void> {
+  const res = await fetch(`${control}/fail-next`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ provider, status }),
+  });
+  if (!res.ok) throw new Error(`fake-ai /fail-next answered ${res.status}`);
+}
+
+/** The calls the fake server answered since the last reset, oldest first. */
+export async function fakeLog(control: string): Promise<FakeCall[]> {
+  const res = await fetch(`${control}/log`);
+  if (!res.ok) throw new Error(`fake-ai /log answered ${res.status}`);
+  return (await res.json()) as FakeCall[];
+}
+
+/**
+ * Opens the editor's "AI model" section if needed and presses `label`'s select button. The
+ * buttons all read "Use" or "Selected", so the button is found by its column: the model's
+ * column header in the provider's comparison table.
+ */
+export async function selectModel(page: Page, label: string): Promise<void> {
+  const table = page
+    .getByRole('table')
+    .filter({ has: page.getByRole('columnheader', { name: label, exact: true }) });
+  if (!(await table.isVisible())) {
+    // The section is a <details>; its <summary> has no accessible role, so it is found by its text.
+    await page.getByText('AI model', { exact: true }).click();
+  }
+  const headers = await table.getByRole('columnheader').allTextContents();
+  // The first column header is the empty one above the row labels.
+  const button = table.getByRole('button').nth(headers.indexOf(label) - 1);
+  await button.click();
+  await expect(button).toHaveText('Selected');
+}
+
 /** Generates from `prompt`, answering the questions with their defaults ("You decide"). */
 export async function generate(page: Page, prompt: string): Promise<void> {
+  const done = page.getByRole('status').filter({ hasText: 'New diagram generated' });
+  // A previous generation's notice would satisfy the waits below before this one has started.
+  if (await done.isVisible()) await done.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(done).toHaveCount(0);
   await page.getByPlaceholder('Describe your application').fill(prompt);
   await page.getByRole('button', { name: 'Generate', exact: true }).click();
-  const done = page.getByRole('status').filter({ hasText: 'New diagram generated' });
   const questions = page.getByRole('region', { name: 'Clarify before drawing' });
   // The questions step appears only when the extraction found gaps.
   await expect(questions.or(done)).toBeVisible({ timeout: GENERATION_TIMEOUT_MS });

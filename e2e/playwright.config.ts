@@ -16,6 +16,8 @@ export default defineConfig({
   outputDir: './test-results',
   forbidOnly: !!process.env.CI,
   retries: 0,
+  // Per test; a generation step alone may wait up to GENERATION_TIMEOUT_MS (tests/helpers.ts).
+  timeout: 180_000,
   // The setups share port 8080, and each spec walks one journey in order.
   workers: 1,
   reporter: 'list',
