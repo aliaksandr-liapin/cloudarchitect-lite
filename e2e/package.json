@@ -8,11 +8,14 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "record": "node src/record.ts"
+    "record": "tsx src/record.ts"
   },
   "devDependencies": {
+    "@cloudarchitect/catalog": "workspace:*",
+    "@cloudarchitect/domain": "workspace:*",
     "@cloudarchitect/generator": "workspace:*",
     "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },

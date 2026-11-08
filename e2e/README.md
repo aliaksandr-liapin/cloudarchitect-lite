@@ -25,3 +25,16 @@ PORT=4010 CONTROL_PORT=4011 FIXTURES=e2e/fixtures/fixtures.json node e2e/fake-ai
 
 - `pnpm --filter @cloudarchitect/e2e test` — unit tests of the fake server, using the real
   provider adapters from `@cloudarchitect/generator`.
+
+## Fixtures
+
+`fixtures/fixtures.json` holds real provider answers for the prompts in `src/prompts.ts` (two
+Anthropic designs with Haiku, one each with GPT Sol and Gemini Argon). `src/fixtures.test.ts`
+replays them through the current generator in `pnpm test`; when a catalog, schema or prompt
+change makes them stop fitting it fails with
+`fixtures are out of date: re-record with pnpm --filter @cloudarchitect/e2e record`.
+
+- `pnpm --filter @cloudarchitect/e2e record` — paid (about $0.20), needs `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY` and `GEMINI_API_KEY` (environment or repo-root `.env`). Runs the prompts
+  against the real APIs through the fake server in record mode and rewrites the fixtures. Writes
+  nothing if any provider answers non-2xx. Keys are never stored.

@@ -121,12 +121,21 @@ importers:
 
   e2e:
     devDependencies:
+      '@cloudarchitect/catalog':
+        specifier: workspace:*
+        version: link:../packages/catalog
+      '@cloudarchitect/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
       '@cloudarchitect/generator':
         specifier: workspace:*
         version: link:../packages/generator
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
