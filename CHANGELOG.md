@@ -4,7 +4,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-11-17
+## [0.3.1] - 2026-11-11
 
 Fixes a node that could stay invisible after Restore or Import, Gemini retries transient errors, and the benchmark report shows which rules each model breaks.
 
