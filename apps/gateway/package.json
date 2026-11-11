@@ -15,8 +15,8 @@
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
     "@cloudarchitect/generator": "workspace:*",
-    "@hono/node-server": "^2.1.5",
-    "hono": "^4.13.14",
+    "@hono/node-server": "^2.1.6",
+    "hono": "^4.13.17",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -25,7 +25,7 @@
     "fflate": "0.8.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "license": "Apache-2.0"
 }
