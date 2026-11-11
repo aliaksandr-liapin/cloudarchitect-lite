@@ -90,29 +90,42 @@ test('reload', async () => {
 });
 
 test('budget', async () => {
-  const before = (await generationCalls()).length;
+  const calls = (await generationCalls()).length;
   await page.getByPlaceholder('Describe your application').fill(PROMPTS.google[0]);
   await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: BUDGET_ERROR })).toBeVisible();
   // Refused by the gateway: nothing reached the provider.
-  expect(await generationCalls()).toHaveLength(before);
+  expect(await generationCalls()).toHaveLength(calls);
   // The design is unchanged.
   await expectNodes(page, dental);
 
   // Manual editing: drag a node that sits in no container, so the move is not clamped.
-  const label = dental.nodes.find((n) => !n.containerId)!.label;
-  const node = canvas(page).getByText(label, { exact: true }).first();
-  const start = (await node.boundingBox())!;
-  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(start.x + start.width / 2 + 120, start.y + start.height / 2 + 80, {
-    steps: 10,
+  const free = dental.nodes.find((n) => !n.containerId);
+  expect(free, 'fixture has no node outside a container; pick another drag target').toBeDefined();
+  const node = canvas(page).getByText(free!.label, { exact: true });
+  // Measured against another node: a drag on the canvas pans the viewport and moves every node,
+  // so only a change in the distance between the two shows that the node itself was moved.
+  const other = canvas(page).getByText(dental.nodes.find((n) => n.label !== free!.label)!.label, {
+    exact: true,
   });
+  const offset = async () => {
+    const [a, b] = [(await node.boundingBox())!, (await other.boundingBox())!];
+    return { x: a.x - b.x, y: a.y - b.y };
+  };
+  const moved = (from: { x: number; y: number }) => async () => {
+    const to = await offset();
+    return Math.hypot(to.x - from.x, to.y - from.y);
+  };
+  const before = await offset();
+  const box = (await node.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 10 });
   await page.mouse.up();
-  await expect
-    .poll(async () => {
-      const end = (await node.boundingBox())!;
-      return Math.hypot(end.x - start.x, end.y - start.y);
-    })
-    .toBeGreaterThan(50);
+  await expect.poll(moved(before)).toBeGreaterThan(50);
+
+  // The drop is saved: after a reload the node is still away from where it was.
+  await page.reload();
+  await expectNodes(page, dental);
+  await expect.poll(moved(before)).toBeGreaterThan(20);
 });
