@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-11
+
+Fixes a node that could stay invisible after Restore or Import, Gemini retries transient errors, and the benchmark report shows which rules each model breaks.
+
 ### Added
 
 - Benchmark report: rule hits per model (which validation rules each model's designs trigger), and `pnpm --filter @cloudarchitect/eval rules` to print them from saved live runs.
@@ -13,6 +17,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 - Editor: after **Restore** or **Import JSON**, a diagram node could stay invisible until the page was reloaded (more likely on a busy computer). Found by the new browser end-to-end test.
 - Gemini requests retry transient errors (408, 429, 5xx) up to twice, like Anthropic and OpenAI requests. Before, a single rate-limit or server error failed the generation ([#30](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/30)).
+- Setup wizard, Models step: when only one model is on offer (for example a Gemini-only install), it is selected; before, Next stayed disabled until you ticked it.
+- Setup wizard: the Gemini 4 Argon note no longer compares its cost with Claude Sonnet, which a Gemini-only install does not show; the Limits step rounds the cost per generation like the Models step ($0.120, not $0.1197).
 
 ## [0.3.0] - 2026-11-10
 
@@ -108,7 +114,8 @@ First tagged pre-alpha. AI generation is not implemented yet.
 - CI: lint, typecheck, tests, build, eval harness, image builds with Trivy scans, install smoke test, CodeQL (fails on any finding), `pnpm audit`, gitleaks; release workflow with SBOM and build provenance.
 - Apache-2.0 license, NOTICE, code of conduct, support guide; README screenshots and an illustrated setup guide (`pnpm screenshots` regenerates them).
 
-[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aliaksandr-liapin/cloudarchitect-lite/compare/v0.1.0...v0.2.0

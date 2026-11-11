@@ -1,6 +1,6 @@
 {
   "name": "@cloudarchitect/generator",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "LLM client, price table, requirement extraction and architecture generation shared by the gateway and the eval harness.",

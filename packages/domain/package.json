@@ -1,6 +1,6 @@
 {
   "name": "@cloudarchitect/domain",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Project schema, catalog types, graph patches and validation rules shared by web and gateway.",

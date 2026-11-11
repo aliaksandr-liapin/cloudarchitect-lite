@@ -1,7 +1,7 @@
 import { MODEL_OPTIONS, listedModels, type ModelChoice } from '@cloudarchitect/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { ModelComparison, ModelGroups, pickChoice } from './models';
+import { ModelComparison, ModelGroups, pickChoice, usd } from './models';
 
 const withBenchmark = (id: string) => MODEL_OPTIONS.find((o) => o.id === id)!;
 const luna = { ...withBenchmark('gpt-luna') };
@@ -93,5 +93,12 @@ describe('pickChoice', () => {
   });
   it('selects nothing when there is no default', () => {
     expect(pickChoice(null, { enabled: [] })).toBeUndefined();
+  });
+});
+
+describe('usd', () => {
+  it('rounds like the comparison table, so the wizard shows one cost everywhere', () => {
+    expect(usd(0.1197)).toBe('$0.120');
+    expect(usd(0.0071)).toBe('$0.0071');
   });
 });

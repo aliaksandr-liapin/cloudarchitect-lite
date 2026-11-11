@@ -106,6 +106,14 @@ describe('provider helpers', () => {
     });
   });
 
+  it('selects the only offered model when none of the configured ones has a key', () => {
+    // Gemini-only install: the default configuration names Haiku, which has no key.
+    expect(effectiveSelection(['haiku'], 'haiku', offeredModels(['google']))).toEqual({
+      models: ['gemini-argon'],
+      defaultModel: 'gemini-argon',
+    });
+  });
+
   it('names the providers that have keys', () => {
     expect(welcomeKeyLine(['anthropic', 'google'])).toContain('Claude and Gemini');
     expect(welcomeKeyLine([])).toContain('Claude, OpenAI or Gemini');

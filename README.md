@@ -20,13 +20,13 @@ You need [Docker](https://docs.docker.com/get-docker/) and an API key from Anthr
 macOS and Linux:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml && docker compose up
+curl -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.1/compose.yaml && docker compose up
 ```
 
 Windows (PowerShell):
 
 ```powershell
-curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.0/compose.yaml; docker compose up
+curl.exe -fsSLO https://raw.githubusercontent.com/aliaksandr-liapin/cloudarchitect-lite/v0.3.1/compose.yaml; docker compose up
 ```
 
 Open the setup link printed in the terminal. A short wizard checks your keys, lets you pick models and sets your daily and monthly spending limits. Then the editor is at <http://localhost:8080>.
