@@ -15,6 +15,7 @@ const manifests = [
   'packages/catalog/package.json',
   'packages/generator/package.json',
   'eval/package.json',
+  'e2e/package.json',
 ];
 
 const versions = new Map<string, string>();

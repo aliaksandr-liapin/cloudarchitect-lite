@@ -21,3 +21,6 @@ eval/results/
 .superpowers/
 # Downloaded provider icon packs and generated icon sets (tools/fetch-icons.ts)
 .cache/
+# Browser end-to-end test output (e2e/)
+test-results/
+playwright-report/

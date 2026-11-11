@@ -32,7 +32,7 @@ Every pull request runs unit tests, the offline eval harness and an install smok
 2. **When:** every pull request as a **required, blocking** check, and every push to `main`.
 3. **Journeys:** for each of three provider setups (Claude only, Gemini only, all three keys): setup wizard → generate (clarifying questions, then the design) → findings → export PNG, SVG and JSON → import JSON → restore a version → reload and confirm the design is still there.
 4. **Failures in scope:** a 429 that is retried and then succeeds, a rejected key, and the daily budget limit.
-5. **Fixtures are recorded from the real APIs once** and committed; a command re-records them. Recording costs about $0.30 per run and only happens when someone runs that command.
+5. **Fixtures are recorded from the real APIs once** and committed; a command re-records them. Recording costs about $0.20 per run and only happens when someone runs that command.
 
 ## How it works
 

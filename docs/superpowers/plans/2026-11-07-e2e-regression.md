@@ -14,7 +14,7 @@
 
 - No test switch in app code. The tested images are built from `infra/docker/*.Dockerfile` (PRs, `main`) or pulled from GHCR (release tags); the only test-specific settings are environment variables in the e2e compose override.
 - Base-URL variables, exactly: `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GOOGLE_GEMINI_BASE_URL`.
-- No paid calls in CI. Recording (`pnpm --filter @cloudarchitect/e2e record`) is manual, needs real keys, costs about $0.30.
+- No paid calls in CI. Recording (`pnpm --filter @cloudarchitect/e2e record`) is manual, needs real keys, costs about $0.20.
 - The repo-root `.env` (the owner's real keys) must never reach the e2e stack.
 - Fake keys are constants in the test; the fake server's control port binds `127.0.0.1` only.
 - Each CI job finishes in about 10 minutes; Playwright retries: 0.
@@ -32,7 +32,7 @@
 
 1. **The owner's real `.env` leaks into the stack** (compose.yaml loads `.env` from the project directory; locally that file holds real keys). Expected: the e2e stack only ever loads its own generated env file. Pinned by a test in Task 4.
 2. **Fixtures go stale** after a catalog, schema or prompt change, and the browser test then fails with an unclear "Generation failed". Expected: a fast unit test replays the fixtures through the current generator and fails with "fixtures are out of date: re-record". Pinned in Task 3.
-3. **One failed test leaves the fake server mid-sequence**, so every later test gets the wrong response. Expected: each test starts from a reset fake server. Pinned in Task 2 (reset) and Task 5 (`beforeEach`).
+3. **One failed test leaves the fake server mid-sequence**, so every later test gets the wrong response. Expected: the fake server is reset once per spec file in `beforeAll` (controller ruling R6), because the Anthropic fixture sequence spans tests; serial mode stops the file after a failure. Pinned in Task 2 (reset) and Task 5 (`beforeAll`).
 4. **Control port reachable from outside the runner.** Expected: published on `127.0.0.1` only. Pinned in Task 4.
 5. **The real AWS icon download is slow or down**, failing the run for a reason unrelated to the change. Expected: the stack helper waits up to 120 s for `"state":"ready"` (as the install smoke test does) and fails with a message naming the icon download. Pinned in Task 4.
 
@@ -132,7 +132,7 @@ it('honors the SDK base-URL variables', () => {
 - [ ] **Step 1: Write the failing freshness test** `e2e/src/fixtures.test.ts`: for each provider and each of its prompts, point the base-URL variables at a fake server replaying `fixtures.json`, run `extract` then `generateArchitecture` with all questions answered `YOU_DECIDE`, and assert the project parses with `Project` from `@cloudarchitect/domain`. On a `GenerationError`, fail with: `fixtures are out of date: re-record with pnpm --filter @cloudarchitect/e2e record`. Also assert the two Anthropic designs differ (different node id sets).
 - [ ] **Step 2: Run it and see it fail** — no `fixtures.json` yet.
 - [ ] **Step 3: Implement `record.ts`** — reads keys from the repo-root `.env` (same parsing as `eval/src/live.ts`), starts the server in record mode with `upstream` = the providers' real base URLs, runs each prompt through `extract` + `generateArchitecture` with `MODELS[provider]`, writes `fixtures.json` (`recordedAt`, `prompts`, `responses`), prints the total cost from the returned usage. Refuses to run unless all three keys are present.
-- [ ] **Step 4: Ask the owner before recording** (about $0.30 of API budget), then run `pnpm --filter @cloudarchitect/e2e record`. Check `fixtures.json` contains no key: `grep -E 'sk-|AIza' e2e/fixtures/fixtures.json` prints nothing.
+- [ ] **Step 4: Ask the owner before recording** (about $0.20 of API budget), then run `pnpm --filter @cloudarchitect/e2e record`. Check `fixtures.json` contains no key: `grep -E 'sk-|AIza' e2e/fixtures/fixtures.json` prints nothing.
 - [ ] **Step 5: Run the freshness test** — expected: PASS. It runs in `pnpm run ci` (no Docker).
 - [ ] **Step 6: Commit** — `test(e2e): recorded provider fixtures and freshness test`
 
@@ -224,7 +224,7 @@ it('honors the SDK base-URL variables', () => {
 
 - [ ] **Step 1: CI job** `e2e` in `ci.yml`, name `Browser end-to-end (${{ matrix.setup }})`, matrix `setup: [claude, gemini, all]`, `timeout-minutes: 15`, runs on pull requests and pushes to `main` like the other jobs: checkout, pnpm + Node 26 as in `verify`, `pnpm install --frozen-lockfile`, buildx with the same GHA cache scopes as `containers` (`web`, `gateway`), `pnpm --filter @cloudarchitect/e2e test` (includes the stack tests), `E2E_SETUP=${{ matrix.setup }} pnpm e2e`. On failure, upload `e2e/test-results/` (traces, screenshots, compose logs) with `actions/upload-artifact`, `retention-days: 7`. Always `docker compose ... down --volumes`.
 - [ ] **Step 2: Release job** `e2e` in `release.yml` after `publish`, same matrix with `E2E_IMAGES=ghcr` and `E2E_VERSION=${GITHUB_REF_NAME#v}`; add a `workflow_dispatch` input `version` so a manual run can test published images (for example `0.3.0`); the job runs on tags or when `version` is given.
-- [ ] **Step 3: Docs** — CONTRIBUTING: how to run `pnpm e2e` locally (Docker running, `E2E_SETUP`), and that the repo-root `.env` is never used; releasing guide: the release `e2e` job and the manual run; `e2e/README.md`: architecture in five lines, when and how to re-record (cost about $0.30, needs the owner's OK); CHANGELOG Unreleased → Added: "A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls."
+- [ ] **Step 3: Docs** — CONTRIBUTING: how to run `pnpm e2e` locally (Docker running, `E2E_SETUP`), and that the repo-root `.env` is never used; releasing guide: the release `e2e` job and the manual run; `e2e/README.md`: architecture in five lines, when and how to re-record (cost about $0.20, needs the owner's OK); CHANGELOG Unreleased → Added: "A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls."
 - [ ] **Step 4: Verify** — `pnpm run ci` passes; push the branch and open the PR; all three `Browser end-to-end` jobs pass. Run the release workflow by hand with `version: 0.3.0`; all three jobs pass against the published images.
 - [ ] **Step 5: Commit** — `ci: browser end-to-end job on PRs, main and releases`
 - [ ] **Step 6: Hand-off to the owner** — after the first green run on `main`, add the three `Browser end-to-end (…)` checks to the branch protection's required checks (Claude cannot change branch protection).

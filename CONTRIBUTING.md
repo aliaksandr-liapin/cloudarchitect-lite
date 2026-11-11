@@ -78,8 +78,18 @@ The editor, validation and export work without an API key. More in the
 
    `pnpm format` fixes formatting. UI changes: include a before/after screenshot in the pull request.
 
-5. Open a pull request using the template. CI runs the same checks plus a security scan and an
-   install smoke test.
+   The browser end-to-end test runs the production images in Docker, with recorded AI responses
+   instead of paid calls. It needs Docker running, Google Chrome and port 8080 free:
+
+   ```bash
+   E2E_SETUP=claude pnpm e2e   # one setup: claude, gemini or all; unset runs every setup in turn
+   ```
+
+   It builds the images from your checkout and never reads the repo-root `.env`, so your real API
+   keys are not used. See [e2e/README.md](e2e/README.md).
+
+5. Open a pull request using the template. CI runs the same checks plus a security scan, an
+   install smoke test and the browser end-to-end test.
 6. A maintainer reviews it. The pull request is squash-merged with a
    [Conventional Commits](https://www.conventionalcommits.org/) title, for example
    `feat(domain): add VR-026 rule` or `fix(web): keep the selection after export`.

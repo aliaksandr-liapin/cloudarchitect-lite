@@ -17,7 +17,9 @@ git checkout main && git pull
 git tag v0.3.0 && git push origin v0.3.0
 ```
 
-The tag starts **Release images** (`.github/workflows/release.yml`): it builds the `web` and `gateway` images for amd64 and arm64, publishes them to GHCR as `ghcr.io/aliaksandr-liapin/cloudarchitect-lite/{web,gateway}:<version>`, then installs from the published images and checks that neither contains AWS icon files.
+The tag starts **Release images** (`.github/workflows/release.yml`): it builds the `web` and `gateway` images for amd64 and arm64, publishes them to GHCR as `ghcr.io/aliaksandr-liapin/cloudarchitect-lite/{web,gateway}:<version>`, then installs from the published images and checks that neither contains AWS icon files. Its `e2e` jobs (**Browser end-to-end**, one per setup) then run the browser test from `e2e/` against the published images of that version, with recorded AI responses instead of paid calls.
+
+To re-run only the browser test against images that are already published: Actions → Release images → Run workflow, with **version** set (for example `0.4.0`). Nothing is built or published on such a run. It uses the test code of the chosen branch, so it only makes sense for versions that include the gateway's key check against the fake AI server (0.3.2 / 0.4 or later); the 0.3.0 images fail the typed-key steps. The release `e2e` jobs therefore run for the first time at the next tag.
 
 The README install command points at the tag, so it works as soon as the tag is pushed.
 

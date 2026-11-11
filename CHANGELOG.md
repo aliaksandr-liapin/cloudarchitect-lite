@@ -4,6 +4,14 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls.
+
+### Changed
+
+- Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
+
 ## [0.3.1] - 2026-11-11
 
 Fixes a node that could stay invisible after Restore or Import, Gemini retries transient errors, and the benchmark report shows which rules each model breaks.

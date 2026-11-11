@@ -1,0 +1,41 @@
+# Browser end-to-end test override, used by e2e/src/stack.ts — not for running the app:
+#
+#   docker compose -f compose.yaml [-f compose.build.yaml] -f e2e/compose.e2e.yaml up
+#
+# Adds a fake AI server replaying recorded provider responses and points the gateway at it.
+# The gateway's env_file is replaced, so the repo-root .env (real keys) is never loaded.
+services:
+  fake-ai:
+    # Pinned by digest; Dependabot does not update it. Refresh with the node major bump or a security advisory.
+    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+    # Imports only node: builtins, so no install step. Paths are relative to the repo root.
+    command: [node, /e2e/fake-ai/server.ts]
+    environment:
+      PORT: '8790'
+      CONTROL_PORT: '8799'
+      FIXTURES: /e2e/fixtures/fixtures.json
+    volumes: ['./e2e:/e2e:ro']
+    # The control API only; the provider port stays inside the compose network.
+    ports: ['127.0.0.1:8799:8799']
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8799/log').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  gateway:
+    env_file: !override
+      - path: ${E2E_ENV_FILE:?set by e2e/src/stack.ts}
+    environment:
+      ANTHROPIC_BASE_URL: http://fake-ai:8790
+      OPENAI_BASE_URL: http://fake-ai:8790/v1
+      GOOGLE_GEMINI_BASE_URL: http://fake-ai:8790
+    depends_on:
+      fake-ai: { condition: service_healthy }
