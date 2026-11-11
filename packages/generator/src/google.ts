@@ -108,6 +108,8 @@ export function geminiSdk(
 ): GenAIish {
   return new GoogleGenAI({
     apiKey,
+    // @google/genai 3 defaults to v1; responseJsonSchema and thinkingConfig were built and benchmarked on v1beta.
+    apiVersion: 'v1beta',
     httpOptions: {
       retryOptions: { ...RETRY, initialDelay: opts.initialDelay ?? RETRY.initialDelay },
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
