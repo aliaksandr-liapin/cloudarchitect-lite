@@ -113,6 +113,8 @@ test('export', async () => {
 });
 
 test('versions', async () => {
+  expect(onlyIn(dental, photos).length, 'fixture designs must differ').toBeGreaterThan(0);
+  expect(onlyIn(photos, dental).length, 'fixture designs must differ').toBeGreaterThan(0);
   await generate(page, PROMPTS.anthropic[1]);
   await expect(page.getByRole('banner').getByText(photos.name, { exact: true })).toBeVisible();
   await expectNodes(page, photos);
@@ -136,6 +138,8 @@ test('versions', async () => {
 });
 
 test('import', async () => {
+  expect(onlyIn(dental, photos).length, 'fixture designs must differ').toBeGreaterThan(0);
+  expect(onlyIn(photos, dental).length, 'fixture designs must differ').toBeGreaterThan(0);
   // Bring the second design back first, so the import visibly replaces it.
   await page.getByRole('button', { name: 'Restore', exact: true }).first().click();
   await expectNodes(page, photos);

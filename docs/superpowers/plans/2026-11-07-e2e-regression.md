@@ -32,7 +32,7 @@
 
 1. **The owner's real `.env` leaks into the stack** (compose.yaml loads `.env` from the project directory; locally that file holds real keys). Expected: the e2e stack only ever loads its own generated env file. Pinned by a test in Task 4.
 2. **Fixtures go stale** after a catalog, schema or prompt change, and the browser test then fails with an unclear "Generation failed". Expected: a fast unit test replays the fixtures through the current generator and fails with "fixtures are out of date: re-record". Pinned in Task 3.
-3. **One failed test leaves the fake server mid-sequence**, so every later test gets the wrong response. Expected: each test starts from a reset fake server. Pinned in Task 2 (reset) and Task 5 (`beforeEach`).
+3. **One failed test leaves the fake server mid-sequence**, so every later test gets the wrong response. Expected: the fake server is reset once per spec file in `beforeAll` (controller ruling R6), because the Anthropic fixture sequence spans tests; serial mode stops the file after a failure. Pinned in Task 2 (reset) and Task 5 (`beforeAll`).
 4. **Control port reachable from outside the runner.** Expected: published on `127.0.0.1` only. Pinned in Task 4.
 5. **The real AWS icon download is slow or down**, failing the run for a reason unrelated to the change. Expected: the stack helper waits up to 120 s for `"state":"ready"` (as the install smoke test does) and fails with a message naming the icon download. Pinned in Task 4.
 

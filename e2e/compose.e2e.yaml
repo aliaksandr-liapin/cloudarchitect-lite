@@ -6,7 +6,8 @@
 # The gateway's env_file is replaced, so the repo-root .env (real keys) is never loaded.
 services:
   fake-ai:
-    image: node:26-alpine
+    # Pinned by digest; Dependabot does not update it. Refresh with the node major bump or a security advisory.
+    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
     # Imports only node: builtins, so no install step. Paths are relative to the repo root.
     command: [node, /e2e/fake-ai/server.ts]
     environment:

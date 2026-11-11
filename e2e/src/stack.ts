@@ -149,6 +149,8 @@ export async function startStack(opts: {
   };
 
   try {
+    // A crashed earlier run can leave a configured `gateway-data` volume, which hides the setup link.
+    await docker(args, ['down', '--volumes', '--remove-orphans'], env).catch(() => undefined);
     await docker(args, ['up', '--detach', '--wait', '--wait-timeout', '300'], env, true);
     const setupUrl = await poll(30_000, async () => {
       const out = await docker(args, ['logs', '--no-color', 'gateway'], env);
