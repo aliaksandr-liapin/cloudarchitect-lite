@@ -172,13 +172,21 @@ describe('geminiSdk retries (real SDK, fake fetch, no network)', () => {
     }) as unknown as typeof globalThis.fetch;
     return { calls, fetch };
   };
-  const ok = sse({
-    candidates: [{ content: { parts: [{ text: '{"kind":"a"}' }] }, finishReason: 'STOP' }],
-    usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+  const ok = () =>
+    sse({
+      candidates: [{ content: { parts: [{ text: '{"kind":"a"}' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+    });
+
+  it('calls the v1beta API, whatever the SDK default is', async () => {
+    // @google/genai 3 defaults to v1; structured output was built and benchmarked on v1beta.
+    const f = fakeFetch(ok());
+    await googleClient('k', geminiSdk('k', { fetch: f.fetch, initialDelay: 0.001 }))(baseReq);
+    expect(f.calls[0]).toContain('/v1beta/models/');
   });
 
   it('retries once after a 503 and returns the answer', async () => {
-    const f = fakeFetch(error(503), ok);
+    const f = fakeFetch(error(503), ok());
     const sdk = geminiSdk('AIza-SECRET', { fetch: f.fetch, initialDelay: 0.001 });
     const res = await googleClient('AIza-SECRET', sdk)(baseReq);
     expect(f.calls).toHaveLength(2);
@@ -186,14 +194,14 @@ describe('geminiSdk retries (real SDK, fake fetch, no network)', () => {
   });
 
   it('retries a 429', async () => {
-    const f = fakeFetch(error(429), ok);
+    const f = fakeFetch(error(429), ok());
     const sdk = geminiSdk('k', { fetch: f.fetch, initialDelay: 0.001 });
     await googleClient('k', sdk)(baseReq);
     expect(f.calls).toHaveLength(2);
   });
 
   it('does not retry a 400 and keeps the key out of the error', async () => {
-    const f = fakeFetch(error(400), ok);
+    const f = fakeFetch(error(400), ok());
     const sdk = geminiSdk('AIza-SECRET', { fetch: f.fetch, initialDelay: 0.001 });
     const err = await googleClient('AIza-SECRET', sdk)(baseReq).catch((e: unknown) => e);
     expect(f.calls).toHaveLength(1);
@@ -202,7 +210,7 @@ describe('geminiSdk retries (real SDK, fake fetch, no network)', () => {
   });
 
   it('gives up after 2 retries', async () => {
-    const f = fakeFetch(error(503), error(503), error(503), ok);
+    const f = fakeFetch(error(503), error(503), error(503), ok());
     const sdk = geminiSdk('k', { fetch: f.fetch, initialDelay: 0.001 });
     const err = await googleClient('k', sdk)(baseReq).catch((e: unknown) => e);
     expect(f.calls).toHaveLength(3);
