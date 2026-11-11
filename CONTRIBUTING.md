@@ -82,7 +82,7 @@ The editor, validation and export work without an API key. More in the
    instead of paid calls. It needs Docker running, Google Chrome and port 8080 free:
 
    ```bash
-   E2E_SETUP=claude pnpm e2e   # one setup: claude or all; unset runs every setup in turn
+   E2E_SETUP=claude pnpm e2e   # one setup: claude, gemini or all; unset runs every setup in turn
    ```
 
    It builds the images from your checkout and never reads the repo-root `.env`, so your real API

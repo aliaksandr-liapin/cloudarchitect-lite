@@ -35,7 +35,8 @@ PORT=4010 CONTROL_PORT=4011 FIXTURES=e2e/fixtures/fixtures.json node e2e/fake-ai
 - `pnpm --filter @cloudarchitect/e2e test` — unit tests of the fake server, using the real
   provider adapters from `@cloudarchitect/generator`.
 - `E2E_SETUP=claude pnpm e2e` — the browser journey in `tests/claude.spec.ts` (Chrome, Docker, port
-  8080 free). `E2E_SETUP` is one of `claude` and `all`; unset runs every spec in turn.
+  8080 free). `E2E_SETUP` is one of `claude`, `gemini` and `all` (`tests/<setup>.spec.ts`); unset
+  runs every spec in turn.
   `E2E_IMAGES=ghcr` uses the published images instead of a local build, at `E2E_VERSION` (for
   example `0.4.0`; the default image tag in `compose.yaml` when unset).
 

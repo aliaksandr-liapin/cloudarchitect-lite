@@ -42,26 +42,31 @@ export async function rejectKey(control: string, key: string): Promise<void> {
 export const keyField = (page: Page, p: Provider): Locator =>
   page.getByLabel(`${PROVIDER_LABEL[p]} API key`);
 
+/** A provider's card on the AI providers step: its heading's parent (the card has no role). */
+const providerCard = (page: Page, p: Provider): Locator =>
+  page.getByRole('heading', { name: PROVIDER_LABEL[p], exact: true }).locator('..');
+
 /** Types a key on the AI providers step and checks it; the check must pass. */
 export async function enterKey(page: Page, p: Provider, key: string): Promise<void> {
   await keyField(page, p).fill(key);
-  // One "Check key" button per provider card, in provider order, next to its key field.
-  const card = page.getByRole('heading', { name: PROVIDER_LABEL[p], exact: true }).locator('..');
+  const card = providerCard(page, p);
   await card.getByRole('button', { name: 'Check key' }).click();
   await expect(card.getByText('✓ Key works')).toBeVisible();
 }
 
 /**
  * Walks the wizard from the page it is on (Welcome, opened with the setup link) to the editor:
- * AI providers (typing and checking `typeKeys`), Models (checking that exactly `offered` are
- * listed, then ticking `enable`), Limits, Review,
- * Finish setup, Open the editor.
+ * AI providers (checking that `envKeys` show as set by the environment, typing and checking
+ * `typeKeys`), Models (checking that exactly `offered` are listed and `preselected` are ticked and
+ * locked, then ticking `enable`), Limits, Review, Finish setup, Open the editor.
  */
 export async function finishWizard(
   page: Page,
   opts: {
+    envKeys?: Provider[];
     typeKeys?: Partial<Record<Provider, string>>;
     offered?: string[];
+    preselected?: string[];
     enable?: string[];
   } = {},
 ): Promise<void> {
@@ -70,6 +75,12 @@ export async function finishWizard(
   await next.click();
 
   await expect(page.getByRole('heading', { name: 'AI providers' })).toBeVisible();
+  for (const p of opts.envKeys ?? []) {
+    await expect(
+      providerCard(page, p).getByText('✓ Set by environment (.env). Nothing to enter here.'),
+    ).toBeVisible();
+    await expect(keyField(page, p)).toHaveCount(0);
+  }
   for (const [p, key] of Object.entries(opts.typeKeys ?? {}) as [Provider, string][]) {
     await enterKey(page, p, key);
   }
@@ -81,6 +92,11 @@ export async function finishWizard(
     for (const label of opts.offered) {
       await expect(page.getByRole('checkbox', { name: label, exact: true })).toBeVisible();
     }
+  }
+  for (const label of opts.preselected ?? []) {
+    const box = page.getByRole('checkbox', { name: label, exact: true });
+    await expect(box).toBeChecked();
+    await expect(box).toBeDisabled();
   }
   for (const label of opts.enable ?? []) {
     await page.getByRole('checkbox', { name: label, exact: true }).check();

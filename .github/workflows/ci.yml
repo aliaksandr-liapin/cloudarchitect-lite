@@ -130,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         # One entry per spec in e2e/tests/ (<setup>.spec.ts).
-        setup: [claude, all]
+        setup: [claude, gemini, all]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
