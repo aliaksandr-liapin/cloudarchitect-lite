@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from 'react';
 import { ApiError, api, type KeySource } from './api';
 import { REPO_URL } from './demo';
-import { ModelGroups } from './models';
+import { ModelGroups, usd } from './models';
 
 const STEPS = ['Welcome', 'AI providers', 'Models', 'Limits', 'Review'] as const;
 
@@ -127,7 +127,9 @@ export function effectiveSelection(
   defaultModel: ModelChoice,
   offered: readonly ModelOption[],
 ) {
-  const kept = models.filter((m) => offered.some((o) => o.id === m));
+  const configured = models.filter((m) => offered.some((o) => o.id === m));
+  // One model on offer (e.g. a Gemini-only install): select it rather than leave Next disabled.
+  const kept = configured.length === 0 && offered.length === 1 ? [offered[0]!.id] : configured;
   return {
     models: kept,
     defaultModel: kept.includes(defaultModel) ? defaultModel : kept[0],
@@ -472,7 +474,7 @@ export function SetupWizard() {
                   <input
                     type="checkbox"
                     checked={selection.models.includes(o.id)}
-                    disabled={isLocked('AI_MODELS')}
+                    disabled={isLocked('AI_MODELS') || offered.length === 1}
                     onChange={() => toggleModel(o.id)}
                   />
                   {o.label}
@@ -532,7 +534,7 @@ export function SetupWizard() {
                 </>
               ) : (
                 <>
-                  With {chosenDefault && modelOption(chosenDefault).label} at about ${cost} per
+                  With {chosenDefault && modelOption(chosenDefault).label} at about {usd(cost!)} per
                   generation, ${monthlyBudgetUsd} a month covers about{' '}
                   <strong>{generationsPerMonth.toLocaleString()}</strong> generations.
                 </>
