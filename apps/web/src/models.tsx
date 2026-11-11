@@ -14,7 +14,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 const NOT_MEASURED = 'Not yet measured';
 const orNot = (x: number | undefined, f: (x: number) => string) =>
   x === undefined ? NOT_MEASURED : f(x);
-const usd = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(3)}`);
+export const usd = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(3)}`);
 
 /** Measured quality, cost and speed per model (ADR-0011), so the choice is informed. */
 export function ModelComparison({
