@@ -1,6 +1,6 @@
 {
   "name": "@cloudarchitect/e2e",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Browser end-to-end regression test: the production images in Docker, AI providers replaced by a fake server replaying recorded responses.",
@@ -14,7 +14,7 @@
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
     "@cloudarchitect/generator": "workspace:*",
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
