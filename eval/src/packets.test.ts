@@ -537,3 +537,25 @@ describe('normalizeReviewOutput', () => {
     expect(acceptSaved(JSON.stringify(o), ['alpha'])!.reviews).toHaveLength(2);
   });
 });
+
+describe('buildPackets with arm pairs', () => {
+  it('pairs the two arms of one job', () => {
+    const armRuns = ['alpha', 'beta'].flatMap((s) => [
+      design('haiku~W', s, 1),
+      design('haiku~I', s, 1),
+    ]);
+    const { packets, key } = buildPackets({
+      runs: armRuns,
+      scenarios,
+      seed: 1,
+      pairs: { 'haiku~W': 'haiku~I', 'haiku~I': 'haiku~W' },
+    });
+    const entries = Object.values(key).flatMap((g) => Object.entries(g));
+    expect(entries).toHaveLength(2);
+    for (const [, e] of entries) {
+      expect([e.A.model, e.B.model].sort()).toEqual(['haiku~I', 'haiku~W']);
+    }
+    expect(packets.length).toBeGreaterThan(0);
+    for (const p of packets) expect(p.markdown).not.toMatch(/~[WI]/);
+  });
+});
