@@ -1,7 +1,18 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import { graphContentHash, YOU_DECIDE, type Requirement } from '@cloudarchitect/domain';
+import {
+  graphContentHash,
+  validateProject,
+  YOU_DECIDE,
+  type Requirement,
+} from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
-import { buildRequirements, generateArchitecture, type GenerateInput } from './generate.js';
+import {
+  buildRequirements,
+  draftArchitecture,
+  generateArchitecture,
+  repairDraft,
+  type GenerateInput,
+} from './generate.js';
 import { GenerationError, type LlmClient, type LlmRequest } from './llm.js';
 
 const usage = { input: 2000, output: 800, cacheWrite: 0, cacheRead: 0 };
@@ -262,5 +273,43 @@ describe('generateArchitecture', () => {
     await expect(
       generateArchitecture(llm, awsCatalog, input({ model: 'sonnet' })),
     ).rejects.toBeInstanceOf(GenerationError);
+  });
+
+  it('never sends info findings to repair', async () => {
+    const g = graph(true);
+    const infoOnly = { ...g, nodes: [...g.nodes, node('table', 'aws.dynamodb', ['R1'])] };
+    const { llm, requests } = fake(infoOnly);
+    const r = await generateArchitecture(llm, awsCatalog, input());
+    const severities = validateProject(r.project, awsCatalog).map((f) => f.severity);
+    expect(severities).toContain('info');
+    expect(severities).not.toContain('error');
+    expect(severities).not.toContain('warning');
+    expect(requests).toHaveLength(1);
+    expect(r.repairTurnsUsed).toBe(0);
+  });
+});
+
+describe('draftArchitecture and repairDraft', () => {
+  it('draftArchitecture returns the first draft, its findings and one usage entry', async () => {
+    const { llm } = fake(graph(false));
+    const draft = await draftArchitecture(llm, awsCatalog, input());
+    expect(draft.findings.map((f) => f.ruleId)).toContain('VR-004');
+    expect(draft.usage).toHaveLength(1);
+    expect(draft.messages).toHaveLength(1);
+  });
+
+  it('repairDraft repairs from the given draft without mutating it', async () => {
+    const { llm, requests } = fake(graph(false), graph(true), graph(true));
+    const draft = await draftArchitecture(llm, awsCatalog, input());
+    const a = await repairDraft(llm, awsCatalog, input(), draft, 'message A');
+    const b = await repairDraft(llm, awsCatalog, input(), draft, 'message B');
+    expect(requests[1]?.messages).toHaveLength(3);
+    expect(requests[1]?.messages[2]?.content).toBe('message A');
+    expect(requests[2]?.messages).toHaveLength(3);
+    expect(requests[2]?.messages[2]?.content).toBe('message B');
+    expect(draft.messages).toHaveLength(1);
+    expect(draft.usage).toHaveLength(1);
+    expect(a.usage).toHaveLength(2);
+    expect(b.usage).toHaveLength(2);
   });
 });

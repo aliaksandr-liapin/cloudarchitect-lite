@@ -4,6 +4,10 @@
  *
  * Usage: pnpm --filter @cloudarchitect/eval review --runs <id,id,...> --max-usd <n> [--seed 1]
  *        [--reviewers anthropic,openai,google] [--repeat n] [--scenarios id,id] [--base-scenarios id,id] [--packets-only]
+ * Arms mode: pnpm --filter @cloudarchitect/eval review --arms <runId-or-dir> --max-usd <n> [--per-model 10]
+ * [--seed 1] [--packets-only] reviews the two repair arms of an info-repair run: per model,
+ * sampleReviewJobs picks the jobs whose final designs differ; the designs are named <model>~W and
+ * <model>~I and paired with each other. Writes eval/reviews/info-repair-<date>/ (same layout).
  * Resume: when today's output folder already has a key.json, packets are rebuilt and must match the
  * saved ones byte for byte; valid saved reviews are kept and only missing (reviewer, packet) calls run.
  * --packets-only then prints how many calls a resume would make per reviewer.
@@ -36,9 +40,11 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { Scenario } from './harness.js';
+import { sampleReviewJobs } from './info-repair-arms.js';
+import type { InfoRepairRecord } from './info-repair-job.js';
 import {
   aggregate,
   buildPackets,
@@ -72,6 +78,8 @@ const MAX_TOKENS = 24000;
 const { values: args } = parseArgs({
   options: {
     runs: { type: 'string' },
+    arms: { type: 'string' },
+    'per-model': { type: 'string', default: '10' },
     'max-usd': { type: 'string' },
     seed: { type: 'string', default: '1' },
     repeat: { type: 'string' },
@@ -81,7 +89,11 @@ const { values: args } = parseArgs({
     'packets-only': { type: 'boolean', default: false },
   },
 });
-if (!args.runs) throw new Error('--runs <id,id,...> is required');
+if (!args.runs && !args.arms) throw new Error('--runs <id,id,...> or --arms <runId> is required');
+if (args.runs && args.arms) throw new Error('--runs and --arms cannot be combined');
+const perModel = Number(args['per-model']);
+if (!Number.isInteger(perModel) || perModel < 1)
+  throw new Error('--per-model must be a positive integer');
 const packetsOnly = args['packets-only'];
 const maxUsd = Number(args['max-usd']);
 if (!packetsOnly && (!Number.isFinite(maxUsd) || maxUsd <= 0))
@@ -96,24 +108,56 @@ const scenarios = readdirSync(join(root, 'scenarios'))
   .map((f) => Scenario.parse(JSON.parse(readFileSync(join(root, 'scenarios', f), 'utf8'))));
 
 const runs: DesignRun[] = [];
-for (const runId of args.runs.split(',')) {
-  const dir = join(root, 'results', 'live', runId);
-  if (!existsSync(join(dir, 'records.json'))) throw new Error(`Unknown run ${runId}`);
-  const records = JSON.parse(readFileSync(join(dir, 'records.json'), 'utf8')) as {
-    scenarioId: string;
-    model: string;
-    repeat: number;
-    ok: boolean;
-  }[];
-  for (const r of records) {
-    const file = join(dir, 'outputs', `${r.model}-${r.scenarioId}-${r.repeat}.project.json`);
-    if (!r.ok || !existsSync(file)) continue;
-    runs.push({
-      model: r.model,
-      scenarioId: r.scenarioId,
-      repeat: r.repeat,
-      project: JSON.parse(readFileSync(file, 'utf8')) as Project,
-    });
+/** Arms mode: partner model per arm name, e.g. haiku~W <-> haiku~I. */
+let armPairs: Record<string, string> | undefined;
+if (args.arms) {
+  const dir =
+    isAbsolute(args.arms) || args.arms.includes('/')
+      ? resolve(args.arms)
+      : join(root, 'results', 'live', args.arms);
+  if (!existsSync(join(dir, 'records.json'))) throw new Error(`Unknown run ${args.arms}`);
+  const records = JSON.parse(readFileSync(join(dir, 'records.json'), 'utf8')) as InfoRepairRecord[];
+  armPairs = {};
+  let skippedJobs = 0;
+  for (const r of sampleReviewJobs(records, perModel, seed)) {
+    const file = (arm: 'W' | 'I') =>
+      join(dir, 'outputs', `${r.model}-${r.scenarioId}-${r.repeat}.${arm}.project.json`);
+    if (!existsSync(file('W')) || !existsSync(file('I'))) {
+      skippedJobs++;
+      continue;
+    }
+    for (const arm of ['W', 'I'] as const) {
+      runs.push({
+        model: `${r.model}~${arm}`,
+        scenarioId: r.scenarioId,
+        repeat: r.repeat,
+        project: JSON.parse(readFileSync(file(arm), 'utf8')) as Project,
+      });
+    }
+    armPairs[`${r.model}~W`] = `${r.model}~I`;
+    armPairs[`${r.model}~I`] = `${r.model}~W`;
+  }
+  if (skippedJobs) console.log(`${skippedJobs} sampled jobs skipped: arm files missing`);
+} else {
+  for (const runId of args.runs!.split(',')) {
+    const dir = join(root, 'results', 'live', runId);
+    if (!existsSync(join(dir, 'records.json'))) throw new Error(`Unknown run ${runId}`);
+    const records = JSON.parse(readFileSync(join(dir, 'records.json'), 'utf8')) as {
+      scenarioId: string;
+      model: string;
+      repeat: number;
+      ok: boolean;
+    }[];
+    for (const r of records) {
+      const file = join(dir, 'outputs', `${r.model}-${r.scenarioId}-${r.repeat}.project.json`);
+      if (!r.ok || !existsSync(file)) continue;
+      runs.push({
+        model: r.model,
+        scenarioId: r.scenarioId,
+        repeat: r.repeat,
+        project: JSON.parse(readFileSync(file, 'utf8')) as Project,
+      });
+    }
   }
 }
 
@@ -124,6 +168,7 @@ const { packets, key } = buildPackets({
   runs,
   scenarios,
   seed,
+  pairs: armPairs,
   repeat,
   onlyScenarios: args.scenarios?.split(','),
   baseScenarios: args['base-scenarios']?.split(','),
@@ -137,7 +182,11 @@ for (const p of packets) {
     console.log(`warning: ${p.id} mentions ${leaks.join(', ')}; check the packet text`);
 }
 
-const outDir = join(root, 'reviews', `phase3-${new Date().toISOString().slice(0, 10)}`);
+const outDir = join(
+  root,
+  'reviews',
+  `${args.arms ? 'info-repair' : 'phase3'}-${new Date().toISOString().slice(0, 10)}`,
+);
 mkdirSync(join(outDir, 'packets'), { recursive: true });
 const instructionsSrc = join(
   root,

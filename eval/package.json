@@ -9,6 +9,8 @@
     "spike": "tsx src/spike.ts",
     "rescore": "tsx src/rescore.ts",
     "live": "tsx src/live.ts",
+    "info-repair": "tsx src/info-repair.ts",
+    "info-repair-report": "tsx src/info-repair-report.ts",
     "review": "tsx src/review.ts",
     "rules": "tsx src/rule-report.ts",
     "typecheck": "tsc --noEmit",

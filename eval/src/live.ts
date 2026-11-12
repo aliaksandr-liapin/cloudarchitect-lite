@@ -10,40 +10,27 @@
  * eval/results/live/<runId>/. Console output carries ids, scores, cost and latency only.
  */
 import { awsCatalog } from '@cloudarchitect/catalog';
-import {
-  ModelChoice,
-  modelOption,
-  validateProject,
-  YOU_DECIDE,
-  type Provider,
-} from '@cloudarchitect/domain';
-import {
-  anthropicClient,
-  costMicroUsd,
-  extract,
-  extractionModel,
-  generateArchitecture,
-  GenerationError,
-  googleClient,
-  openaiClient,
-  type LlmClient,
-} from '@cloudarchitect/generator';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { type ModelChoice, modelOption, validateProject } from '@cloudarchitect/domain';
+import { generateArchitecture, GenerationError } from '@cloudarchitect/generator';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { evaluateGate, KEY_VAR, modelsWithKeys, type LiveSummary } from './gate.js';
-import { Scenario, scoreCandidate, type ScenarioResult } from './harness.js';
+import { evaluateGate, modelsWithKeys, type LiveSummary } from './gate.js';
+import { scoreCandidate, type Scenario, type ScenarioResult } from './harness.js';
+import {
+  Budget,
+  evalRoot as root,
+  extractWithAnswers,
+  loadClients,
+  loadScenarios,
+  meteredClient,
+  parseModels,
+  positiveInt,
+  type CallRecord,
+} from './live-common.js';
 import { countByRule, type FindingsByRule } from './rule-hits.js';
 
-const root = new URL('..', import.meta.url).pathname;
-const envFile = join(root, '..', '.env');
-const PROVIDER_CLIENT: Record<Provider, (apiKey: string) => LlmClient> = {
-  anthropic: anthropicClient,
-  openai: openaiClient,
-  google: googleClient,
-};
-if (Object.values(KEY_VAR).some((v) => !process.env[v]) && existsSync(envFile))
-  process.loadEnvFile(envFile);
+const clients = loadClients();
 
 const { values: args } = parseArgs({
   options: {
@@ -56,18 +43,7 @@ const { values: args } = parseArgs({
   },
 });
 
-const positiveInt = (name: string, v: string) => {
-  const n = Number(v);
-  if (!Number.isInteger(n) || n < 1) throw new Error(`--${name} must be a positive integer`);
-  return n;
-};
-const requested = args.models.split(',').map((m) => ModelChoice.parse(m));
-// One client per provider that has a key; a model without its provider key is skipped (gate: fails).
-const clients: Partial<Record<Provider, LlmClient>> = {};
-for (const p of Object.keys(KEY_VAR) as Provider[]) {
-  const key = process.env[KEY_VAR[p]];
-  if (key) clients[p] = PROVIDER_CLIENT[p](key);
-}
+const requested = parseModels(args.models);
 const keyed = modelsWithKeys(requested, (p) => Boolean(clients[p]), args.gate);
 for (const w of keyed.warnings) console.log(w);
 if (keyed.failures.length) {
@@ -84,13 +60,7 @@ const concurrency = positiveInt('concurrency', args.concurrency);
 const maxUsd = Number(args['max-usd']);
 if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be a positive number');
 
-const all = readdirSync(join(root, 'scenarios'))
-  .filter((f) => f.endsWith('.json'))
-  .map((f) => Scenario.parse(JSON.parse(readFileSync(join(root, 'scenarios', f), 'utf8'))));
-const wanted = args.scenarios?.split(',');
-const unknown = wanted?.filter((id) => !all.some((s) => s.id === id)) ?? [];
-if (unknown.length) throw new Error(`Unknown scenarios: ${unknown.join(', ')}`);
-const scenarios = wanted ? all.filter((s) => wanted.includes(s.id)) : all;
+const scenarios = loadScenarios(args.scenarios);
 
 const runId = new Date().toISOString().replace(/[:.]/g, '-');
 const outDir = join(root, 'results', 'live', runId);
@@ -104,7 +74,7 @@ interface LiveRecord {
   error?: string;
   questionTopics: string[];
   /** Per model call: stop reason and tokens only, never content. */
-  calls: { model: string; stopReason: string | null; outputTokens: number; costUsd: number }[];
+  calls: CallRecord[];
   costUsd: number;
   latencyMs: number;
   findingsByRule?: FindingsByRule;
@@ -114,63 +84,24 @@ interface LiveRecord {
   score?: ScenarioResult;
 }
 
-class SpendCapReached extends Error {}
-
-let spentMicro = 0;
-const capMicro = maxUsd * 1e6;
-/** Set when the cap stopped a call or left jobs unscheduled; such a run fails the gate. */
-let cutShort = false;
+const budget = new Budget(maxUsd);
 
 async function runJob(s: Scenario, model: ModelChoice, repeat: number): Promise<LiveRecord> {
   const started = Date.now();
-  let jobMicro = 0;
-  const calls: LiveRecord['calls'] = [];
-  let lastText = '';
+  const { llm, meter } = meteredClient(clients[modelOption(model).provider]!, budget);
+  const { calls } = meter;
   let questionTopics: string[] = [];
-  // Each call's cost is counted as soon as it returns; the cap is checked before every call.
-  const real = clients[modelOption(model).provider]!;
-  const llm: LlmClient = async (req) => {
-    if (spentMicro >= capMicro) throw new SpendCapReached(`--max-usd ${maxUsd} reached`);
-    const res = await real(req);
-    const cost = costMicroUsd(req.model, res.usage);
-    spentMicro += cost;
-    jobMicro += cost;
-    calls.push({
-      model: req.model,
-      stopReason: res.stopReason,
-      outputTokens: res.usage.output,
-      costUsd: cost / 1e6,
-    });
-    lastText = res.text;
-    return res;
-  };
   const base = { scenarioId: s.id, model, repeat };
   const done = () => ({
     questionTopics,
     calls,
-    costUsd: jobMicro / 1e6,
+    costUsd: meter.jobMicro / 1e6,
     latencyMs: Date.now() - started,
   });
   try {
-    const ex = await extract(
-      llm,
-      { prompt: s.prompt, toggles: s.toggles },
-      extractionModel(modelOption(model).provider),
-    );
-    questionTopics = ex.questions.map((q) => q.topic);
-    const answers = Object.fromEntries(
-      ex.questions.map((q) => [q.topic, s.answers[q.topic] ?? YOU_DECIDE]),
-    );
-    const r = await generateArchitecture(llm, awsCatalog, {
-      prompt: s.prompt,
-      toggles: s.toggles,
-      model,
-      name: ex.name,
-      requirements: ex.requirements,
-      assumptions: ex.assumptions,
-      questions: ex.questions,
-      answers,
-    });
+    const step = await extractWithAnswers(llm, s, model);
+    questionTopics = step.questionTopics;
+    const r = await generateArchitecture(llm, awsCatalog, step.input);
     writeFileSync(
       join(outDir, 'outputs', `${model}-${s.id}-${repeat}.project.json`),
       JSON.stringify(r.project, null, 2),
@@ -185,10 +116,12 @@ async function runJob(s: Scenario, model: ModelChoice, repeat: number): Promise<
       score: scoreCandidate(s, r.project),
     };
   } catch (err) {
-    if (err instanceof SpendCapReached) cutShort = true;
     // The rejected answer stays in the local, git-ignored results folder for diagnosis.
     if (err instanceof GenerationError)
-      writeFileSync(join(outDir, 'outputs', `${model}-${s.id}-${repeat}.rejected.txt`), lastText);
+      writeFileSync(
+        join(outDir, 'outputs', `${model}-${s.id}-${repeat}.rejected.txt`),
+        meter.lastText,
+      );
     return {
       ...base,
       ok: false,
@@ -209,8 +142,8 @@ const records: LiveRecord[] = [];
 let next = 0;
 async function worker() {
   while (next < jobs.length) {
-    if (spentMicro >= capMicro) {
-      cutShort = true;
+    if (budget.exhausted) {
+      budget.cutShort = true;
       return;
     }
     const { s, model, repeat } = jobs[next++]!;
@@ -254,7 +187,7 @@ const gate = models.map((model, i) => {
   const expected = scenarios.length * repeats;
   const result = evaluateGate(summary[i]!, modelOption(model).benchmark?.costPerOperationUsd);
   const failures = [...result.failures];
-  if (cutShort || summary[i]!.runs < expected)
+  if (budget.cutShort || summary[i]!.runs < expected)
     failures.push(
       `${model}: run cut short by --max-usd ${maxUsd} (${summary[i]!.runs}/${expected} runs)`,
     );
@@ -270,8 +203,8 @@ writeFileSync(
       repeats,
       scenarios: scenarios.length,
       maxUsd,
-      spentUsd: spentMicro / 1e6,
-      cutShort,
+      spentUsd: budget.spentMicro / 1e6,
+      cutShort: budget.cutShort,
       summary,
       gate,
     },
@@ -299,7 +232,7 @@ console.table(
 );
 console.table(summary);
 console.log(
-  `total spent: $${(spentMicro / 1e6).toFixed(4)}${cutShort ? ' (stopped at --max-usd)' : ''}; results: ${outDir}`,
+  `total spent: $${(budget.spentMicro / 1e6).toFixed(4)}${budget.cutShort ? ' (stopped at --max-usd)' : ''}; results: ${outDir}`,
 );
 
 if (args.gate) {
