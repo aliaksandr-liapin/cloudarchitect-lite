@@ -43,6 +43,8 @@ export interface ArmResult {
   score?: ScenarioResult;
   /** Extraction + draft + this arm's repair. */
   costUsd: number;
+  /** Extraction + draft + this arm's own repair wall time (the arms' repairs run concurrently). */
+  latencyMs: number;
 }
 
 export interface InfoRepairRecord {
@@ -86,6 +88,8 @@ export async function runInfoRepairJob(
   model: ModelChoice,
   repeat: number,
   save: (name: SaveName, project: Project) => void,
+  /** Receives the model's rejected text when the first draft fails schema validation. */
+  saveRejectedDraft: (text: string) => void = () => {},
 ): Promise<InfoRepairRecord> {
   const started = Date.now();
   // Local meter only: the caller's client enforces any spend cap.
@@ -99,13 +103,22 @@ export async function runInfoRepairJob(
   try {
     const step = await extractWithAnswers(metered, scenario, model);
     const extractionMicro = sumMicro(step.usage);
-    const draft = await draftArchitecture(metered, catalog, step.input);
+    let draft: Draft;
+    try {
+      draft = await draftArchitecture(metered, catalog, step.input);
+    } catch (err) {
+      if (err instanceof GenerationError) saveRejectedDraft(meter.lastText);
+      throw err;
+    }
+    const draftDoneMs = Date.now() - started;
     save('draft', draft.project);
 
     const runArm = async (arm: Arm): Promise<{ result: ArmResult; final: Project | null }> => {
       const message = messageFor(arm, draft.findings);
       const sent = armFindings(draft.findings, arm);
       let repaired: Draft;
+      const repairStarted = Date.now();
+      const latencyMs = () => draftDoneMs + (Date.now() - repairStarted);
       if (message === undefined) repaired = draft;
       else {
         try {
@@ -124,14 +137,19 @@ export async function runInfoRepairJob(
               regressions: 0,
               score: scoreCandidate(scenario, null),
               costUsd: (extractionMicro + sumMicro(err.usage)) / 1e6,
+              latencyMs: latencyMs(),
             },
           };
         }
         save(arm, repaired.project);
       }
+      const armLatencyMs = latencyMs();
       if (message === undefined) save(arm, draft.project);
       const changes = message === undefined ? [] : diffDesigns(draft.project, repaired.project);
-      const { targeted, collateral } = classifyChanges(changes, sent);
+      const { targeted, collateral } = classifyChanges(changes, sent, {
+        before: draft.project,
+        after: repaired.project,
+      });
       return {
         final: repaired.project,
         result: {
@@ -144,6 +162,7 @@ export async function runInfoRepairJob(
           regressions: regressions(draft.findings, repaired.findings).length,
           score: scoreCandidate(scenario, repaired.project),
           costUsd: (extractionMicro + sumMicro(repaired.usage)) / 1e6,
+          latencyMs: armLatencyMs,
         },
       };
     };

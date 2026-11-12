@@ -215,13 +215,65 @@ describe('runInfoRepairJob', () => {
     expect(savedAfterReturn).toBe(false);
   });
 
-  it('records a failed draft as ok false without arms', async () => {
+  it('records a failed draft as ok false without arms and hands over the rejected text', async () => {
     const { llm, requests } = fake({ draft: 'not json' });
-    const r = await run(llm).record;
+    const rejected: string[] = [];
+    const r = await runInfoRepairJob(
+      llm,
+      awsCatalog,
+      scenario,
+      'haiku',
+      1,
+      () => {},
+      (text) => rejected.push(text),
+    );
 
     expect(requests).toHaveLength(2);
     expect(r.ok).toBe(false);
     expect(r.arms).toBeUndefined();
     expect(r.costUsd).toBeGreaterThan(0);
+    expect(rejected).toEqual(['not json']);
+  });
+
+  it('does not hand over rejected text when the draft succeeds', async () => {
+    const { llm } = fake({ draft: graph(false, false), W: graph(true, false), I: 'not json' });
+    const rejected: string[] = [];
+    await runInfoRepairJob(
+      llm,
+      awsCatalog,
+      scenario,
+      'haiku',
+      1,
+      () => {},
+      (text) => rejected.push(text),
+    );
+    expect(rejected).toEqual([]);
+  });
+
+  it('times each arm as extraction + draft + its own repair', async () => {
+    const slow = { W: 0, I: 120 };
+    const { llm: base } = fake({
+      draft: graph(false, false),
+      W: graph(true, false),
+      I: graph(true, true),
+    });
+    let n = 0;
+    const llm: LlmClient = async (req) => {
+      n++;
+      const last = req.messages[req.messages.length - 1]!.content;
+      if (n === 2) await new Promise((r) => setTimeout(r, 40)); // the draft
+      if (n > 2) {
+        const ms = last.includes('Apply each info finding') ? slow.I : slow.W;
+        await new Promise((r) => setTimeout(r, ms));
+      }
+      return base(req);
+    };
+    const r = await run(llm).record;
+
+    const { W, I } = r.arms!;
+    expect(W.latencyMs).toBeGreaterThanOrEqual(40);
+    expect(W.latencyMs).toBeLessThan(I.latencyMs - 60);
+    expect(I.latencyMs).toBeGreaterThanOrEqual(160);
+    expect(I.latencyMs).toBeLessThanOrEqual(r.latencyMs);
   });
 });

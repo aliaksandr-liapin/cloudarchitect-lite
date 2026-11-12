@@ -5,7 +5,8 @@
  *
  * Usage: pnpm --filter @cloudarchitect/eval info-repair --max-usd <n>
  *        [--models haiku,gpt-luna,gemini-flash-lite] [--repeats 2] [--scenarios id,id] [--concurrency 4]
- * --max-usd is required: one shared cap, so a run can never start uncapped. Results go to
+ * --max-usd is required: one shared cap, so a run can never start uncapped. A requested model whose
+ * provider key is missing fails the run before any call. Results go to
  * eval/results/live/<runId>/. Console output carries ids, counts, cost and latency only.
  */
 import { awsCatalog } from '@cloudarchitect/catalog';
@@ -43,13 +44,13 @@ if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be 
 const repeats = positiveInt('repeats', args.repeats);
 const concurrency = positiveInt('concurrency', args.concurrency);
 
-const keyed = modelsWithKeys(parseModels(args.models), (p) => Boolean(clients[p]), false);
-for (const w of keyed.warnings) console.log(w);
-const { models } = keyed;
-if (models.length === 0) {
-  console.log('No requested model has a provider key — info-repair skipped');
-  process.exit(0);
+// Every requested model must have its key: a run that silently drops a model is not the experiment.
+const keyed = modelsWithKeys(parseModels(args.models), (p) => Boolean(clients[p]), true);
+if (keyed.failures.length) {
+  for (const f of keyed.failures) console.error(f);
+  process.exit(1);
 }
+const { models } = keyed;
 const scenarios = loadScenarios(args.scenarios);
 
 const runId = new Date().toISOString().replace(/[:.]/g, '-');
@@ -75,6 +76,8 @@ async function worker() {
       return;
     }
     const { s, model, repeat } = jobs[next++]!;
+    const file = (suffix: string) =>
+      join(outDir, 'outputs', `${model}-${s.id}-${repeat}.${suffix}`);
     const r = await runInfoRepairJob(
       meteredClient(clients[modelOption(model).provider]!, budget).llm,
       awsCatalog,
@@ -82,10 +85,9 @@ async function worker() {
       model,
       repeat,
       (name, project) =>
-        writeFileSync(
-          join(outDir, 'outputs', `${model}-${s.id}-${repeat}.${name}.project.json`),
-          JSON.stringify(project, null, 2),
-        ),
+        writeFileSync(file(`${name}.project.json`), JSON.stringify(project, null, 2)),
+      // The rejected answer stays in the local, git-ignored results folder for diagnosis.
+      (text) => writeFileSync(file('rejected.txt'), text),
     );
     records.push(r);
     console.log(

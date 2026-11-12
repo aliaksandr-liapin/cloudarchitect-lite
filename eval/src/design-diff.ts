@@ -111,21 +111,61 @@ export function diffDesigns(before: Project, after: Project): Change[] {
   );
 }
 
-/** Targeted: touches an element a sent finding names, or drops a requirement link it names. */
+/**
+ * Catalog services a rule's remediation asks for, for rules whose findings name no node and no
+ * edge (so an added node cannot be tied to the finding by id). Other such rules ask for no
+ * specific service: VR-012 names a requirement, VR-022's region finding asks for a second Region
+ * container, and the structural checks name containers or duplicate ids.
+ */
+export const RULE_REQUESTED_SERVICES: Readonly<Record<string, readonly string[]>> = {
+  'VR-007': ['aws.cloudwatch'],
+};
+
+/**
+ * Splits changes into targeted and collateral (controller ruling R7, identical for both arms).
+ * Named nodes are the sent findings' nodes plus both ends (before or after) of every edge they
+ * name. A change is targeted when it touches a named node, a named edge, or drops a named
+ * requirement link. An added node is targeted when an added edge connects it to a named node, or
+ * when a sent finding that names no node or edge asks for its service (RULE_REQUESTED_SERVICES);
+ * edge changes touching such a node are targeted too. Everything else is collateral.
+ */
 export function classifyChanges(
   changes: Change[],
   sent: Finding[],
+  designs: { before: Project; after: Project },
 ): { targeted: Change[]; collateral: Change[] } {
-  const nodes = new Set(sent.flatMap((f) => f.nodeIds));
   const edges = new Set(sent.flatMap((f) => f.edgeIds));
+  const nodes = new Set(sent.flatMap((f) => f.nodeIds));
+  for (const e of [...designs.before.edges, ...designs.after.edges])
+    if (edges.has(e.id)) nodes.add(e.source).add(e.target);
   const reqs = new Set(sent.flatMap((f) => f.requirementIds));
+  const requested = new Set(
+    sent
+      .filter((f) => f.nodeIds.length === 0 && f.edgeIds.length === 0)
+      .flatMap((f) => RULE_REQUESTED_SERVICES[f.ruleId ?? ''] ?? []),
+  );
+  const afterNodes = byId(designs.after.nodes);
+  const added = new Set(changes.filter((c) => c.kind === 'node-added').map((c) => c.nodeIds[0]!));
+  const addedTargets = new Set<string>();
+  for (const id of added) {
+    const service = afterNodes.get(id)?.serviceId;
+    const linked = changes.some(
+      (c) =>
+        c.kind === 'edge-added' && c.nodeIds.includes(id) && c.nodeIds.some((n) => nodes.has(n)),
+    );
+    if (linked || (service !== undefined && requested.has(service))) addedTargets.add(id);
+  }
+  const isEdgeChange = (c: Change) =>
+    c.kind === 'edge-added' || c.kind === 'edge-removed' || c.kind === 'edge-rewired';
   const targeted: Change[] = [];
   const collateral: Change[] = [];
   for (const c of changes) {
     const hit =
       c.nodeIds.some((id) => nodes.has(id)) ||
       c.edgeIds.some((id) => edges.has(id)) ||
-      (c.requirementId !== undefined && reqs.has(c.requirementId));
+      (c.requirementId !== undefined && reqs.has(c.requirementId)) ||
+      (c.kind === 'node-added' && addedTargets.has(c.nodeIds[0]!)) ||
+      (isEdgeChange(c) && c.nodeIds.some((id) => addedTargets.has(id)));
     (hit ? targeted : collateral).push(c);
   }
   return { targeted, collateral };

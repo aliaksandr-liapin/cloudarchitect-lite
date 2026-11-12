@@ -22,6 +22,7 @@ function arm(over: Partial<ArmResult> = {}): ArmResult {
     changesByKind: {},
     regressions: 0,
     costUsd: 0.01,
+    latencyMs: 1000,
     score: { passed: true } as ArmResult['score'],
     ...over,
   };
