@@ -1,0 +1,263 @@
+{
+  "reviews": [
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A dedicated NAT gateway incurs hourly charges throughout the day for a task that runs only about 25 minutes nightly, with no cost estimate or alternatives considered. Compare existing shared egress or a public-subnet Fargate task with no inbound access before accepting this fixed cost.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudWatch logs and alarms are named, but completion-failure detection and recovery are not defined. EventBridge delivery retries do not rerun application work after a successful task launch; specify failed-task and missing-success detection, an alert destination, and a safe rerun procedure.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "Database authentication and PostgreSQL privileges are unspecified. A generic IAM task role does not by itself establish database access; choose managed credentials or IAM database authentication and explicitly grant a read-only database account the required SQL privileges.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.DBAccounts.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The launch configuration is underspecified: identify the ECS cluster and RunTask target, task-definition reference, task execution role, and container-image source rather than presenting the task definition as the launch intermediary.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the schedule's time zone, SES verified-sender and production-access prerequisites, and the download-link lifetime relative to the task role's temporary signing credentials.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The Fargate-based pipeline covers the requested workflow, but dedicated NAT cost, incomplete database authentication and unspecified completion-failure recovery need attention."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A dedicated NAT gateway incurs hourly charges throughout the day for a task that runs only about 25 minutes nightly, with no cost estimate or alternatives considered. Compare existing shared egress or a public-subnet Fargate task with no inbound access before accepting this fixed cost.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "major",
+          "description": "CloudWatch logs and alarms are named, but completion-failure detection and recovery are not defined. EventBridge delivery retries do not rerun application work after a successful task launch; specify failed-task and missing-success detection, an alert destination, and a safe rerun procedure.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "Database authentication and PostgreSQL privileges are unspecified. A generic IAM task role does not by itself establish database access; choose managed credentials or IAM database authentication and explicitly grant a read-only database account the required SQL privileges.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.DBAccounts.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The launch configuration is underspecified: identify the ECS cluster and RunTask target, task-definition reference, task execution role, and container-image source rather than presenting the task definition as the launch intermediary.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the schedule's time zone, SES verified-sender and production-access prerequisites, and the download-link lifetime relative to the task role's temporary signing credentials.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The Fargate-based pipeline covers the requested workflow, but dedicated NAT cost, incomplete database authentication and unspecified completion-failure recovery need attention."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "CloudFront is expected to fetch from a private bucket, but origin authorization is not specified. Configure an S3 REST origin with Origin Access Control, a distribution-scoped bucket policy, and S3 Block Public Access so the origin remains private while CloudFront can read it.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate's region is unspecified; the certificate attached to CloudFront must be requested or imported in us-east-1, regardless of the S3 bucket's region.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the default root object, such as index.html, and the five pages' object paths. A private S3 REST origin does not automatically provide S3 website-endpoint index-document behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This economical, maintenance-free static-site architecture meets the request but needs explicit private-origin authorization and a few CloudFront configuration details."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "CloudFront is expected to fetch from a private bucket, but origin authorization is not specified. Configure an S3 REST origin with Origin Access Control, a distribution-scoped bucket policy, and S3 Block Public Access so the origin remains private while CloudFront can read it.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate's region is unspecified; the certificate attached to CloudFront must be requested or imported in us-east-1, regardless of the S3 bucket's region.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the default root object, such as index.html, and the five pages' object paths. A private S3 REST origin does not automatically provide S3 website-endpoint index-document behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This economical, maintenance-free static-site architecture meets the request but needs explicit private-origin authorization and a few CloudFront configuration details."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R12 is tagged but has no implementation mechanism: workflow retries or a new execution for the same date can repeat notifications and report writes. Define durable per-date and per-recipient completion state, conditional report creation, and an explicit notification retry policy rather than relying on orchestration alone.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design does not specify execution-role trust or least-privilege boundaries for Scheduler, Step Functions, ECS task execution, the application task, and the notifier. Define these roles and scope secret reads, report writes, presigned-download GetObject permissions, and SES sending separately.",
+          "evidence": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"
+        },
+        {
+          "severity": "major",
+          "description": "The inferred R7 promises recipient-restricted access, but presigned URLs are transferable bearer tokens rather than recipient-authenticated access. Explicitly accept bearer-link sharing as an assumption or add recipient authentication if access must remain limited to the intended manager.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "major",
+          "description": "A dedicated NAT gateway adds hourly charges even when the nightly task is idle, with no cost estimate or alternative considered. Evaluate existing shared egress, a tightly restricted public-subnet task, or appropriately priced endpoints before accepting this fixed cost.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify a Standard Step Functions workflow and the ECS RunTask .sync integration for the 25-minute wait, including task timeout, retry/catch behavior, and validation that reporting completed successfully before notification.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The NAT rationale attributes SES and Step Functions calls to Fargate, although the shown design sends email from Lambda and has Step Functions wait externally. Document the task's actual egress dependencies, including image retrieval, Secrets Manager, S3 and logging.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed workflow fits the runtime and serverless preference, but duplicate prevention, permission boundaries and recipient-access assumptions remain unresolved while NAT adds substantial idle cost."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R12 is tagged but has no implementation mechanism: workflow retries or a new execution for the same date can repeat notifications and report writes. Define durable per-date and per-recipient completion state, conditional report creation, and an explicit notification retry policy rather than relying on orchestration alone.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design does not specify execution-role trust or least-privilege boundaries for Scheduler, Step Functions, ECS task execution, the application task, and the notifier. Define these roles and scope secret reads, report writes, presigned-download GetObject permissions, and SES sending separately.",
+          "evidence": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"
+        },
+        {
+          "severity": "major",
+          "description": "The inferred R7 promises recipient-restricted access, but presigned URLs are transferable bearer tokens rather than recipient-authenticated access. Explicitly accept bearer-link sharing as an assumption or add recipient authentication if access must remain limited to the intended manager.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "major",
+          "description": "A dedicated NAT gateway adds hourly charges even when the nightly task is idle, with no cost estimate or alternative considered. Evaluate existing shared egress, a tightly restricted public-subnet task, or appropriately priced endpoints before accepting this fixed cost.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify a Standard Step Functions workflow and the ECS RunTask .sync integration for the 25-minute wait, including task timeout, retry/catch behavior, and validation that reporting completed successfully before notification.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The NAT rationale attributes SES and Step Functions calls to Fargate, although the shown design sends email from Lambda and has Step Functions wait externally. Document the task's actual egress dependencies, including image retrieval, Secrets Manager, S3 and logging.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed workflow fits the runtime and serverless preference, but duplicate prevention, permission boundaries and recipient-access assumptions remain unresolved while NAT adds substantial idle cost."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "nightly-reports",
+      "better": "tie",
+      "why": "Both provide the same runtime, retention and delivery architecture and share the same cost and operational weaknesses; B's encryption annotation for the existing Aurora database does not establish a material implementation advantage."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "tie",
+      "why": "The architectures are functionally identical and appropriately inexpensive; B's encryption annotation adds little because S3 already encrypts new uploads by default, while both omit the same private-origin authorization."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "tie",
+      "why": "Both satisfy the managed-compute preference with the same services and share the same idempotency, authorization, recipient-access and NAT-cost gaps; the added Aurora encryption annotation does not resolve those differences from an MVP-ready design."
+    }
+  ]
+}

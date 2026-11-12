@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A provisioned OpenSearch Service domain for vector search over 20,000 manuals carries a fixed always-on cost and cluster operations. A managed RAG option such as Bedrock Knowledge Bases or OpenSearch Serverless would be simpler and cheaper for an MVP, and the design gives no justification for the choice.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/kb-how-it-works.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API Gateway edge is labelled 'JWT authorization' while the API is a REST API with a Cognito user pool authorizer. 'JWT authorizer' is HTTP API terminology, so the wording is inconsistent.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Ingestion runs as a Lambda worker with a 15-minute limit. Large PDFs may need chunking, queue visibility-timeout tuning and a maxReceiveCount setting, none of which are described. OpenSearch access control and VPC placement are also not described.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No S3 Block Public Access, TLS enforcement or S3 versioning is mentioned. Citations show source manuals only as metadata, with no secure link back to the PDF. Encryption is explicit for S3 and DynamoDB.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct serverless RAG design with Cognito-protected API, DynamoDB TTL for history, and an SQS/DLQ ingestion pipeline. It is somewhat costly because of the OpenSearch cluster and slightly under-specified on security details."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A provisioned OpenSearch Service domain for vector search over 20,000 manuals carries a fixed always-on cost and cluster operations. A managed RAG option such as Bedrock Knowledge Bases or OpenSearch Serverless would be simpler and cheaper for an MVP, and the design gives no justification for the choice.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/kb-how-it-works.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API Gateway edge is labelled 'JWT authorization' while the API is a REST API with a Cognito user pool authorizer. 'JWT authorizer' is HTTP API terminology, so the wording is inconsistent.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption settings are not stated for S3 or DynamoDB. Both are encrypted by default, but the design does not say so, and the S3 manual bucket has no stated access restrictions or Block Public Access.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Ingestion runs as a Lambda worker with a 15-minute limit. Large PDFs may need chunking and queue visibility-timeout tuning, which are not described.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The topology is identical to A and equally workable, but B omits the explicit encryption settings on S3 and DynamoDB and has the same OpenSearch cost concern."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 1,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design uses two separate ALB nodes, one per subnet, and has Shoppers connect to both. A single ALB spans multiple AZs by itself, and clients cannot fan out to two load balancers this way. The result is redundant cost and a wrong model.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The sync path 'Product Database -> Sync Function (event, Stream)' is not a native capability for Aurora PostgreSQL. Reaching Lambda needs DMS/CDC to Kinesis or MSK, or triggers using the aws_lambda extension. The one-minute sync requirement therefore has no real mechanism and the connection is mislabelled.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/PostgreSQL-Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks, OpenSearch, ElastiCache and the Lambda are all placed only in Private Subnet A, and Private Subnet B is unused. Aurora is Multi-AZ but the rest of the stack is a single-AZ failure domain.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito is added to authenticate shoppers, with a questionable 'Cognito -> ALB' edge and a satisfies mapping to the availability requirement. Anonymous shoppers browsing product pages do not need it, and it was not requested.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No cache invalidation on price update is described, and no security groups or VPC endpoints are specified for the private Lambda.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design has the right building blocks (Fargate, Aurora, OpenSearch, ElastiCache), but the duplicated ALB, the unrealistic Aurora stream to Lambda, the single-AZ placement and the unrequested Cognito pool weaken it."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The single ALB node is placed in Public Subnet A only. An ALB needs subnets in at least two AZs, so the rationale of multi-AZ entry is not reflected in the diagram placement.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The sync path 'Product Database -> Sync Function (event, Stream)' is not a native capability for Aurora PostgreSQL. Reaching Lambda needs DMS/CDC to Kinesis or MSK, or triggers using the aws_lambda extension. The one-minute sync requirement therefore has no real mechanism.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/PostgreSQL-Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks, OpenSearch, ElastiCache and the Lambda are all placed only in Private Subnet A, and Private Subnet B is unused. The Aurora Multi-AZ setting is therefore undercut by a single-AZ compute, search and cache tier.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+        },
+        {
+          "severity": "minor",
+          "description": "There is no CloudWatch edge from components, no cache invalidation on price change, and no security group or endpoint detail.",
+          "evidence": ""
+        }
+      ],
+      "summary": "B is cleaner and cheaper than A, with a single ALB and no extra Cognito. It shares the same unrealistic Aurora stream and single-AZ placement problems."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The presigned URLs are generated by a Fargate task using a task role. A presigned URL made with temporary credentials stops working when those credentials expire, which is at most a few hours. Managers opening the 02:30 email the next day may find expired links. The design does not say how long-lived links are obtained.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No explicit encryption or backup settings are shown for Aurora or S3. SES sandbox exit and sender verification are not mentioned. The 'configured time zone' claim needs EventBridge Scheduler, which the node does not name.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no retry, and no alarm tied to a missing run beyond the generic CloudWatch statement. The task is in a public subnet with a public IP, which is cheap but needs tight security groups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cheap and fitting Fargate, S3 and SES batch design with lifecycle expiry and monitoring. Presigned URL lifetime under role credentials is the main gap."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The presigned URLs are generated by a Fargate task using a task role. A presigned URL made with temporary credentials stops working when those credentials expire, which is at most a few hours. Managers opening the email later may find expired links. The design does not say how long-lived links are obtained.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "SES sandbox exit and sender verification are not mentioned. The 'configured time zone' claim needs EventBridge Scheduler, which the node does not name.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no retry, and no explicit missing-run alarm beyond the generic monitoring node. The task is in a public subnet with a public IP, so tight security groups are needed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is essentially the same design as A, with explicit encryption configuration on Aurora and S3. It has the same presigned URL lifetime gap and is otherwise simple and cheap."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "support-chatbot",
+      "better": "A",
+      "why": "The topologies are identical, but A states encryption on DynamoDB and S3 explicitly, which is a marginally stronger security baseline."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "B is simpler and avoids A's duplicated ALB nodes and unrequested Cognito edge. Both share the same unrealistic Aurora stream sync and single-AZ placement weaknesses."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "The designs are nearly identical, but B states encryption on Aurora and S3 explicitly. Both share the presigned URL lifetime gap."
+    }
+  ]
+}

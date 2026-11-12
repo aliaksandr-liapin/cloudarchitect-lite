@@ -1,0 +1,288 @@
+{
+  "reviews": [
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ingestion DLQ is defined and monitored, but neither a source-queue redrive policy nor a queue-to-DLQ relationship is specified. Configure the DLQ ARN and maxReceiveCount so repeatedly failing messages actually reach the monitored queue.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authentication is specified, but customer-scoped authorization for conversation history is not. Derive ownership from the validated customer identity, enforce it on every history operation, and define least-privilege access for the chat and ingestion roles.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB TTL does not guarantee physical deletion exactly at 30 days. Clarify the retention interpretation, exclude expired records from conversation reads, and provide additional deletion controls if 30 days is a strict purge deadline.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API invocation arrow misrepresents authorization: the customer supplies a token and API Gateway's configured authorizer validates it. The history read arrow also uses the opposite operation direction from the other read edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The usage-scale and availability clarification requirements remain questions rather than concrete architectural assumptions; specify these before sizing OpenSearch and setting ingestion concurrency and service quotas.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed RAG design covers the requested functionality, but customer-level authorization, ingestion redrive configuration, and retention semantics need clarification before implementation."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The ingestion DLQ is defined and monitored, but neither a source-queue redrive policy nor a queue-to-DLQ relationship is specified. Configure the DLQ ARN and maxReceiveCount so repeatedly failing messages actually reach the monitored queue.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authentication is specified, but customer-scoped authorization for conversation history is not. Derive ownership from the validated customer identity, enforce it on every history operation, and define least-privilege access for the chat and ingestion roles.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB TTL does not guarantee physical deletion exactly at 30 days. Clarify the retention interpretation, exclude expired records from conversation reads, and provide additional deletion controls if 30 days is a strict purge deadline.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API invocation arrow misrepresents authorization: the customer supplies a token and API Gateway's configured authorizer validates it. The history read arrow also uses the opposite operation direction from the other read edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The usage-scale and availability clarification requirements remain questions rather than concrete architectural assumptions; specify these before sizing OpenSearch and setting ingestion concurrency and service quotas.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed RAG design covers the requested functionality, but customer-level authorization, ingestion redrive configuration, and retention semantics need clarification before implementation."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The sole change-capture path is an Aurora 'Stream' directly triggering Lambda, but Aurora does not provide the native Lambda stream event-source mapping implied here. Aurora-to-Lambda invocation integrations are not automatic CDC streams. Specify a supported CDC pipeline or an explicit trigger/outbox consumer, including initial loading and measured end-to-end lag, before claiming sub-minute search freshness.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The design describes a second ALB as required for multi-AZ operation and places each ALB in only one subnet. A regional ALB requires subnets in at least two Availability Zones; two independent single-subnet ALBs are not a valid substitute. Represent one logical ALB associated with both public subnets.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "The cache has only a read path. No population on cache miss, refresh, TTL, or invalidation behavior is specified, leaving the high-read product-page optimization incomplete and potentially stale after updates.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html"
+        },
+        {
+          "severity": "major",
+          "description": "The search index is placed only in AZ-a with no multi-AZ or replica configuration, while all API tasks are also shown only in AZ-a. Database Multi-AZ alone does not make browsing and search resilient to an AZ failure.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Private placement and HTTPS ingress are useful, but task-role permissions, security-group relationships, database/cache transport encryption, and OpenSearch access policies are unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is disconnected from the workload, and no synchronization-lag alarm, replay strategy, or indexing-failure handling is described. Traffic and availability assumptions also remain unanswered clarification questions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requiring Cognito sign-in before shoppers can browse or search is an unrequested product constraint and adds authentication complexity; mark this as an assumption or restrict authentication to operations that require it.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The service choices broadly fit product search, but the unsupported CDC stream and incorrect per-AZ ALB model make the stated implementation non-working."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The sole change-capture path is an Aurora 'Stream' directly triggering Lambda, but Aurora does not provide the native Lambda stream event-source mapping implied here. Aurora-to-Lambda invocation integrations are not automatic CDC streams. Specify a supported CDC pipeline or an explicit trigger/outbox consumer, including initial loading and measured end-to-end lag, before claiming sub-minute search freshness.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html"
+        },
+        {
+          "severity": "major",
+          "description": "Only Public Subnet A is associated with the ALB in the design. Explicitly associate the same logical ALB with both public subnets, because a regional ALB requires subnets in at least two Availability Zones.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "major",
+          "description": "The cache has only a read path. No population on cache miss, refresh, TTL, or invalidation behavior is specified, leaving the high-read product-page optimization incomplete and potentially stale after updates.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html"
+        },
+        {
+          "severity": "major",
+          "description": "The search index is placed only in AZ-a with no multi-AZ or replica configuration, while all API tasks are also shown only in AZ-a. Database Multi-AZ alone does not make browsing and search resilient to an AZ failure.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Private placement and HTTPS ingress are useful, but task-role permissions, security-group relationships, database/cache transport encryption, and OpenSearch access policies are unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is disconnected from the workload, and no synchronization-lag alarm, replay strategy, or indexing-failure handling is described. Traffic and availability assumptions also remain unanswered clarification questions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The leaner container-and-search architecture is appropriate in outline, but its unsupported Aurora CDC path cannot deliver the required price-update freshness as specified."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Public-subnet placement alone does not give a Fargate task outbound connectivity. Specify an assigned public IP and internet-gateway route, or appropriate private endpoints/egress, so the task can pull its image and reach logging, S3, and SES services; inbound access need not be opened.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-outbound.html"
+        },
+        {
+          "severity": "major",
+          "description": "The task's AWS permissions are not defined. Specify a least-privilege task role for report-prefix S3 operations, presigned GET authorization, and SES sending, separate from the execution role used for task startup and logging.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Failure visibility is planned, but runtime retry/rerun behavior and idempotency are unspecified. Distinguish successful task launch from successful report completion, and prevent duplicate reports or emails when a run is repeated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose an explicit presigned-link lifetime and account for expiration of the task-role credentials used to sign it; retaining reports for a year does not make an emailed link valid for a year.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The existing Aurora database's encryption state, database TLS requirements, and secure credential retrieval are not stated; verify these rather than treating private-subnet placement as the complete data-protection control.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Scheduled Fargate, private S3 lifecycle storage, and SES form a simple low-cost solution for the 25-minute job, with networking, permissions, and rerun details still required."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Public-subnet placement alone does not give a Fargate task outbound connectivity. Specify an assigned public IP and internet-gateway route, or appropriate private endpoints/egress, so the task can pull its image and reach logging, S3, and SES services; inbound access need not be opened.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-outbound.html"
+        },
+        {
+          "severity": "major",
+          "description": "The task's AWS permissions are not defined. Specify a least-privilege task role for report-prefix S3 operations, presigned GET authorization, and SES sending, separate from the execution role used for task startup and logging.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Failure visibility is planned, but runtime retry/rerun behavior and idempotency are unspecified. Distinguish successful task launch from successful report completion, and prevent duplicate reports or emails when a run is repeated.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose an explicit presigned-link lifetime and account for expiration of the task-role credentials used to sign it; retaining reports for a year does not make an emailed link valid for a year.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database TLS requirements and secure credential retrieval are not stated. Also verify that the existing Aurora database already satisfies the declared at-rest encryption configuration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design appropriately uses scheduled Fargate for the long-running job and explicitly encrypted storage, while leaving networking, permissions, and rerun behavior to be completed."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "support-chatbot",
+      "better": "tie",
+      "why": "Both have the same functional architecture and implementation gaps; A's explicit S3 and DynamoDB encryption labels do not materially distinguish services that encrypt stored data by default."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "B avoids A's unnecessary second ALB and unrequested shopper-authentication dependency, but neither design is buildable as specified until the Aurora CDC path is corrected."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "B has a narrow security-specification advantage by explicitly requiring Aurora encryption while preserving the same simple, inexpensive scheduled-Fargate workflow; both need the same networking and permission fixes."
+    }
+  ]
+}

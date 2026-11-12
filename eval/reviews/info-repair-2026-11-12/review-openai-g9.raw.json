@@ -1,0 +1,308 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The upload-URL request goes directly from the browser to Lambda, bypassing the defined API Gateway authorizer, but no Function URL or authenticated Lambda invocation mechanism is specified; route this request through the protected API.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html"
+        },
+        {
+          "severity": "major",
+          "description": "Object-created notifications and thumbnail output use the same bucket without a specified input-prefix filter or output exclusion, creating a recursive-invocation risk when thumbnails are saved.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Bucket access policies, CloudFront origin access control, least-privilege Lambda roles, and author-specific upload authorization are unspecified; encryption alone does not establish these controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The thumbnail DLQ and CloudWatch services are listed without an explicit failure-destination association, retry policy, actionable alarms, or recovery procedure; welcome-email retries and idempotency are also unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cache behaviors, TTLs, invalidation, and authorization-header handling are unspecified; distinguish cacheable published reads from authenticated or subscriber-specific operations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The expected-load clarification remains a question rather than a chosen assumption, and DynamoDB capacity mode and any paid API Gateway cache allocation are not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless service selection fits the blog, but the upload-URL path, same-bucket thumbnail processing, and incomplete security and failure-handling details need correction."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Cognito is included, but the API Gateway configuration does not attach a user-pool authorizer or identify protected methods, leaving enforcement of authentication for author and upload operations unspecified.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html"
+        },
+        {
+          "severity": "major",
+          "description": "Object-created notifications and thumbnail output use the same bucket without a specified input-prefix filter or output exclusion, creating a recursive-invocation risk when thumbnails are saved.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Bucket access policies, CloudFront origin access control, least-privilege Lambda roles, and author-specific restrictions on presigned uploads are unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Failure-destination handling is stated as an intention, but its DLQ association, retry policy, alarms, and recovery procedure are not detailed; welcome-email retries and idempotency are also unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Cache behaviors, TTLs, invalidation, and authorization-header handling are unspecified; distinguish cacheable published reads from authenticated or subscriber-specific operations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The expected-load clarification remains a question rather than a chosen assumption, and DynamoDB capacity mode and any paid API Gateway cache allocation are not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design provides an appropriate serverless blog foundation and correctly routes upload-URL requests through API Gateway, but authorization and thumbnail-loop prevention remain unresolved."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The HTTP API is shown forwarding directly to private Fargate tasks without a supported private integration target or VPC link; provide an ALB/NLB listener or Cloud Map service and the required VPC link.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both availability zones depend on the single NAT gateway in AZ 1, so loss of that AZ removes payments connectivity even if application tasks remain available elsewhere.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "The session cache has no cross-AZ replica, Multi-AZ setting, or automatic failover configuration, so it does not establish the required availability-zone resilience.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
+        },
+        {
+          "severity": "major",
+          "description": "Automatic credential rotation is asserted without selecting an RDS-managed rotation mechanism or configuring a Secrets Manager rotation workflow and schedule; application retrieval and adoption of rotated credentials are also absent.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "major",
+          "description": "The HTTP API's Cognito authentication intent is not translated into its supported JWT authorizer configuration, including a Cognito issuer and audience; a REST API user-pool authorizer configuration is not interchangeable with an HTTP API JWT authorizer.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The multi-AZ task deployment is stated in prose but not made concrete through an ECS service, both subnet IDs, and a minimum task count sufficient to retain capacity after an AZ failure.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Security-group restrictions, task IAM roles, database/cache TLS, scaling assumptions, log delivery, and actionable alarms remain unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Fargate and managed PostgreSQL are appropriate choices, but the ingress path is incomplete and the single NAT gateway and unreplicated cache fail the required AZ-loss resilience."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The HTTP API is shown forwarding directly to private Fargate tasks without a supported private integration target or VPC link; provide an ALB/NLB listener or Cloud Map service and the required VPC link.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both availability zones depend on the single NAT gateway in AZ 1, so loss of that AZ removes payments connectivity even if application tasks remain available elsewhere.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html"
+        },
+        {
+          "severity": "major",
+          "description": "The session cache has no cross-AZ replica, Multi-AZ setting, or automatic failover configuration, so it does not establish the required availability-zone resilience.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
+        },
+        {
+          "severity": "major",
+          "description": "Automatic credential rotation is asserted without selecting an RDS-managed rotation mechanism or configuring a Secrets Manager rotation workflow and schedule; application retrieval and adoption of rotated credentials are also absent.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "major",
+          "description": "The explicit Cognito user pool does not complete HTTP API authorization: configure a JWT authorizer with its issuer and audience and attach it to protected routes rather than relying on the generic COGNITO setting.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The multi-AZ task deployment is stated in prose but not made concrete through an ECS service, both subnet IDs, and a minimum task count sufficient to retain capacity after an AZ failure.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Security-group restrictions, task IAM roles, database/cache TLS, scaling assumptions, log delivery, and actionable alarms remain unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The explicit Cognito authentication flow improves clarity, but the design retains a non-working ingress integration and major gaps in AZ resilience and credential rotation."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "At-rest encryption is not specified for either Aurora or the session cache; explicitly enable encryption for both rather than treating private subnet placement as protection for stored data.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html ; https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+        },
+        {
+          "severity": "major",
+          "description": "Client credentials produces access tokens, but no required OAuth scopes are specified on REST API methods; a Cognito authorizer without method scopes treats the supplied token as an identity token, so configure resource-server scopes and enforce them on protected methods.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-enable-cognito-user-pool.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Show clients obtaining tokens from Cognito separately from API Gateway validating JWTs; the API Gateway-to-Cognito OAuth invocation edge is not an accurate depiction of the token-validation protocol.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify security-group relationships, least-privilege task and proxy roles, TLS for database/cache connections, task authentication to RDS Proxy, and the selected automatic-rotation mechanism.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make the intended HA deployment concrete with both subnet attachments, minimum task capacity, Aurora reader placement, and cache replica/failover settings; also define failover retries, payment idempotency, alarms, and restore testing.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "For the assumed modest workload, quantify Aurora instance capacity and the incremental benefit of RDS Proxy so the additional managed-service baseline is justified; the two NAT gateways are justified by the HA requirement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The architecture addresses the requested multi-AZ topology and private container operation, but encryption and access-token authorization need explicit configuration before deployment."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Client credentials produces access tokens, but no required OAuth scopes are specified on REST API methods; a Cognito authorizer without method scopes treats the supplied token as an identity token, so configure resource-server scopes and enforce them on protected methods.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-enable-cognito-user-pool.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Show clients obtaining tokens from Cognito separately from API Gateway validating JWTs; the API Gateway-to-Cognito OAuth invocation edge is not an accurate depiction of the token-validation protocol.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify security-group relationships, least-privilege task and proxy roles, TLS for database/cache connections, task authentication to RDS Proxy, and the selected automatic-rotation mechanism.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Make the intended HA deployment concrete with both subnet attachments, minimum task capacity, Aurora reader placement, and cache replica/failover settings; also define failover retries, payment idempotency, alarms, and restore testing.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "For the assumed modest workload, quantify Aurora instance capacity and the incremental benefit of RDS Proxy so the additional managed-service baseline is justified; the two NAT gateways are justified by the HA requirement.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the requested managed, private, multi-AZ architecture and explicitly encrypts stateful services, with remaining work concentrated in authorization and deployment-level security and recovery settings."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B routes upload-URL requests through the existing API Gateway rather than an undefined direct Lambda endpoint, although its authorizer must be explicitly attached and both designs need thumbnail-loop protection."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "B marginally improves authentication clarity by including the Cognito pool and client sign-in path, but neither design is deployable as drawn or satisfies end-to-end AZ-loss resilience."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "B",
+      "why": "Both address the enabled Multi-AZ priority, but B additionally specifies encryption for Aurora and ElastiCache and makes the ALB's cross-AZ intent clearer."
+    }
+  ]
+}

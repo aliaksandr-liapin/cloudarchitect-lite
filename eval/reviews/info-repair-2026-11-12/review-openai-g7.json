@@ -1,0 +1,303 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "DynamoDB Streams cannot publish directly to SNS as depicted. Add a stream consumer, such as Lambda, that reliably publishes committed order events and handles publication failures.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The selected HTTP API does not support a direct DynamoDB read integration. Implement order lookup through Lambda, or explicitly select a REST API with an appropriate AWS service integration.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "major",
+          "description": "The DLQ-to-source edges describe replay, but no source-queue redrive policies are specified to move repeatedly failing messages into those DLQs. Configure deadLetterTargetArn, maxReceiveCount, suitable retention, and monitored replay procedures.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Worker DLQs do not capture failures delivering SNS notifications to SQS. Configure SNS subscription DLQs and alarms so failures before messages reach the worker queues are not silently discarded.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "No idempotency strategy is specified for payment capture, inventory reservation, or email processing. SQS-triggered Lambda processing can deliver duplicates, so retries must not cause repeated charges or reservations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html"
+        },
+        {
+          "severity": "major",
+          "description": "The global table replicates order data, but the design does not explain restoration of the API, authentication, processing infrastructure, or pending work in the second Region. Define reproducible deployment, recovery procedures, and replay from replicated per-step processing state.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For an HTTP API, describe Cognito authentication as a JWT authorizer with the appropriate issuer and audience rather than leaving the configuration as an ambiguous Cognito authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege execution, queue, topic, and KMS policies, and enforce ownership or another explicit authorization rule for order-ID lookups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless fan-out and replicated order storage are appropriate, but unsupported event-publication and lookup integrations prevent the design from working as drawn."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "DynamoDB Streams cannot publish directly to SNS as depicted. Add a stream consumer, such as Lambda, that reliably publishes committed order events and handles publication failures.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The selected HTTP API does not support a direct DynamoDB read integration. Implement order lookup through Lambda, or explicitly select a REST API with an appropriate AWS service integration.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "major",
+          "description": "The DLQ-to-source edges describe replay, but no source-queue redrive policies are specified to move repeatedly failing messages into those DLQs. Configure deadLetterTargetArn, maxReceiveCount, suitable retention, and monitored replay procedures.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "Worker DLQs do not capture failures delivering SNS notifications to SQS. Configure SNS subscription DLQs and alarms so failures before messages reach the worker queues are not silently discarded.",
+          "evidence": "https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "No idempotency strategy is specified for payment capture, inventory reservation, or email processing. SQS-triggered Lambda processing can deliver duplicates, so retries must not cause repeated charges or reservations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html"
+        },
+        {
+          "severity": "major",
+          "description": "The global table replicates order data, but the design does not explain restoration of the API, authentication, processing infrastructure, or pending work in the second Region. Define reproducible deployment, recovery procedures, and replay from replicated per-step processing state.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For an HTTP API, describe Cognito authentication as a JWT authorizer with the appropriate issuer and audience rather than leaving the configuration as an ambiguous Cognito authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify least-privilege execution, queue, topic, and KMS policies, and enforce ownership or another explicit authorization rule for order-ID lookups.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless fan-out and replicated order storage are appropriate, but unsupported event-publication and lookup integrations prevent the design from working as drawn."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Aurora-to-Lambda database-change edge lacks a concrete capture mechanism. Aurora's SQL-based Lambda integration is not an automatic row-change event source; specify engine-compatible triggers or a CDC/outbox implementation and validate an end-to-end latency budget below one minute.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "No initial backfill of the existing two million products or durable indexing recovery process is defined. Specify full-load and ongoing-change handling, retry/replay, update ordering, reconciliation, and indexing-lag alarms so failed updates do not leave search permanently stale.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Elasticsearch.html"
+        },
+        {
+          "severity": "major",
+          "description": "Multi-AZ operation is claimed, but the ALB is placed in only one subnet and ECS tasks are shown only in one AZ. Explicitly configure ALB subnets in at least two AZs and distribute sufficient ECS tasks across both; the current placement does not substantiate the availability claim.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "minor",
+          "description": "Document private-task bootstrap connectivity through NAT or suitable VPC endpoints, together with task roles, database credential handling, security-group boundaries, and encrypted database connections.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Resolve the unanswered traffic and availability assumptions into a sizing baseline, including ECS scaling and OpenSearch topology, and define CloudFront cache keys, TTLs, and invalidation behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed search, container, and caching services fit the workload, but the sub-minute indexing pipeline and claimed multi-AZ deployment need concrete implementation and recovery details."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Aurora-to-Lambda database-change edge lacks a concrete capture mechanism. Aurora's SQL-based Lambda integration is not an automatic row-change event source; specify engine-compatible triggers or a CDC/outbox implementation and validate an end-to-end latency budget below one minute.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "No initial backfill of the existing two million products or durable indexing recovery process is defined. Specify full-load and ongoing-change handling, retry/replay, update ordering, reconciliation, and indexing-lag alarms so failed updates do not leave search permanently stale.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.Elasticsearch.html"
+        },
+        {
+          "severity": "major",
+          "description": "Multi-AZ operation is claimed, but the ALB is placed in only one subnet and ECS tasks are shown only in one AZ. Explicitly configure ALB subnets in at least two AZs and distribute sufficient ECS tasks across both; the current placement does not substantiate the availability claim.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#subnets-load-balancer"
+        },
+        {
+          "severity": "minor",
+          "description": "Document private-task bootstrap connectivity through NAT or suitable VPC endpoints, together with task roles, database credential handling, security-group boundaries, and encrypted database connections.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Resolve the unanswered traffic and availability assumptions into a sizing baseline, including ECS scaling and OpenSearch topology, and define CloudFront cache keys, TTLs, and invalidation behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed search, container, and caching services fit the workload, but the sub-minute indexing pipeline and claimed multi-AZ deployment need concrete implementation and recovery details."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Originals and generated thumbnails share a bucket, but no input-only notification filter is specified. Thumbnail writes can therefore trigger more thumbnail jobs; filter notifications to an originals prefix and write outputs elsewhere, or use separate buckets.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The welcome-email DLQ exists without a configured connection to the DynamoDB stream consumer. Configure the event-source mapping's on-failure destination and retry/record-age settings; creating a queue alone does not capture discarded stream batches.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authors and subscribers use the same user pool, but author-only authorization is not specified for post mutations and upload-URL issuance. A valid Cognito token establishes authentication, not the author's role; enforce author privileges in the handler or through appropriately restricted authorization scopes.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-enable-cognito-user-pool.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the read paths explicit: the handler-to-table edge shows only writes, and there is no image delivery route from the photo bucket to readers. A CloudFront photo origin with OAC would align image delivery with the global latency goal.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify anonymous public GET methods separately from protected writes, and document cache keys, TTLs, and invalidation while excluding subscriber-specific or private author responses from shared caching.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless edge-cached architecture fits the blog and cost goals, but author authorization, thumbnail-loop prevention, and welcome-email failure capture need completion."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Originals and generated thumbnails share a bucket, but no input-only notification filter is specified. Thumbnail writes can therefore trigger more thumbnail jobs; filter notifications to an originals prefix and write outputs elsewhere, or use separate buckets.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The welcome-email DLQ exists without a configured connection to the DynamoDB stream consumer. Configure the event-source mapping's on-failure destination and retry/record-age settings; creating a queue alone does not capture discarded stream batches.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Authors and subscribers use the same user pool, but author-only authorization is not specified for post mutations and upload-URL issuance. A valid Cognito token establishes authentication, not the author's role; enforce author privileges in the handler or through appropriately restricted authorization scopes.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-enable-cognito-user-pool.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the read paths explicit: the handler-to-table edge shows only writes, and there is no image delivery route from the photo bucket to readers. A CloudFront photo origin with OAC would align image delivery with the global latency goal.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify anonymous public GET methods separately from protected writes, and document cache keys, TTLs, and invalidation while excluding subscriber-specific or private author responses from shared caching.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless edge-cached architecture fits the blog and cost goals, but author authorization, thumbnail-loop prevention, and welcome-email failure capture need completion."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "tie",
+      "why": "Both have the same effective architecture, unsupported integrations, and incomplete failure-retention and regional recovery arrangements; the authentication wording does not materially distinguish them."
+    },
+    {
+      "scenario": "product-search",
+      "better": "tie",
+      "why": "Both choose the same suitable services and leave the same indexing and availability gaps; moving the ALB depiction between the two public subnets does not establish multi-AZ operation."
+    },
+    {
+      "scenario": "myblog",
+      "better": "tie",
+      "why": "The deployed services and connections are equivalent, with identical authorization, thumbnail-processing, and email-recovery weaknesses; requirement-traceability differences do not change functionality."
+    }
+  ]
+}

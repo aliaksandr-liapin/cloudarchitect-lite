@@ -7,6 +7,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Added
 
 - A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls.
+- Experiment report: what happens when the repair turn also gets info findings ([docs/product/info-repair-experiment.md](docs/product/info-repair-experiment.md)), with the eval commands `info-repair`, `review --arms` and `info-repair-report` to reproduce it.
 
 ### Changed
 

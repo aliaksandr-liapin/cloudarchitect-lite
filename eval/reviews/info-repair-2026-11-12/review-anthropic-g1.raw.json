@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "No encryption settings are stated for the S3 buckets or the DynamoDB table. Defaults would apply, but the design never says so.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only the Blog API Lambda is wired to CloudWatch. The Thumbnail and Welcome email Lambdas have no explicit log or metric edge, although R14 asks for alarms on Lambda errors.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Versioning is enabled on three buckets with no lifecycle rule to expire noncurrent versions, which will slowly raise storage cost. A single DLQ is shared by two Lambdas with different event shapes. The DynamoDB stream needs a filter so only new-subscriber INSERTs send email.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Blog API Lambda to DynamoDB edge is typed 'read' but carries reads and writes. The CloudFront to API Gateway origin does not mention forwarding the Authorization header or the cache key for authenticated calls.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless blog that meets the backup and versioning priority (PITR on DynamoDB, versioning on all three buckets). It leaves encryption unstated and has thin Lambda error observability."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Only the Blog API Lambda is wired to CloudWatch. The Thumbnail and Welcome email Lambdas have no explicit log or metric edge, although R14 asks for alarms on Lambda errors.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Versioning is enabled on three buckets with no lifecycle rule to expire noncurrent versions. A single DLQ is shared by two Lambdas. The DynamoDB stream needs an INSERT/subscriber filter. The 'read' edge type is used for read and write.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Neither WAF nor a throttling or usage plan is applied to the public API. This is acceptable for an MVP but worth noting.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally the same as A, and it also states AWS-managed encryption on every S3 bucket and the DynamoDB table. It meets the backup and versioning priority and has a slightly better security baseline."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Two separate Application Load Balancers, one per AZ, are provisioned and described as protecting against a zone outage. A single ALB already spans multiple AZs. The second ALB doubles a fixed hourly cost, conflicts with the minimize-cost priority, and has no DNS or traffic-splitting mechanism in front of it. The rationale is technically incorrect.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "The indexer Lambda is placed in 'Region' (outside the VPC) but reads from RDS Proxy and invalidates ElastiCache, which are only reachable inside the VPC. As drawn, the Lambda cannot connect. It needs VPC attachment (and a route to OpenSearch and SQS).",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Several services bill while idle (ALB, NAT Gateway, ElastiCache, RDS Proxy, OpenSearch), so scale-to-zero is mostly unmet. The claim that Fargate is 'scale-to-zero-friendly' behind an ALB is overstated. VPC endpoints could replace the NAT Gateway.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption is not stated for RDS, ElastiCache or OpenSearch. The web API, RDS and ElastiCache sit in a single private subnet (one AZ). Initial bulk load of 2M rows in a 15-minute Lambda is not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is the right core pattern (RDS as source of truth, OpenSearch, polling sync, cache with invalidation, DLQ). The duplicated ALBs with a wrong HA rationale add avoidable cost against the cost priority."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The indexer Lambda is placed in 'Region' (outside the VPC) but reads from RDS Proxy and invalidates ElastiCache, which are only reachable inside the VPC. As drawn, the Lambda cannot connect. It needs VPC attachment.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Several services bill while idle (ALB, NAT Gateway, ElastiCache, RDS Proxy, OpenSearch), so scale-to-zero is largely unmet. The Fargate scale-to-zero claim is overstated. VPC endpoints could replace the NAT Gateway.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ALB is shown in a single public subnet although the description says it spans two AZs. The API, RDS and cache are in one private subnet. OpenSearch encryption is not stated. The 2M-row initial bulk load in a time-limited Lambda is not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The same sound core pattern as A with a single ALB, and it states encryption on RDS and ElastiCache. It is cheaper and simpler, though still not truly scale-to-zero."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "DMS and DataSync are drawn pulling directly from the legacy data center, but no private connectivity (Site-to-Site VPN or Direct Connect) is modeled. DMS also needs a replication instance in the VPC, and DataSync needs an on-premises agent for NFS. Without these the migration path is incomplete.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_ReplicationInstance.VPC.html"
+        },
+        {
+          "severity": "major",
+          "description": "The two EC2 instances are standalone, with no Auto Scaling group or health-based replacement. A failed instance is not replaced, and the HA claim rests only on two static instances.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-your-workload-service-architecture.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Adds Cognito authentication at the ALB (R15), which the user never asked for. A legacy monolith normally has its own login, so this adds user migration, a double login risk and scope against the minimal-change, three-month constraint.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single NAT Gateway in AZ A is a single-AZ dependency for outbound traffic from AZ B. EFS and RDS are shown in private subnet A only, although mount targets or subnet groups are needed in both AZs. Only instance A has a CloudWatch edge. Session stickiness for a stateful Java app is not considered.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the core lift-and-shift (ALB, EC2 in two AZs, Multi-AZ RDS, EFS, DMS, DataSync). It adds an unrequested Cognito authentication layer and omits the on-premises network path and an Auto Scaling group."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "DMS and DataSync are drawn pulling directly from the legacy data center, but no private connectivity (Site-to-Site VPN or Direct Connect) is modeled. DMS also needs a replication instance in the VPC, and DataSync needs an on-premises agent for NFS. Without these the migration path is incomplete.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_ReplicationInstance.VPC.html"
+        },
+        {
+          "severity": "major",
+          "description": "The two EC2 instances are standalone, with no Auto Scaling group or health-based replacement. A failed instance is not replaced, and the HA claim rests only on two static instances.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-your-workload-service-architecture.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A single NAT Gateway in AZ A is a single-AZ dependency. EFS and RDS are shown in private subnet A only, although mount targets or subnet groups are needed in both AZs. Only instance A has a CloudWatch edge. Session stickiness is not considered. Application-level authentication is left unchanged, which is appropriate here.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Delivers the same lift-and-shift core as A without adding unrequested scope, which fits the minimal-change, three-month brief. It shares A's gaps on on-premises connectivity and Auto Scaling."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "The architectures are otherwise identical, but B explicitly states AWS-managed encryption at rest on all S3 buckets and the DynamoDB table, giving it a slightly stronger and clearer security baseline."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "B",
+      "why": "B uses a single ALB, which spans AZs natively. A duplicates the ALB with an incorrect HA rationale, which adds fixed cost against the minimize-cost priority. B also states encryption on RDS and ElastiCache. Both share the Lambda-outside-VPC flaw."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "B",
+      "why": "The two designs are the same apart from A's added Cognito authentication at the ALB, which the user did not request. It pushes scope and user-migration risk against minimal code changes and the three-month deadline. B stays within the requirements; the preference is modest because A's extra authentication is not harmful in itself."
+    }
+  ]
+}

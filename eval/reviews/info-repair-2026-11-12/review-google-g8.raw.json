@@ -1,0 +1,273 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "While the Orders table is replicated to the Recovery Region via DynamoDB Global Tables, Amazon Cognito User Pools do not natively replicate user credentials across regions, and no recovery-region API/compute instructions or DNS failover mechanism are modeled to complete regional restoration.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/plan-for-disaster-recovery-dr.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The three downstream consumer Lambda functions claim to be idempotent keyed by order ID (R12), but none of them have an edge to the Orders table or a dedicated idempotency table to persist step state and prevent duplicate execution.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Order intake function to Orders table is labeled only as a write operation ('Store order') even though the function also performs read lookups by order ID (R6).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Order event publisher reads from the DynamoDB Stream without an on-failure destination (DLQ) configured on the stream event source mapping to isolate poison-pill records.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-structured serverless event-driven architecture that decouples order intake from independent downstream steps using DynamoDB Streams, EventBridge, and per-step SQS queues with DLQs, plus DynamoDB Global Tables for cross-region data replication."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "While the Orders table is replicated to the Recovery Region via DynamoDB Global Tables, Amazon Cognito User Pools do not natively replicate user credentials across regions, and no recovery-region API/compute resources or DNS failover mechanism are modeled to complete regional restoration.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/plan-for-disaster-recovery-dr.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Unlike Design A, neither Orders table nor Orders table replica explicitly specifies an encryption-at-rest configuration attribute.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The three downstream consumer Lambda functions claim to be idempotent keyed by order ID (R12), but none of them have an edge to the Orders table or a dedicated idempotency table to record processing state.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Order intake function to Orders table is labeled only as a write operation ('Store order') despite the function also serving read lookups by order ID (R6).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Order event publisher reads from the DynamoDB Stream without an on-failure destination (DLQ) configured on the stream event source mapping.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Nearly identical to Design A with strong serverless decoupling via DynamoDB Streams, EventBridge, and independent SQS queues/DLQs, but omits explicit encryption configuration on the primary and replica DynamoDB tables."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The PDF report Fargate task is placed in a public subnet while having direct network access to the private Aurora PostgreSQL database; AWS ECS security best practices recommend placing tasks that access private databases in private subnets (using a free S3 Gateway VPC endpoint for S3 access).",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/BestPracticesGuide/security-network.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Unlike Design B, the Existing Aurora PostgreSQL node does not specify encryption at rest in its configuration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No secrets management mechanism (such as AWS Secrets Manager or RDS IAM authentication) is shown for the Fargate task to authenticate to Aurora PostgreSQL.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms and logs connects directly to the Operations team without an Amazon SNS topic to deliver alarm notifications, and lacks log/alarm edges from the Fargate task and Email sender Lambda.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A pragmatic, low-cost batch architecture using EventBridge Scheduler, Step Functions, on-demand Fargate, S3 presigned URLs, and SES, marred slightly by placing the database-connected Fargate task in a public subnet and omitting database encryption metadata."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The PDF report Fargate task is placed in a public subnet while having direct network access to the private Aurora PostgreSQL database; AWS ECS security best practices recommend placing tasks that access private databases in private subnets (using a free S3 Gateway VPC endpoint for S3 access).",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/BestPracticesGuide/security-network.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No secrets management mechanism (such as AWS Secrets Manager or RDS IAM authentication) is shown for the Fargate task to authenticate to Aurora PostgreSQL.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms and logs connects directly to the Operations team without an Amazon SNS topic to deliver alarm notifications, and lacks log/alarm edges from the Fargate task and Email sender Lambda.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cost-effective nightly reporting pipeline using EventBridge Scheduler, Step Functions, Fargate, S3, Lambda, and SES that improves slightly on Design A by explicitly noting encryption at rest on Aurora PostgreSQL."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Chat Lambda and Ingestion Lambda are placed in Private Subnet 1 inside a VPC that has no NAT Gateway (or public subnet) and no VPC Endpoints for Amazon Bedrock, Amazon S3, or Amazon DynamoDB, meaning outbound HTTPS calls to those AWS services will fail to connect.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Ingestion Lambda claims in its rationale that it 'Parses and embeds PDFs into OpenSearch' while R5 requires using a managed foundation model, yet Ingestion Lambda has no connection to Amazon Bedrock to generate vector embeddings.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html"
+        },
+        {
+          "severity": "major",
+          "description": "Ingestion DLQ (Amazon SQS) is an isolated node with no incoming edge from Ingestion Lambda or S3, so failed ingestion events will never reach it.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "major",
+          "description": "Although the VPC defines two Availability Zones and two private subnets, Chat Lambda, Ingestion Lambda, and the OpenSearch Vector Database are deployed solely in Private Subnet 1, leaving Private Subnet 2 empty and sacrificing multi-AZ availability.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8 and R9 were left as raw clarifying questions ('What is the expected concurrent user scale...?', 'What is the required availability target...?') rather than concrete architectural assumptions, and Customer Browser is inaccurately marked as satisfying both.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Chat Lambda only has a write edge to Chat History Table and never reads conversation history to provide multi-turn context or display past conversations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Using Amazon Bedrock Knowledge Bases instead of custom PDF-parsing Lambda code and a self-managed OpenSearch domain would significantly reduce operational complexity for ingesting and citing 20,000 manuals.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A RAG chatbot design using Cognito, API Gateway, Lambda, Bedrock, OpenSearch, and DynamoDB that suffers from missing VPC outbound connectivity (no NAT or VPC endpoints), a missing embedding call from the ingestion Lambda to Bedrock, single-AZ resource placement, and an unconnected DLQ."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Chat Lambda and Ingestion Lambda are placed in Private Subnet 1 inside a VPC that has no NAT Gateway (or public subnet) and no VPC Endpoints for Amazon Bedrock, Amazon S3, or Amazon DynamoDB, meaning outbound HTTPS calls to those AWS services will fail to connect.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Ingestion Lambda claims in its rationale that it 'Parses and embeds PDFs into OpenSearch' while R5 requires using a managed foundation model, yet Ingestion Lambda has no connection to Amazon Bedrock to generate vector embeddings.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both Ingestion DLQ (Amazon SQS) and Ingestion Failure Topic (Amazon SNS) are completely disconnected orphan nodes with no edges from Ingestion Lambda, and provisioning both an SQS DLQ and an SNS failure destination for the same function is redundant.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "major",
+          "description": "Although the VPC defines two Availability Zones and two private subnets, Chat Lambda, Ingestion Lambda, and the OpenSearch Vector Database are deployed solely in Private Subnet 1, leaving Private Subnet 2 empty and sacrificing multi-AZ availability.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R8 and R9 were left as raw clarifying questions rather than concrete architectural assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Chat Lambda only has a write edge to Chat History Table and never reads conversation history to support multi-turn conversations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Using Amazon Bedrock Knowledge Bases instead of custom PDF-parsing Lambda code and a self-managed OpenSearch domain would significantly reduce operational complexity for ingesting and citing 20,000 manuals.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Shares all of Design A's networking, multi-AZ, and ingestion pipeline defects while adding a second redundant and disconnected failure target (Ingestion Failure Topic in SNS alongside the unconnected Ingestion DLQ in SQS)."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "A",
+      "why": "Both designs use the same strong event-driven architecture with DynamoDB Streams, EventBridge, independent SQS queues/DLQs, and Global Tables, but Design A explicitly configures encryption at rest on both the primary and replica DynamoDB tables."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "B",
+      "why": "Both designs are identical except that Design B explicitly configures encryption at rest on the existing Aurora PostgreSQL database node."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "A",
+      "why": "Both designs suffer from missing VPC endpoints/NAT, a missing Bedrock connection for ingestion embeddings, and single-AZ placement, but Design B is slightly worse because it adds a redundant, disconnected SNS Ingestion Failure Topic alongside the already-disconnected SQS Ingestion DLQ."
+    }
+  ]
+}

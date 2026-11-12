@@ -1,0 +1,238 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The requirement for a REST API with caching is only met for static assets. CloudFront fronts only the S3 site bucket. Users call API Gateway directly, and no API stage cache or CloudFront distribution sits in front of the API. Every blog read therefore goes API Gateway -> Lambda -> DynamoDB, which undercuts the read-heavy, low-latency and low-cost goals.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Thumbnail Lambda is triggered by object-created events on the Photo Uploads Bucket and writes thumbnails back to the same bucket. Unless a prefix or suffix filter is specified, this risks a recursive invocation loop with runaway cost. No separate output bucket or prefix filter is described.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge Users -> Photo Uploads Bucket (write, HTTPS) has no authorization mechanism. No presigned URL flow, Cognito identity pool or API-issued upload URL is shown. The Cognito pool node has no edges and is only referenced as the API authorizer. The upload path is therefore either unauthenticated or non-working.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Subscriber DLQ has no redrive edge from the Subscriber Queue, so it is orphaned. There is no failure handling at all for the thumbnail Lambda. CloudWatch has no edges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption is not stated for the buckets or the table. The defaults apply, but the design is not explicit. CloudFront-to-S3 origin access control is not mentioned. SES sandbox exit is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the main functional flows with versioning and PITR, but caching is limited to static content, the upload path is unauthenticated, the thumbnail trigger can recurse, and the DLQ is unwired."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "API caching is not provided. CloudFront fronts only the S3 site bucket, while the REST API is called directly from Users with no API Gateway cache or CloudFront in front. Read-heavy blog reads hit Lambda and DynamoDB each time.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "major",
+          "description": "Thumbnails are written back to the same Photo Uploads Bucket that triggers the thumbnail Lambda. Without a prefix or suffix filter or a separate bucket this can loop recursively. None is specified.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "major",
+          "description": "Users -> Photo Uploads Bucket (write) has no authorization path. There is no presigned URL or identity-pool flow, and Cognito has no edges. The upload path is unauthenticated or non-functional as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Both the Subscriber Queue DLQ and the Thumbnail DLQ are orphaned. There is no redrive edge from the queue and no Lambda failure-destination edge from the thumbnail Lambda. CloudWatch has no edges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same architecture as A with explicit encryption settings and a thumbnail failure queue (unwired), but it shares the caching gap, the unauthenticated upload path and the recursion risk."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A NAT Gateway is used only so a nightly 25-minute Fargate task can reach S3 and CloudWatch. This adds a fixed hourly cost, which conflicts with 'simple and cheap'. A free S3 gateway endpoint, plus a logs interface endpoint or a public-subnet task, would be cheaper for S3 traffic.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "Download links are presigned URLs generated by a Lambda using its role credentials. A URL signed with temporary credentials expires when those credentials expire, regardless of the requested expiry. Managers who open the email the next day, or later, may find the link dead. No regeneration path is given, even though reports are retained for a year.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "R13 idempotency is claimed on the notify edges, but no mechanism such as a dedupe record or conditional write is shown. R15 is claimed, but no reader endpoint or replica is specified. The one-year lifecycle rule is only described in the rationale, not configured on the node.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS-managed encryption is asserted on the existing Aurora cluster, which may not be encrypted and cannot be encrypted in place. Aurora credentials handling and SES sandbox or verified-identity setup are not covered.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple EventBridge->Fargate->S3->Lambda->SES pipeline that fits the 25-minute job, but the NAT Gateway adds avoidable cost and presigned-URL expiry may break the links."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A NAT Gateway is used only for the Fargate task's S3 and CloudWatch egress. This adds fixed cost that conflicts with the 'cheap' requirement. A free S3 gateway endpoint, plus a logs interface endpoint or a public-subnet task, would be cheaper for S3 traffic.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "Presigned URLs generated by a Lambda role expire when the temporary credentials expire, so links emailed overnight may not work when managers read them. No expiry strategy or link regeneration is given.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency (R13) and Aurora isolation (R15) are claimed without any supporting mechanism such as a dedupe record or a reader endpoint. The lifecycle rule is not configured on the bucket node. Aurora credentials and SES sandbox setup are not covered.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally the same as A, with S3 encryption stated and no encryption claim on the existing Aurora cluster, but it shares the NAT cost and presigned-link expiry weaknesses."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The worker is described as creating embeddings, and the handler needs a query embedding for vector retrieval. No edge connects either Lambda to an embedding model in Bedrock. The only Bedrock edge is the handler's answer generation. The ingestion and retrieval path is therefore incomplete.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/embeddings.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A hand-built Lambda extraction pipeline plus a provisioned OpenSearch domain is used instead of Bedrock Knowledge Bases, which handles PDF parsing, chunking, embeddings and source citations natively. This adds more to build and operate and has a standing OpenSearch cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Conversation history sits in the same OpenSearch cluster as the manual index. A TTL store such as DynamoDB would be simpler for 30-day expiry, whereas OpenSearch needs index lifecycle management for it. Large or scanned PDFs may exceed Lambda limits or need OCR, and the OCR assumption (R10) is not stated clearly.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not stated for the PDF bucket or the OpenSearch domain. No throttling or WAF is mentioned on the chat API.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Reasonable serverless RAG with Cognito-protected API, Bedrock and an ingestion failure queue, but the embedding path is not wired, the pipeline is heavier than needed and the index is a costly fit for history."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 1,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The worker creates embeddings and the handler needs query embeddings, but neither Lambda has an edge to a Bedrock embedding model. Only answer generation is connected, so the retrieval and ingestion flow is incomplete as drawn.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/embeddings.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A custom Lambda and OpenSearch pipeline is used instead of Bedrock Knowledge Bases, which manages PDF parsing, chunking, embeddings and source citations natively. This is more to build and operate, with a standing OpenSearch cost.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Conversation history is stored in OpenSearch, which needs index lifecycle management for 30-day expiry. Scanned PDFs, the R10 assumption and large-file Lambda limits are not clearly handled. No encryption is stated for OpenSearch.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially A with explicit S3 encryption and slightly fuller requirement mapping, but it has the same missing embedding connection and the same heavyweight custom retrieval stack."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "The architectures are otherwise identical, and B adds explicit encryption settings and a thumbnail failure queue, though that queue is unwired. Both share the major caching, upload-auth and recursion defects."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "tie",
+      "why": "Functionally the same design with the same NAT cost and presigned-URL expiry issues. The differences are only minor configuration annotations."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "B",
+      "why": "Nearly identical, but B explicitly encrypts the PDF bucket and maps retrieval requirements slightly more completely. Both have the same missing embedding connection."
+    }
+  ]
+}

@@ -1,0 +1,288 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The welcome-email recovery path needs event-source-mapping failure handling, not merely Lambda asynchronous-invocation failure handling. Specify an SQS OnFailure destination on the DynamoDB stream event source mapping and bounded retry or record-age settings; otherwise a failing record can repeatedly block processing without reaching the depicted queue.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail processor has no depicted read connection to the original-photo bucket. An S3 notification identifies the object rather than supplying its image bytes, so the function needs an explicit GetObject path and scoped permission on the upload bucket.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3-tutorial.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency is listed as a requirement but has no concrete implementation. Specify persistent deduplication or processing state for duplicate upload notifications and subscriber events, including behavior when sending email succeeds but recording completion fails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Complete the security boundaries: distinguish public read/subscription methods from author-only mutations, define author authorization and least-privilege roles, explicitly keep upload and thumbnail buckets non-public, and restrict shared API caching to responses safe for all readers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless stack fits the blog and explicitly protects its content stores with versioning and PITR, but thumbnail source access and stream-failure recovery need completion."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The welcome-email recovery path needs event-source-mapping failure handling, not merely Lambda asynchronous-invocation failure handling. Specify an SQS OnFailure destination on the DynamoDB stream event source mapping and bounded retry or record-age settings; otherwise a failing record can repeatedly block processing without reaching the depicted queue.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail processor has no depicted read connection to the original-photo bucket. An S3 notification identifies the object rather than supplying its image bytes, so the function needs an explicit GetObject path and scoped permission on the upload bucket.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3-tutorial.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency is listed as a requirement but has no concrete implementation. Specify persistent deduplication or processing state for duplicate upload notifications and subscriber events, including behavior when sending email succeeds but recording completion fails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Explicit encryption does not complete the access-control design. Distinguish public methods from author-only mutations, define least-privilege roles and bucket policies, and ensure CloudFront caches only API responses safe for sharing among readers.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The explicitly encrypted, backed-up serverless stack is well matched to the workload, but it retains unresolved thumbnail-read, stream-recovery, and access-control details."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "As specified, the indexer is outside the VPC with no VPC attachment, yet it must reach a private RDS Proxy and ElastiCache deployment. The synchronization path cannot operate without attaching Lambda to suitable VPC subnets and security groups and providing the necessary outbound connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "An every-minute schedule does not meet the stated within-one-minute propagation requirement. A change just after a poll can wait almost a minute before processing starts, after which scheduling delay, database reads, indexing, and search refresh add latency; EventBridge also documents second-scale delivery delays.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain has neither a specified VPC deployment nor a resource policy, IAM authorization, or fine-grained access-control model. Define how the API and indexer receive different query and indexing permissions without exposing the index to unauthorized access.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The two ALB entries ambiguously represent either separately deployed single-AZ load balancers or managed nodes of one regional ALB. Model one ALB enabled in both public subnets, or explicitly identify both entries as nodes of that same resource; do not budget them as two necessary load balancers.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The synchronization design needs a durable, recoverable watermark and explicit handling of partial bulk failures, deletions, overlapping runs, and paginated initial loading. Keeping the only progress marker in an unspecified cache configuration does not establish reliable recovery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cost objective is not substantiated with workload assumptions or sizing. Evaluate the fixed costs of OpenSearch, ElastiCache, RDS Proxy, ALB, and NAT; justify the proxy from expected connection demand and explain how a zero-task API would receive a signal to restart.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Authentication and authorization for product/price mutations, SQL and Redis transport protection, database/cache encryption, and credential management are unspecified. Also mark the assumption that the existing relational database is a supported RDS database rather than silently introducing that constraint.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The search technology is appropriate, but the depicted indexer cannot reach its private dependencies and minute polling does not satisfy the freshness requirement."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 1,
+        "serviceFitness": 2,
+        "connectionCorrectness": 0,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "As specified, the indexer is outside the VPC with no VPC attachment, yet it must reach a private RDS Proxy and ElastiCache deployment. The synchronization path cannot operate without attaching Lambda to suitable VPC subnets and security groups and providing the necessary outbound connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "An every-minute schedule does not meet the stated within-one-minute propagation requirement. A change just after a poll can wait almost a minute before processing starts, after which scheduling delay, database reads, indexing, and search refresh add latency; EventBridge also documents second-scale delivery delays.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain has neither a specified VPC deployment nor a resource policy, IAM authorization, or fine-grained access-control model. Define how the API and indexer receive different query and indexing permissions without exposing the index to unauthorized access.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the ALB's association with both public subnets explicit. Its two-AZ description must also not be confused with application redundancy: all depicted API tasks and private dependencies remain in Availability Zone A, which should be an explicit cost-versus-availability decision.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The synchronization design needs a durable, recoverable watermark and explicit handling of partial bulk failures, deletions, overlapping runs, and paginated initial loading. Keeping the only progress marker in an unspecified cache configuration does not establish reliable recovery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cost objective is not substantiated with workload assumptions or sizing. Evaluate the fixed costs of OpenSearch, ElastiCache, RDS Proxy, ALB, and NAT; justify the proxy from expected connection demand and explain how a zero-task API would receive a signal to restart.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Although database and cache encryption are explicit, mutation authorization, transport protection, and credential management remain unspecified. Also identify the assumption that the existing relational database is a supported RDS database.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clearer single-ALB model and explicit data encryption improve the baseline, but the indexer networking and one-minute freshness defects remain."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The on-premises NFS migration omits the required DataSync agent. Specify the agent deployment and its network/firewall reachability to the NFS server and AWS endpoints so the file-transfer path is executable.",
+          "evidence": "https://docs.aws.amazon.com/datasync/latest/userguide/create-nfs-location.html"
+        },
+        {
+          "severity": "major",
+          "description": "Two-AZ file-access availability is not established. EFS is placed only in subnet A without an explicit Regional storage choice or mount-target topology; specify Regional EFS and a mount target in each application AZ so continued file access does not depend on a mount target in the failed zone.",
+          "evidence": "https://docs.aws.amazon.com/efs/latest/ug/manage-fs-access-create-delete-mount-targets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Define automatic replacement or recovery for the two standalone EC2 instances and verify that the surviving AZ has enough application capacity. Document that the single NAT gateway also makes outbound connectivity dependent on AZ A, adding another gateway only if runtime dependencies require it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R10 and R11 remain questions rather than chosen recovery and capacity assumptions. Add concrete RTO/RPO and load assumptions, plus a cutover runbook covering write quiescence, database/file catch-up, validation, and rollback after AWS begins accepting writes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Complete the security baseline with scoped ALB-to-instance, instance-to-MySQL, and NFS security-group rules, encrypted EC2 volumes, service roles, credential handling, and a private administrative access method.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Mandatory Cognito authentication adds an identity and login migration that the user did not request. ALB authentication is technically supported, but validate compatibility with existing identities, sessions, public paths, and non-browser clients before introducing it into a minimal-change migration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The EC2, Multi-AZ RDS, and EFS approach fits a rapid rehost, but migration plumbing and file-access HA need definition and the added login layer increases scope."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The on-premises NFS migration omits the required DataSync agent. Specify the agent deployment and its network/firewall reachability to the NFS server and AWS endpoints so the file-transfer path is executable.",
+          "evidence": "https://docs.aws.amazon.com/datasync/latest/userguide/create-nfs-location.html"
+        },
+        {
+          "severity": "major",
+          "description": "Two-AZ file-access availability is not established. EFS is placed only in subnet A without an explicit Regional storage choice or mount-target topology; specify Regional EFS and a mount target in each application AZ so continued file access does not depend on a mount target in the failed zone.",
+          "evidence": "https://docs.aws.amazon.com/efs/latest/ug/manage-fs-access-create-delete-mount-targets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Define automatic replacement or recovery for the two standalone EC2 instances and verify that the surviving AZ has enough application capacity. Document that the single NAT gateway also makes outbound connectivity dependent on AZ A, adding another gateway only if runtime dependencies require it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R10 and R11 remain questions rather than chosen recovery and capacity assumptions. Add concrete RTO/RPO and load assumptions, plus a cutover runbook covering write quiescence, database/file catch-up, validation, and rollback after AWS begins accepting writes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Complete the security baseline with scoped ALB-to-instance, instance-to-MySQL, and NFS security-group rules, encrypted EC2 volumes, service roles, credential handling, and a private administrative access method; explicitly retain the application's existing authentication behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a well-matched minimal-change rehost with managed database backups, provided the DataSync agent, Regional EFS access topology, and operational recovery details are completed."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "tie",
+      "why": "Both provide the same architecture, versioning, PITR, and unresolved processing details; B makes encryption explicit, but S3 and DynamoDB already encrypt data at rest by default, so this does not materially change the solution."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "B",
+      "why": "B has a clearer single-ALB model and explicitly encrypts the database and cache, although neither design is build-ready until indexer networking and the freshness mechanism are corrected and the cost assumptions are substantiated."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "B",
+      "why": "B preserves the appropriate EC2/RDS/EFS rehosting approach without adding an unrequested identity migration, making it better aligned with the three-month deadline and minimal-change constraint."
+    }
+  ]
+}

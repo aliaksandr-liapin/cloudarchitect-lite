@@ -1,0 +1,322 @@
+{
+  "g1": {
+    "myblog-backups": {
+      "A": {
+        "model": "haiku~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "haiku~I",
+        "repeat": 2
+      }
+    },
+    "product-search-cost": {
+      "A": {
+        "model": "haiku~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~I",
+        "repeat": 1
+      }
+    },
+    "legacy-lift-and-shift": {
+      "A": {
+        "model": "haiku~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~W",
+        "repeat": 1
+      }
+    }
+  },
+  "g2": {
+    "myblog-backups": {
+      "A": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 2
+      }
+    },
+    "nightly-reports": {
+      "A": {
+        "model": "haiku~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~W",
+        "repeat": 1
+      }
+    },
+    "support-chatbot": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 2
+      }
+    }
+  },
+  "g3": {
+    "myblog-backups": {
+      "A": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      }
+    },
+    "claims-approval-workflow": {
+      "A": {
+        "model": "haiku~I",
+        "repeat": 2
+      },
+      "B": {
+        "model": "haiku~W",
+        "repeat": 2
+      }
+    },
+    "product-search-cost": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 2
+      }
+    }
+  },
+  "g4": {
+    "myblog-backups": {
+      "A": {
+        "model": "haiku~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~W",
+        "repeat": 1
+      }
+    },
+    "myblog": {
+      "A": {
+        "model": "gpt-luna~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gpt-luna~W",
+        "repeat": 1
+      }
+    },
+    "legacy-lift-and-shift": {
+      "A": {
+        "model": "gpt-luna~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gpt-luna~W",
+        "repeat": 1
+      }
+    }
+  },
+  "g5": {
+    "support-chatbot": {
+      "A": {
+        "model": "gpt-luna~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gpt-luna~W",
+        "repeat": 1
+      }
+    },
+    "product-search": {
+      "A": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 2
+      }
+    },
+    "nightly-reports-serverless": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 1
+      }
+    }
+  },
+  "g6": {
+    "k8s-microservices-ha": {
+      "A": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      }
+    },
+    "mobile-backend": {
+      "A": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 2
+      }
+    },
+    "iot-telemetry": {
+      "A": {
+        "model": "gpt-luna~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gpt-luna~W",
+        "repeat": 1
+      }
+    }
+  },
+  "g7": {
+    "order-events-cross-region": {
+      "A": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      }
+    },
+    "product-search": {
+      "A": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      }
+    },
+    "myblog": {
+      "A": {
+        "model": "haiku~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~I",
+        "repeat": 1
+      }
+    }
+  },
+  "g8": {
+    "order-events-cross-region": {
+      "A": {
+        "model": "haiku~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~W",
+        "repeat": 1
+      }
+    },
+    "nightly-reports": {
+      "A": {
+        "model": "haiku~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "haiku~I",
+        "repeat": 2
+      }
+    },
+    "support-chatbot": {
+      "A": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      }
+    }
+  },
+  "g9": {
+    "myblog": {
+      "A": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 2
+      }
+    },
+    "saas-containers": {
+      "A": {
+        "model": "gemini-flash-lite~I",
+        "repeat": 1
+      },
+      "B": {
+        "model": "gemini-flash-lite~W",
+        "repeat": 1
+      }
+    },
+    "saas-containers-multi-az": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 2
+      }
+    }
+  },
+  "g10": {
+    "nightly-reports": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 2
+      }
+    },
+    "brochure-site": {
+      "A": {
+        "model": "gpt-luna~W",
+        "repeat": 2
+      },
+      "B": {
+        "model": "gpt-luna~I",
+        "repeat": 2
+      }
+    },
+    "nightly-reports-serverless": {
+      "A": {
+        "model": "haiku~W",
+        "repeat": 1
+      },
+      "B": {
+        "model": "haiku~I",
+        "repeat": 1
+      }
+    }
+  }
+}

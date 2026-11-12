@@ -1,0 +1,273 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Users write directly to the Photo Uploads Bucket (Users -> Photo Uploads Bucket) without a presigned URL flow from the API Handler or a Cognito Identity Pool; a Cognito User Pool alone only issues JWTs that Amazon S3 does not accept for direct object uploads.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "major",
+          "description": "Thumbnail Generator is triggered by Object Created events on Photo Uploads Bucket and writes thumbnails back to the same bucket without prefix or suffix filtering or separate buckets, creating a high risk of recursive Lambda invocation loops.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "API Handler only has a read edge to Blog Database and no write edge to create posts or subscriber records, leaving no way to populate data or trigger the DynamoDB Stream for welcome emails.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "minor",
+          "description": "User Pool, Thumbnail DLQ, and CloudWatch Logs and Metrics are completely disconnected nodes with no edges to the components that use them.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Photo Uploads Bucket has no origin connection to CloudFront CDN for serving uploaded images and thumbnails to blog readers.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inferred requirements R7, R8, and R9 are left phrased as clarifying questions rather than stating the architectural decisions made.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects appropriate serverless services and backup settings for the blog, but omits a secure presigned URL upload flow, risks an S3-Lambda recursive loop on thumbnail writes, and leaves several nodes disconnected."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail Generator is triggered by Object Created events on Photo Uploads Bucket and writes generated thumbnails back to the same bucket without specifying prefix filtering or a separate output bucket, risking an infinite S3-to-Lambda trigger loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "API Handler only has a read connection to Blog Database (Query Posts) with no write path for creating posts or recording new subscribers to trigger DynamoDB Streams.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito User Pool, Thumbnail DLQ, and CloudWatch Logs and Metrics are orphaned nodes with no edges connecting them to REST API or Lambda functions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Photo Uploads Bucket is not connected as an origin to CloudFront CDN, so readers have no low-latency delivery path for viewing blog photos and thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inferred requirements R7, R8, and R9 contain the literal clarifying question text instead of the chosen architectural assumptions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B improves on photo uploads by issuing S3 presigned URLs from the API Handler and encrypting the DLQ, though it still risks recursive S3-Lambda triggers and leaves several supporting nodes disconnected."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Requirement R10 mandates immutable audit records, but Audit records bucket only enables S3 versioning without S3 Object Lock (WORM), which does not prevent privileged deletion or modification of audit versions.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "major",
+          "description": "Upload validator starts the Step Functions Claim workflow directly on each S3 ObjectCreated event, which fires per uploaded file; when a claim includes multiple photos and PDFs, this triggers premature or duplicate workflow executions per file rather than once per completed claim submission.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/NotificationHowTo.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Customer managed key (N10) states in its purpose that it encrypts both uploaded documents and audit records, but there is no edge connecting Audit records bucket (N17) to the KMS key.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Decision handler to Claims table is typed as read despite its label stating 'Read and record decision'.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A provides a well-structured serverless claims workflow using Step Functions task tokens for the 14-day adjuster review, with minor gaps around multi-file upload coordination and S3 Object Lock for audit immutability."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Requirement R10 requires immutable audit records, but Audit records bucket only configures versioning and KMS encryption without S3 Object Lock to enforce write-once-read-many (WORM) immutability.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "major",
+          "description": "Upload validator invokes Claim workflow on each S3 ObjectCreated event, which occurs per file rather than per claim submission when customers attach multiple photos and PDF documents.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/NotificationHowTo.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Web form bucket (N4) omits encryption configuration metadata, unlike Design A which explicitly configures server-side encryption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Audit records bucket (N17) has no connection to Customer managed key (N10) despite N10 stating it encrypts audit records, and the Decision handler to Claims table edge is typed as read-only.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B is nearly identical to Design A and effectively uses Step Functions for long-running human approval, but misses S3 Object Lock for immutable audit logs, triggers workflows per uploaded file, and omits encryption metadata on the web form bucket."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Containerized web API Fargate tasks are placed in private subnets (Private subnet A and B) with no NAT Gateway or VPC Endpoints in the VPC, preventing tasks from pulling container images or reaching DynamoDB, OpenSearch, and CloudWatch outside the VPC.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Outbox poller Lambda is placed in Primary Region outside Application VPC and has no EventBridge Scheduler trigger; a Lambda function cannot self-poll on a schedule without an event source and cannot reach a private RDS instance without VPC attachment.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge from Product relational database to Outbox poller is reversed (showing RDS reading from the poller), and the bulk export edge from RDS to OpenSearch has no compute component to execute the indexing.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/gsgcreate-domain.html"
+        },
+        {
+          "severity": "major",
+          "description": "Encryption at rest is not configured on Product relational database, Product-page read cache, or Product search index.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "API load balancer (second AZ placement) (N5) is modeled as a separate node with zero edges, whereas a single Application Load Balancer resource spans multiple Availability Zones.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Enforcing Cognito authentication at the ALB for all shopper search and product-page requests adds unnecessary MAU cost and login friction for public catalog browsing.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A captures the outbox pattern, caching, and OpenSearch indexing for 2 million products, but fails to provide VPC connectivity for private Fargate tasks and the RDS poller, omits encryption at rest, and includes an orphaned second ALB node."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Fargate tasks in Private subnet A and Private subnet B have no NAT Gateway or VPC Endpoints configured, leaving them unable to pull container images or reach regional DynamoDB, OpenSearch, and CloudWatch endpoints.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Outbox poller Lambda is placed outside Application VPC with no scheduled trigger (such as EventBridge Scheduler) and a reversed edge from RDS, so it can neither run on a 1-minute schedule nor connect to the private RDS database.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The edge 'Shopper authentication -> API load balancer (invoke, OIDC)' is reversed; Application Load Balancer initiates the OIDC authentication flow against Amazon Cognito rather than Cognito invoking the ALB.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Product relational database -> Product search index shows a direct bulk export and indexing write edge without any compute or pipeline service to perform the initial load.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requiring Cognito login at the ALB for all shoppers browsing product pages or searching the catalog is unnecessary and adds per-user cost against the cost-minimization priority.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B improves on Design A by configuring encryption on RDS and DynamoDB and avoiding duplicate ALB nodes, but shares the same VPC networking omissions, unscheduled outbox poller, and reversed OIDC/database edges."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "Design B properly uses the API Handler to issue S3 presigned URLs for authenticated photo uploads and configures encryption on the SQS DLQ, whereas Design A shows users uploading directly to S3 with no valid authorization mechanism."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "A",
+      "why": "The two designs are nearly identical, but Design A explicitly configures server-side encryption on the web form S3 bucket and links the validation failure queue to the failure-recovery requirement (R7)."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "B",
+      "why": "Design B configures encryption at rest on RDS and DynamoDB and models the multi-AZ Application Load Balancer as a single connected resource instead of leaving a disconnected duplicate ALB node as in Design A."
+    }
+  ]
+}

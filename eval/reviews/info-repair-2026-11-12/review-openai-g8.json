@@ -1,0 +1,308 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream-based publisher closes the immediate database-write/event-publish gap, but its failure recovery is unspecified. DynamoDB Streams retains records for only 24 hours; prolonged publisher failures can therefore lose downstream work unless failed records are retained elsewhere and orders can be reconciled and republished.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "The EventBridge-to-SQS targets have no delivery-failure DLQs. Consumer DLQs cannot capture events that never reach their source queues, and EventBridge drops undelivered events after its retry policy is exhausted.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "Cross-region recovery covers the orders table but not recovery of the complete service. The design needs reproducible deployment and identity recovery, traffic cutover, and a way to reconstruct unfinished payment, inventory and email work when primary-region queues or DLQs are unavailable.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/backup-and-restore.html"
+        },
+        {
+          "severity": "major",
+          "description": "Cognito authentication is specified, but customer-level authorization for order lookup is not. The intake function must compare the authenticated identity with the stored order owner rather than treating possession of an order ID and a valid token as sufficient authorization.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify alarm notification actions, DLQ retention and replay procedures, and durable per-step idempotency/completion records; naming alarms and idempotent consumers does not fully define those operational mechanisms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless fan-out and order storage choices fit well, but upstream event-loss protection and complete regional recovery remain insufficiently defined."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream-based publisher closes the immediate database-write/event-publish gap, but its failure recovery is unspecified. DynamoDB Streams retains records for only 24 hours; prolonged publisher failures can therefore lose downstream work unless failed records are retained elsewhere and orders can be reconciled and republished.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "The EventBridge-to-SQS targets have no delivery-failure DLQs. Consumer DLQs cannot capture events that never reach their source queues, and EventBridge drops undelivered events after its retry policy is exhausted.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html"
+        },
+        {
+          "severity": "major",
+          "description": "Cross-region recovery covers the orders table but not recovery of the complete service. The design needs reproducible deployment and identity recovery, traffic cutover, and a way to reconstruct unfinished payment, inventory and email work when primary-region queues or DLQs are unavailable.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/backup-and-restore.html"
+        },
+        {
+          "severity": "major",
+          "description": "Cognito authentication is specified, but customer-level authorization for order lookup is not. The intake function must compare the authenticated identity with the stored order owner rather than treating possession of an order ID and a valid token as sufficient authorization.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Specify alarm notification actions, DLQ retention and replay procedures, and durable per-step idempotency/completion records; naming alarms and idempotent consumers does not fully define those operational mechanisms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The independent processing paths are appropriate, but delivery-failure handling and recovery of unfinished work across Regions need substantial completion."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The public-subnet Fargate task needs an explicit outbound connectivity configuration. Specify an internet-gateway route and assignPublicIp=ENABLED, or an alternative endpoint/egress arrangement, so image pulls, S3 access and logging work; placement in a public subnet alone is insufficient.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Database access security is asserted in R11 but not implemented in the design. Define the task-to-database security-group rule, read-only database permissions, protected credentials or IAM authentication, TLS, and narrowly scoped task and sender roles.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly choose a Standard Step Functions workflow and the ECS runTask.sync integration; the 25-minute run-and-wait operation must not be implemented as an Express workflow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose and record the schedule time zone and daylight-saving behavior, and disable the flexible time window if execution must begin at 02:00.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Add SES bounce/rejection feedback and per-recipient send tracking so successful API acceptance is not mistaken for delivery and retrying a partially completed email step does not resend all 40 messages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The scheduled Fargate workflow is a sensible low-cost solution for a 25-minute job, with networking, database security and several operational settings still to specify."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The public-subnet Fargate task needs an explicit outbound connectivity configuration. Specify an internet-gateway route and assignPublicIp=ENABLED, or an alternative endpoint/egress arrangement, so image pulls, S3 access and logging work; placement in a public subnet alone is insufficient.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "major",
+          "description": "Database access security is asserted in R11 but not implemented in the design. Define the task-to-database security-group rule, read-only database permissions, protected credentials or IAM authentication, TLS, and narrowly scoped task and sender roles.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicitly choose a Standard Step Functions workflow and the ECS runTask.sync integration; the 25-minute run-and-wait operation must not be implemented as an Express workflow.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose and record the schedule time zone and daylight-saving behavior, and disable the flexible time window if execution must begin at 02:00.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Add SES bounce/rejection feedback and per-recipient send tracking so successful API acceptance is not mistaken for delivery and retrying a partially completed email step does not resend all 40 messages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed batch architecture meets the core reporting requirements economically, but explicit connectivity, access controls and delivery handling are needed before implementation."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Both Lambda functions are placed in a private subnet without NAT or service endpoints. Define outbound paths to Bedrock, S3 and DynamoDB; attaching Lambda to this VPC does not itself provide access to those regional service endpoints.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html"
+        },
+        {
+          "severity": "major",
+          "description": "The embedding pipeline is underspecified: no embedding model or query-embedding operation is identified. Define ingestion and query embeddings using compatible models and dimensions, together with the corresponding OpenSearch vector mapping and search operation.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html"
+        },
+        {
+          "severity": "major",
+          "description": "The citation requirement is assigned to Bedrock without defining source metadata, how retrieved chunks enter the generation request, or how returned citations are mapped to actual manuals. Implement that custom grounding/citation contract or explicitly use a managed Knowledge Bases retrieval-and-generation integration.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-retrieve-generate.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ingestion DLQ is disconnected and no asynchronous Lambda DLQ or on-failure destination configuration is provided. Failed S3-triggered invocations therefore have no defined durable capture path after retries or event age are exhausted.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "major",
+          "description": "The history storage model does not bind conversations to the authenticated customer. Define user-scoped keys and enforce ownership using verified identity claims whenever conversation IDs or history records are accepted or returned.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB TTL is asynchronous rather than an exact 30-day deletion deadline. Filter expired records from application reads and clarify whether the retention requirement also covers PITR backups.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "For the HTTP API, specify a JWT authorizer using the Cognito user-pool issuer and intended app-client audience; the generic Cognito authorizer label should not be implemented as a REST-only COGNITO_USER_POOLS authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R8 and R9 remain unanswered questions rather than chosen assumptions. State concurrency and availability assumptions, right-size OpenSearch accordingly, and define initial ingestion of the existing corpus rather than relying solely on future object-created events.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed-model RAG foundation is suitable, but citation grounding, embeddings, private-subnet connectivity and ingestion failure recovery are not yet sufficiently specified."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Both Lambda functions are placed in a private subnet without NAT or service endpoints. Define outbound paths to Bedrock, S3 and DynamoDB; attaching Lambda to this VPC does not itself provide access to those regional service endpoints.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html"
+        },
+        {
+          "severity": "major",
+          "description": "The embedding pipeline is underspecified: no embedding model or query-embedding operation is identified. Define ingestion and query embeddings using compatible models and dimensions, together with the corresponding OpenSearch vector mapping and search operation.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html"
+        },
+        {
+          "severity": "major",
+          "description": "The citation requirement is assigned to Bedrock without defining source metadata, how retrieved chunks enter the generation request, or how returned citations are mapped to actual manuals. Implement that custom grounding/citation contract or explicitly use a managed Knowledge Bases retrieval-and-generation integration.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-retrieve-generate.html"
+        },
+        {
+          "severity": "major",
+          "description": "Neither the SQS DLQ nor the SNS failure topic has a defined ingestion failure route. SNS is a supported Lambda destination, but publishing to a topic does not populate the SQS queue automatically: configure an on-failure destination and, if retaining SNS, an explicit subscription to durable storage for inspection and replay.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "major",
+          "description": "The history storage model does not bind conversations to the authenticated customer. Define user-scoped keys and enforce ownership using verified identity claims whenever conversation IDs or history records are accepted or returned.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_least_privileges.html"
+        },
+        {
+          "severity": "minor",
+          "description": "DynamoDB TTL is asynchronous rather than an exact 30-day deletion deadline. Filter expired records from application reads and clarify whether the retention requirement also covers PITR backups.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "For the HTTP API, specify a JWT authorizer using the Cognito user-pool issuer and intended app-client audience; the generic Cognito authorizer label should not be implemented as a REST-only COGNITO_USER_POOLS authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R8 and R9 remain unanswered questions rather than chosen assumptions. State concurrency and availability assumptions, right-size OpenSearch accordingly, and define initial ingestion of the existing corpus rather than relying solely on future object-created events.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The additional SNS topic has no stated fan-out requirement and is described as holding records rather than distributing them; a direct SQS on-failure destination would be simpler for inspectable failure retention.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The core service choices are plausible, but essential RAG and network details remain incomplete and the additional failure topic does not establish a working recovery path."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "tie",
+      "why": "The designs are functionally equivalent and share the same event-loss and disaster-recovery gaps; omitting an explicit DynamoDB encryption setting in B does not disable its default encryption at rest."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "tie",
+      "why": "Both provide the same economical, duration-appropriate workflow and have identical implementation gaps; B's encryption annotation for the existing Aurora database does not establish a materially different reporting architecture."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "A",
+      "why": "Both need the same substantial RAG, connectivity and failure-routing work, but A avoids B's additional unconnected SNS topic and its unexplained overlap with the SQS failure queue."
+    }
+  ]
+}

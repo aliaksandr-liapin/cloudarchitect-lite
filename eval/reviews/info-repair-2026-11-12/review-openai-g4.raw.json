@@ -1,0 +1,263 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Originals and thumbnails share a bucket, but the ObjectCreated trigger has no specified original-only filter or processing guard; thumbnail writes can therefore trigger recursive processing and unexpected charges.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The welcome-email failure path does not distinguish DynamoDB event-source-mapping failure handling from a Lambda asynchronous DLQ. Specify mapping retry/record-age limits and an on-failure destination, or explicitly enqueue failed work.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Welcome-email idempotency is asserted through R18 but has no described enforcement mechanism. DynamoDB stream processing is at least once; define durable deduplication state and handling of ambiguous SES outcomes rather than assuming each subscription record is processed once.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "R19 has no concrete upload expiry, object-key scope, or validation path. A signed image Content-Type does not establish that the uploaded bytes are an image.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned URL is incorrectly represented as a Lambda-to-S3 write; URL generation does not upload an object, although the separate author-to-S3 upload edge is correct.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless services and PITR/versioning settings fit the request, but thumbnail recursion protection, stream failure handling, and welcome-email deduplication need concrete designs."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Originals and thumbnails share a bucket, but the ObjectCreated trigger has no specified original-only filter or processing guard; thumbnail writes can therefore trigger recursive processing and unexpected charges.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The welcome-email failure path does not distinguish DynamoDB event-source-mapping failure handling from a Lambda asynchronous DLQ. Specify mapping retry/record-age limits and an on-failure destination, or explicitly enqueue failed work.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-dynamodb-errors.html"
+        },
+        {
+          "severity": "major",
+          "description": "Welcome-email idempotency is asserted through R18 but has no described enforcement mechanism. DynamoDB stream processing is at least once; define durable deduplication state and handling of ambiguous SES outcomes rather than assuming each subscription record is processed once.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "R19 has no concrete upload expiry, object-key scope, or validation path. A signed image Content-Type does not establish that the uploaded bytes are an image.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned URL is incorrectly represented as a Lambda-to-S3 write; URL generation does not upload an object, although the separate author-to-S3 upload edge is correct.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The backup priority and serverless service choices are covered, but the same thumbnail, failure-recovery, and email-idempotency gaps prevent production readiness."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Recording a subscription and then calling SES creates a dual-write failure window: the subscription can persist without a welcome email, while retries can duplicate a successful send. Idempotent subscriber writes alone do not satisfy R16; add durable dispatch state or an outbox and an explicit deduplication policy.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The presigned-upload connection is drawn as a Lambda-to-S3 write despite its text correctly describing a direct author upload. Draw the client-to-S3 transfer separately from URL creation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The private bucket needs an explicit CloudFront origin-access policy and prefix-scoped upload permissions. Upload URL expiry and function least-privilege permissions are also unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No DynamoDB PITR, S3 versioning, or restore approach is selected, leaving accidental deletion and overwrite recovery undefined.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is an economical serverless blog topology with sensible caching and thumbnail isolation, but welcome-email consistency and the upload diagram need correction."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Recording a subscription and then calling SES creates a dual-write failure window: the subscription can persist without a welcome email, while retries can duplicate a successful send. Idempotent subscriber writes alone do not satisfy R16; add durable dispatch state or an outbox and an explicit deduplication policy.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The private bucket needs an explicit CloudFront origin-access policy and prefix-scoped upload permissions. Upload URL expiry and function least-privilege permissions are also unspecified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No DynamoDB PITR, S3 versioning, or restore approach is selected, leaving accidental deletion and overwrite recovery undefined.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design correctly models direct presigned uploads and provides a lean global read path, but reliable, deduplicated welcome-email delivery remains unresolved."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R14 names migration and validation but supplies no database/file transfer method, consistency strategy, rehearsal, or cutover/rollback sequence. Select native tooling or services such as DMS and DataSync and define the migration steps needed to support the three-month deadline.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html ; https://docs.aws.amazon.com/datasync/latest/userguide/what-is-datasync.html"
+        },
+        {
+          "severity": "major",
+          "description": "The two application instances have no specified automatic replacement or recovery mechanism. Use a two-AZ Auto Scaling group or equivalent recovery automation, integrate load-balancer health checks, and validate surviving-AZ capacity.",
+          "evidence": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/healthcheck.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Security-group relationships, database credential storage, instance IAM permissions, and database/NFS transport encryption are unspecified despite the otherwise useful private placement and at-rest encryption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Private instances have no documented endpoint or egress path for CloudWatch logs, management, and patching; define the required VPC endpoints or resilient outbound connectivity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database connections are classified as reads, and NFS connections are classified as reads while explicitly describing reads and writes; use read/write semantics to avoid implying read-only access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "EC2, Multi-AZ RDS, and regional EFS are appropriate low-change migration choices, with explicit encryption, but migration execution and application-tier self-healing are incomplete."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R14 names migration and validation but supplies no database/file transfer method, consistency strategy, rehearsal, or cutover/rollback sequence. Select native tooling or services such as DMS and DataSync and define the migration steps needed to support the three-month deadline.",
+          "evidence": "https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html ; https://docs.aws.amazon.com/datasync/latest/userguide/what-is-datasync.html"
+        },
+        {
+          "severity": "major",
+          "description": "The two application instances have no specified automatic replacement or recovery mechanism. Use a two-AZ Auto Scaling group or equivalent recovery automation, integrate load-balancer health checks, and validate surviving-AZ capacity.",
+          "evidence": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/healthcheck.html"
+        },
+        {
+          "severity": "major",
+          "description": "RDS and EFS at-rest encryption are not selected. Neither can be assumed encrypted across all creation methods; specify encryption and keys before provisioning, especially because existing unencrypted RDS instances cannot simply have encryption enabled in place.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html ; https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Security-group relationships, database credential storage, instance IAM permissions, and database/NFS transport encryption are unspecified. Also confirm whether authentication remains in the existing application rather than assuming the public ALB provides it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Private instances have no documented endpoint or egress path for CloudWatch logs, management, and patching; define the required VPC endpoints or resilient outbound connectivity.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Database connections are classified as reads, and NFS connections are classified as reads while explicitly describing reads and writes; use read/write semantics to avoid implying read-only access.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The target services fit a minimally changed two-AZ migration, but encryption choices, migration execution, and automatic application-instance recovery need to be specified."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "tie",
+      "why": "Both specify DynamoDB PITR and S3 versioning and share the same processing weaknesses; S3 and DynamoDB already provide at-rest encryption by default, so A's added encryption labels do not establish a material advantage for these requirements."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "B correctly models the direct client-to-S3 presigned upload, while retaining the same economical serverless topology; both still need reliable welcome-email dispatch, and omitted S3/DynamoDB encryption labels are not themselves a security regression."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "A",
+      "why": "A explicitly selects RDS/EFS encryption and identifies an authentication boundary while preserving the same low-change migration topology; both need a concrete migration plan and application-tier recovery automation."
+    }
+  ]
+}

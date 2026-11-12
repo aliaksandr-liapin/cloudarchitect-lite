@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Generating S3 presigned URLs inside the 02:00 Fargate task using an IAM task role relies on temporary STS credentials that expire within a few hours, meaning links emailed at 02:25 can expire before regional managers open their email during business hours.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Provisioning an always-on NAT Gateway adds roughly $32/month in fixed hourly costs for a 25-minute nightly job, whereas placing the task in a public subnet with an auto-assigned public IP and restrictive security group would eliminate NAT hourly charges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Existing Aurora PostgreSQL node omits encryption-at-rest configuration, and the design does not show how database credentials or IAM database authentication are managed for the Fargate task.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EventBridge is connected to the ECS task definition which then invokes the Fargate task, whereas EventBridge actually invokes the ECS RunTask API on an ECS cluster using the task definition.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, practical EventBridge- and Fargate-based batch architecture that covers all functional requirements, though presigned URLs signed at 02:00 with temporary task role credentials may expire early and the NAT Gateway adds avoidable monthly cost."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Generating S3 presigned URLs inside the 02:00 Fargate task using an IAM task role relies on temporary STS credentials that expire within a few hours, meaning links emailed at 02:25 can expire before regional managers open their email during business hours.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Provisioning an always-on NAT Gateway adds roughly $32/month in fixed hourly costs for a 25-minute nightly job, whereas placing the task in a public subnet with an auto-assigned public IP and restrictive security group would eliminate NAT hourly charges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not show how database credentials (such as Secrets Manager or IAM database authentication) are provided to the Fargate task.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EventBridge is connected to the ECS task definition which then invokes the Fargate task, whereas EventBridge actually invokes the ECS RunTask API on an ECS cluster using the task definition.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid, straightforward EventBridge and Fargate batch design that explicitly includes encryption at rest on both Aurora and S3, limited mainly by temporary role credential expiration on presigned URLs and NAT Gateway cost."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The S3 bucket node does not explicitly specify server-side encryption configuration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in the generic AWS Region container without noting that certificates attached to CloudFront must be provisioned in us-east-1.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An idiomatic, low-cost serverless static website architecture using Route 53, CloudFront, ACM, and a private S3 origin that fits the bakery's budget and zero-maintenance requirement."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The ACM certificate is placed in the generic AWS Region container without noting that certificates attached to CloudFront must be provisioned in us-east-1.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-structured, cost-effective static website design using Route 53, CloudFront, ACM, and an encrypted private S3 bucket that meets all functional and operational requirements."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Notifier Lambda generates S3 presigned URLs right after the 02:00 job completes using its IAM execution role's temporary STS credentials, which expire when the temporary token expires and before managers likely access the links later in the day.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The NAT Gateway rationale inaccurately states that the private Fargate task needs it to call SES and Step Functions, even though Notifier Lambda calls SES and Step Functions invokes Fargate via ECS integration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no edge showing Regional managers downloading the PDF reports from the S3 Report bucket using the presigned URLs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "An always-on NAT Gateway adds roughly $32/month in fixed hourly charges, which dominates the cost of a 25-minute nightly serverless job.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Existing Aurora PostgreSQL node omits explicit encryption-at-rest configuration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A capable serverless workflow using EventBridge, Step Functions, Fargate, Secrets Manager, and Lambda, though it has an inaccurate NAT Gateway rationale, a missing download edge, and short-lived Lambda-signed presigned URLs."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Notifier Lambda generates S3 presigned URLs right after the 02:00 job completes using its IAM execution role's temporary STS credentials, which expire when the temporary token expires and before managers likely access the links later in the day.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The NAT Gateway rationale inaccurately states that the private Fargate task needs it to call SES and Step Functions, even though Notifier Lambda calls SES and Step Functions invokes Fargate via ECS integration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no edge showing Regional managers downloading the PDF reports from the S3 Report bucket using the presigned URLs.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "An always-on NAT Gateway adds roughly $32/month in fixed hourly charges, which dominates the cost of a 25-minute nightly serverless job.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-orchestrated serverless architecture using Step Functions, Fargate, Secrets Manager, and Lambda with encryption enabled on both Aurora and S3, held back slightly by presigned URL token expiry and a flawed NAT Gateway rationale."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "nightly-reports",
+      "better": "B",
+      "why": "Designs A and B are nearly identical, but Design B explicitly specifies encryption at rest on the Aurora PostgreSQL database in addition to the S3 bucket."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "Designs A and B use the same appropriate Route 53, CloudFront, ACM, and private S3 architecture, but Design B explicitly configures encryption at rest on the S3 bucket."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "Both designs use the same Step Functions, Fargate, Secrets Manager, and Lambda workflow, but Design B explicitly configures encryption at rest on the Aurora PostgreSQL database."
+    }
+  ]
+}

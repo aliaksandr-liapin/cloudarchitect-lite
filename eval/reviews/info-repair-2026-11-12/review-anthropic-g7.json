@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Orders Table -> Order Event Topic (DynamoDB Streams)' is not a valid direct integration. DynamoDB Streams cannot publish to SNS natively and needs a Lambda consumer or an EventBridge Pipe. The Ingestion Lambda is described as 'publishes event' but has no edge to SNS, so the fan-out trigger is undefined.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes.html"
+        },
+        {
+          "severity": "major",
+          "description": "Orders API is an HTTP API and has a direct 'read' edge to DynamoDB. HTTP APIs have no native DynamoDB integration, so order lookup by ID needs a Lambda (or REST API service integration) that is not drawn.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services.html"
+        },
+        {
+          "severity": "major",
+          "description": "DLQ edges point DLQ -> Queue ('SQS Redrive'). A dead-letter queue is configured on the source queue with a redrive policy, so messages flow from the source queue to the DLQ. The drawn direction is wrong and could mislead implementation. No DLQ alarms or DLQ depth monitoring are specified, which weakens the 'never silently lost' guarantee.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The DR region contains only a DynamoDB global table replica. There is no API, Cognito, Lambda, SNS or SQS in us-west-2 and no failover mechanism (Route 53, or a runbook or IaC redeploy), so 'can be restored there' is only partly addressed.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The email Lambda has no SES connection and the payment Lambda has no payment-provider connection. Idempotency for retried payment and inventory steps is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Sound SNS-to-SQS fan-out with per-step DLQs and a global table, but the stream-to-SNS hop, the API-to-DynamoDB read and the DLQ direction are wrong or missing, and DR covers only the data tier."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Orders Table -> Order Event Topic (DynamoDB Streams)' is not a valid direct integration. DynamoDB Streams cannot publish to SNS natively and needs a Lambda consumer or an EventBridge Pipe. The Ingestion Lambda is described as 'publishes event' but has no edge to SNS.",
+          "evidence": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes.html"
+        },
+        {
+          "severity": "major",
+          "description": "Orders API is an HTTP API and has a direct 'read' edge to DynamoDB. HTTP APIs have no native DynamoDB integration, so order lookup by ID needs an undrawn Lambda.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services.html"
+        },
+        {
+          "severity": "major",
+          "description": "DLQ edges point DLQ -> Queue, but redrive goes from the source queue to the DLQ. No DLQ alarms or monitoring are specified, which weakens 'never silently lost'.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "DR is only a DynamoDB replica. No compute, messaging or API exists in the second region and there is no failover mechanism.",
+          "evidence": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No SES or payment-provider integration is drawn, and idempotency for retries is not stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally identical to A, with the same invalid stream-to-SNS and API-to-DynamoDB connections, the same reversed DLQ edges and data-only DR."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Aurora -> Sync Lambda (event, Internal)' is not a native integration. Aurora has no built-in change event source for Lambda, so a CDC mechanism is needed (DMS, a polling or outbox pattern, or a native Lambda invocation function). Without it the one-minute price-update SLA is not achievable as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Availability is claimed as multi-AZ, but the ALB sits in a single public subnet (an ALB needs subnets in at least two AZs), Fargate runs in only Private Subnet 1, and OpenSearch and the Sync Lambda are in only Private Subnet 2. OpenSearch is not configured with multi-AZ and replicas.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront caching of product pages is not tied to price updates (no invalidation or short TTL), so stale prices may be shown. The ALB is not restricted to CloudFront, and there is no WAF. There are no VPC endpoints or NAT for Lambda and Fargate egress, and no DLQ on the sync path.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Reasonable CloudFront/ALB/Fargate/Aurora/OpenSearch layout, but the CDC path from Aurora is hand-waved and the placement is not truly multi-AZ."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Aurora -> Sync Lambda (event, Internal)' is not a native integration. A CDC, outbox or polling mechanism is missing, so the one-minute price freshness is unsupported as drawn.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "The ALB is placed in a single public subnet although it needs subnets in at least two AZs. Fargate, Aurora, OpenSearch and the Sync Lambda are each placed in a single AZ's subnet, so the multi-AZ claim is not reflected.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "No cache invalidation tied to price updates, no WAF, the ALB is not locked to CloudFront, and there is no DLQ on the sync path.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same as A, with the ALB in Public Subnet 1 next to the Fargate tasks; the same CDC and multi-AZ gaps apply."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Thumbnail generator writes thumbnails back into the same Photo bucket that emits ObjectCreated events to the thumbnail queue. Without a prefix/suffix filter or a separate bucket this causes a recursive trigger loop, which is also at odds with the idempotency requirement R20.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Welcome email DLQ node has no edge or configuration connecting it to the Welcome email sender. A DynamoDB-stream-triggered Lambda needs an on-failure destination (SQS), bisect/retry limits and a record filter for subscriber inserts; otherwise failures block the shard or are lost. R21 is therefore not actually wired.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The read path from the Blog API handler to DynamoDB is not drawn (only write). WAF is placed in 'Primary Region', but CloudFront-scoped WAF must be in us-east-1. The REST API's default endpoint can bypass CloudFront and WAF. There are no alarms or SES setup details, and SES sandbox and verified identity are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong serverless blog design with edge caching, WAF, Cognito, presigned uploads and queue-based thumbnails, but the thumbnail loop risk and the unwired email DLQ are real gaps."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Thumbnail generator writes thumbnails into the same Photo bucket that triggers it. This risks a recursive loop without a prefix filter or separate bucket, and conflicts with R20.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Welcome email DLQ is not connected to the email sender. The stream-triggered Lambda needs an on-failure destination and a filter, so R21 is not actually satisfied.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The read path from the API handler to DynamoDB is not drawn. WAF is placed in 'Primary Region' rather than us-east-1. The REST API's default endpoint can bypass CloudFront and WAF. There are no alarm specifics, and the SES sandbox is not addressed.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally identical to A, with the same strong architecture and the same thumbnail loop and unwired email DLQ gaps, and slightly less requirement traceability."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "tie",
+      "why": "The two designs are functionally identical (only node ordering differs) and share the same defects."
+    },
+    {
+      "scenario": "product-search",
+      "better": "tie",
+      "why": "The only difference is the ALB's subnet placement (Public Subnet 2 in A, Public Subnet 1 in B). Both are single-subnet, and both have the same CDC and multi-AZ gaps."
+    },
+    {
+      "scenario": "myblog",
+      "better": "tie",
+      "why": "The architecture is identical; A only adds a few extra requirement traceability links (R17/R18), which does not change correctness."
+    }
+  ]
+}

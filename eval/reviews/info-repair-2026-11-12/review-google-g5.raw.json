@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Manual ingestion dead-letter queue [N10] has no incoming edge from Manual ingestion queue [N9] to represent the SQS redrive policy.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not explicitly configured on Manual search index [N6] (Amazon OpenSearch Service) or the SQS queues [N9, N10].",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A custom SQS and Lambda ingestion pipeline is viable, but Amazon Bedrock Knowledge Bases could natively manage chunking, embedding generation, OpenSearch indexing, and source citations with less custom code.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid, well-structured serverless RAG architecture that covers all functional and retention requirements while explicitly configuring encryption on S3 and DynamoDB."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Manual ingestion dead-letter queue [N10] has no incoming edge from Manual ingestion queue [N9] to represent the SQS redrive policy.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Explicit encryption-at-rest configuration is omitted on all data stores, including Manual PDF storage [N8], Conversation history [N7], and Manual search index [N6].",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A custom SQS and Lambda ingestion pipeline is viable, but Amazon Bedrock Knowledge Bases could natively manage chunking, embedding generation, OpenSearch indexing, and source citations with less custom code.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sound serverless RAG architecture identical in topology to Design A, but omitting explicit encryption-at-rest configurations on the S3 and DynamoDB data stores."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 1
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design models a direct stream event (Product Database -> Sync Function, event: Stream) from Amazon Aurora to AWS Lambda, but Amazon Aurora does not provide a native change stream event source mapping for Lambda; CDC requires a mechanism such as Amazon OpenSearch Ingestion, AWS DMS, or database triggers.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html"
+        },
+        {
+          "severity": "critical",
+          "description": "The design provisions two separate Application Load Balancer nodes (N2 and N3) with the false rationale that a second ALB is required to span multiple Availability Zones, whereas a single Application Load Balancer spans multiple Availability Zones.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "major",
+          "description": "Despite provisioning a second Availability Zone (AZ-b), all compute and data nodes (Web API Tasks, Product Database, Search Index, Sync Function, and Product Cache) are placed exclusively in Private Subnet A, leaving Private Subnet B empty and creating a single-AZ point of failure.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito User Pool [N10] is added to authenticate shoppers at the load balancer before accessing public e-commerce search and product pages, is mapped to uptime requirement R7, and is only connected to one of the two ALB nodes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Product Cache [N8] only has a read edge from Web API Tasks and lacks any write-population or cache-invalidation path when product prices change.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design contains critical flaws, including duplicating the Application Load Balancer per Availability Zone, assuming a native DynamoDB-style change stream from Aurora to Lambda, placing all backend resources in a single AZ, and gating only one of the two ALBs with Cognito."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": true,
+      "defects": [
+        {
+          "severity": "critical",
+          "description": "The design models a direct stream event (Product Database -> Sync Function, event: Stream) from Amazon Aurora to AWS Lambda, but Amazon Aurora does not support native stream event source mappings to Lambda; capturing row changes requires AWS DMS, Amazon OpenSearch Ingestion, or database triggers.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html"
+        },
+        {
+          "severity": "critical",
+          "description": "Application Load Balancer [N2] is placed only in Public Subnet A, and all backend compute and data services are placed only in Private Subnet A (leaving AZ-b completely unused), whereas an Application Load Balancer requires subnets in at least two Availability Zones and Multi-AZ resilience requires distributing tasks and data nodes across AZs.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Product Cache [N7] only has a read edge from Web API Tasks and lacks any cache write or invalidation edge when product prices are updated in Aurora.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The synchronization path lacks a dead-letter queue or retry buffer to prevent silent search index drift if an OpenSearch update fails.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B selects suitable core services and avoids Design A's duplicate ALB and unrequested Cognito gate, but still relies on a non-existent native Aurora-to-Lambda stream and places all resources into a single Availability Zone."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Fargate task generates S3 presigned URLs at 02:00 AM using its ECS task IAM role temporary STS credentials; S3 presigned URLs expire when the temporary signing credentials expire, which can invalidate download links before managers open their email later in the day.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Explicit encryption-at-rest configuration is omitted on Private report bucket [N4] and Existing Aurora PostgreSQL [N3].",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Placing the Fargate task in a public subnet avoids NAT Gateway costs, but assigns a public IP to a workload with access to the private Aurora database; additionally, CloudWatch monitoring has no outbound notification channel (such as SNS or SES) to alert operators on failure.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A simple, cost-conscious serverless batch architecture that fits the 25-minute runtime well, though it overlooks temporary credential expiration on Fargate-signed S3 presigned URLs and omits explicit encryption settings."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Fargate task generates S3 presigned URLs at 02:00 AM using its ECS task IAM role temporary STS credentials; S3 presigned URLs expire when the temporary signing credentials expire, which can invalidate download links before managers open their email later in the day.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Placing the Fargate task in a public subnet avoids NAT Gateway costs, but assigns a public IP to a workload with access to the private Aurora database; additionally, CloudWatch monitoring has no outbound notification channel (such as SNS or SES) to alert operators on failure.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, low-cost serverless batch design that properly configures encryption on S3 and Aurora, with the main caveat being S3 presigned URL expiration when signed by short-lived Fargate task role credentials at 02:00 AM."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "support-chatbot",
+      "better": "A",
+      "why": "Both designs share the same architecture and connections, but Design A explicitly configures encryption at rest on the S3 bucket and DynamoDB conversation table."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "While both designs fail to distribute resources into the second Availability Zone and assume a direct Aurora-to-Lambda stream, Design B avoids Design A's duplicate per-AZ Application Load Balancer node and unrequested Cognito authentication gate on public shopping traffic."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "Both designs use the same cost-effective EventBridge and Fargate architecture, but Design B explicitly configures encryption at rest on S3 and Aurora and more accurately describes the S3 bucket's role."
+    }
+  ]
+}

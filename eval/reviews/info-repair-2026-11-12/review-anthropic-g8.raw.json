@@ -1,0 +1,223 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream-triggered publisher Lambda has no on-failure destination, retry limits or bisect-on-error, and the EventBridge rules have no target DLQ. If publishing keeps failing, stream records expire after 24 hours and are lost, which conflicts with 'never silently lost'.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms have no notification target (e.g. SNS) and there is no explicit replay tooling. R13 (alert operators, replay) is only partly met.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Recovery Region holds only the DynamoDB replica. The API, queues and Lambdas there are not described, and no failover or restore approach (IaC, pilot light, DNS) is stated.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Solid decoupled fan-out with per-step queues and DLQs, a global-table replica and an explicit encryption setting; the publisher and EventBridge failure paths and operator notification are underspecified."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The stream-triggered publisher Lambda has no on-failure destination, retry limits or bisect-on-error, and the EventBridge rules have no target DLQ. If publishing keeps failing, stream records expire after 24 hours and are lost, which conflicts with 'never silently lost'.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption settings are not stated for the orders table or its replica. DynamoDB encrypts at rest by default, but the design does not make the choice explicit.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms have no notification target and there is no explicit replay tooling. The recovery Region has only the table replica, with no failover or restore approach.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally the same architecture as A, with correct fan-out, DLQs and a global-table replica, but encryption is not stated and the same publisher failure and alert gaps remain."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Fargate task sits in a public subnet, which means a public IP. This avoids NAT cost but is weaker than a private subnet with an S3 gateway endpoint. No ECR or image source is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned links signed with Lambda role credentials expire when those temporary credentials expire, so the intended link lifetime may not be honoured. The recipient list is read from the report bucket, which is an odd source for 40 managers.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms notify the operations team without an SNS topic shown. Email-send failures are not wired to alarms (only the workflow is), and the SES sandbox/verification step is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Simple and cheap serverless pipeline (Scheduler, Step Functions, Fargate, S3 lifecycle, Lambda, SES) that meets the stated requirements, with small gaps in network placement, link expiry and alert wiring."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Fargate task sits in a public subnet, which means a public IP. This avoids NAT cost but is weaker than a private subnet with an S3 gateway endpoint. No ECR or image source is shown.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned links signed with Lambda role credentials expire when those temporary credentials expire. The recipient list is read from the report bucket, which is an odd source.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch alarms notify the operations team without an SNS topic shown. Email-send failures are not wired to alarms. The 'AWS-managed' encryption on the existing Aurora cluster is only an annotation; an existing unencrypted cluster cannot be changed in place.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially identical to A, with an extra encryption annotation on Aurora; same sound core design and the same small gaps."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Chat Lambda and Ingestion Lambda are in private subnets, but no NAT gateway or VPC endpoints are shown for Bedrock, DynamoDB or S3. A VPC-attached function without such a path cannot reach these services, so the chat flow would not work as drawn.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Ingestion Lambda has no edge to Bedrock (or any embedding model), yet it is meant to parse and embed PDFs into OpenSearch. Embeddings cannot be generated as drawn.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/embeddings.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Ingestion DLQ is not connected to anything: there is no edge from the Ingestion Lambda, and no alarm. Failed ingestion events would not be captured or surfaced.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-error-handling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A provisioned OpenSearch domain is costly for this MVP. It is placed in a single private subnet, so it has no multi-AZ resilience. Conversation history is not scoped per customer, and the availability and scale questions (R8, R9) are not actually answered.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the main chat path with Cognito JWT auth, Bedrock, DynamoDB TTL and an S3-triggered ingest, but it has missing network egress, no embedding call at ingestion, and a dangling DLQ."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Chat Lambda and Ingestion Lambda are in private subnets, but no NAT gateway or VPC endpoints are shown for Bedrock, DynamoDB or S3. A VPC-attached function without such a path cannot reach these services.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Ingestion Lambda has no edge to Bedrock (or any embedding model), yet it is meant to parse and embed PDFs. Embeddings cannot be generated as drawn.",
+          "evidence": "https://docs.aws.amazon.com/bedrock/latest/userguide/embeddings.html"
+        },
+        {
+          "severity": "major",
+          "description": "Both the Ingestion DLQ and the SNS failure topic are not wired to the Ingestion Lambda (no edges), so neither actually captures failures. Having both is redundant.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-error-handling.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The SNS topic rationale says it 'holds records' of failed invocations, but SNS only forwards messages and does not store them. The OpenSearch domain is costly and single-subnet, and conversation history is not scoped per customer.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same architecture as A with an additional unconnected SNS failure topic whose rationale is inaccurate; it has the same missing egress and embedding path."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "A",
+      "why": "The architectures are otherwise the same, but A states encryption explicitly on the orders table and its replica, while B leaves it unspecified."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "tie",
+      "why": "The designs are effectively identical in structure, with the same strengths and the same minor weaknesses."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "A",
+      "why": "Both share the same major flaws, but B adds a redundant, unconnected SNS node with an inaccurate rationale, so A is marginally cleaner."
+    }
+  ]
+}
