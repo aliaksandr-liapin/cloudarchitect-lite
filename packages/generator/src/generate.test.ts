@@ -11,8 +11,10 @@ import {
   buildRequirements,
   draftArchitecture,
   generateArchitecture,
+  prioritizedRepairMessage,
   repairDraft,
   repairFindings,
+  repairMessageFor,
   type GenerateInput,
 } from './generate.js';
 import { GenerationError, type LlmClient, type LlmRequest } from './llm.js';
@@ -363,6 +365,36 @@ describe('repairFindings', () => {
       'VR-004',
       'VR-008',
     ]);
+  });
+});
+
+describe('prioritizedRepairMessage', () => {
+  const f = (severity: 'error' | 'warning' | 'info', ruleId: string) =>
+    ({ severity, ruleId, explanation: ruleId, nodeIds: [], edgeIds: [] }) as unknown as Finding;
+
+  it('lists errors and warnings before info findings and asks for info only after them', () => {
+    const msg = prioritizedRepairMessage([
+      f('info', 'VR-008'),
+      f('warning', 'VR-018'),
+      f('error', 'VR-009'),
+    ]);
+    expect(msg.indexOf('VR-009')).toBeLessThan(msg.indexOf('VR-008'));
+    expect(msg.indexOf('VR-018')).toBeLessThan(msg.indexOf('Lower priority (info findings):'));
+    expect(msg.indexOf('Lower priority (info findings):')).toBeLessThan(msg.indexOf('VR-008'));
+    expect(msg).toContain(
+      'Only then apply each info finding, if it fits the requirements and does not undo an error or warning fix',
+    );
+  });
+
+  it('equals the plain repair message when no info finding is sent', () => {
+    const sent = [f('warning', 'VR-018'), f('error', 'VR-009')];
+    expect(prioritizedRepairMessage(sent)).toBe(repairMessageFor(sent));
+  });
+
+  it('omits the errors and warnings list when only info findings are sent', () => {
+    const msg = prioritizedRepairMessage([f('info', 'VR-008')]);
+    expect(msg).not.toContain('Errors and warnings:');
+    expect(msg).toContain('Lower priority (info findings):');
   });
 });
 

@@ -11,6 +11,7 @@
     "live": "tsx src/live.ts",
     "info-repair": "tsx src/info-repair.ts",
     "info-repair-report": "tsx src/info-repair-report.ts",
+    "info-repair-followup": "tsx src/info-repair-followup.ts",
     "review": "tsx src/review.ts",
     "rules": "tsx src/rule-report.ts",
     "typecheck": "tsc --noEmit",

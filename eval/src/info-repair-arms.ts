@@ -1,8 +1,15 @@
 import type { Finding } from '@cloudarchitect/domain';
-import { infoRepairMessage, repairMessageFor } from '@cloudarchitect/generator';
+import {
+  infoRepairMessage,
+  prioritizedRepairMessage,
+  repairMessageFor,
+} from '@cloudarchitect/generator';
 import { rng, shuffle } from './packets.js';
 
 export type Arm = 'W' | 'I';
+
+/** How arm I words its message: the adopted info message, or warnings first (follow-up). */
+export type InfoMessage = 'plain' | 'prioritized';
 
 export const INFO_RULES_TO_REPAIR = ['VR-005', 'VR-007', 'VR-008', 'VR-013', 'VR-024'] as const;
 
@@ -22,10 +29,17 @@ export function armFindings(findings: Finding[], arm: Arm): Finding[] {
 export { infoRepairMessage };
 
 /** The repair message for an arm, or undefined when the arm has nothing to send. */
-export function messageFor(arm: Arm, findings: Finding[]): string | undefined {
+export function messageFor(
+  arm: Arm,
+  findings: Finding[],
+  infoMessage: InfoMessage = 'plain',
+): string | undefined {
   const sent = armFindings(findings, arm);
-  // Arm I with no info finding to send makes the same request as arm W.
-  return sent.length ? repairMessageFor(sent) : undefined;
+  if (!sent.length) return undefined;
+  // Arm I with no info finding to send makes the same request as arm W (both builders agree).
+  return arm === 'I' && infoMessage === 'prioritized'
+    ? prioritizedRepairMessage(sent)
+    : repairMessageFor(sent);
 }
 
 /** Per model: differing pairs only, info-bearing first, each group shuffled with the seed. */

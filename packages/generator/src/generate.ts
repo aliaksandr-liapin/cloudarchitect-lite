@@ -92,6 +92,26 @@ export function repairMessageFor(sent: Finding[]): string {
   return sent.some((f) => f.severity === 'info') ? infoRepairMessage(list) : repairMessage(list);
 }
 
+/**
+ * Experimental repair message (not used by the app yet): errors and warnings in their own list
+ * first, info findings in a second list that the model applies only after the first is handled.
+ * With no info finding it is exactly `repairMessageFor`.
+ */
+export function prioritizedRepairMessage(sent: Finding[]): string {
+  const info = sent.filter((f) => f.severity === 'info');
+  if (info.length === 0) return repairMessageFor(sent);
+  const rest = sent.filter((f) => f.severity !== 'info');
+  return [
+    'The deterministic validator reported these findings on your architecture.',
+    ...(rest.length ? ['', 'Errors and warnings:', formatFindings(rest)] : []),
+    '',
+    'Lower priority (info findings):',
+    formatFindings(info),
+    '',
+    'Return the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Only then apply each info finding, if it fits the requirements and does not undo an error or warning fix; otherwise leave it and say why in assumptions. Do not change anything else.',
+  ].join('\n');
+}
+
 type Message = { role: 'user' | 'assistant'; content: string };
 
 /** One architecture the model produced, with the conversation and cost that led to it. */
