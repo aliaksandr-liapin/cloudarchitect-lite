@@ -1,0 +1,121 @@
+/**
+ * Info-repair experiment, generation step: for each model x scenario x repeat, one extraction and
+ * first draft, then two repairs from that draft (arm W: errors and warnings; arm I: also five info
+ * rules). Makes PAID API calls.
+ *
+ * Usage: pnpm --filter @cloudarchitect/eval info-repair --max-usd <n>
+ *        [--models haiku,gpt-luna,gemini-flash-lite] [--repeats 2] [--scenarios id,id] [--concurrency 4]
+ * --max-usd is required: one shared cap, so a run can never start uncapped. Results go to
+ * eval/results/live/<runId>/. Console output carries ids, counts, cost and latency only.
+ */
+import { awsCatalog } from '@cloudarchitect/catalog';
+import { modelOption } from '@cloudarchitect/domain';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseArgs } from 'node:util';
+import { modelsWithKeys } from './gate.js';
+import { runInfoRepairJob, type InfoRepairRecord } from './info-repair-job.js';
+import {
+  Budget,
+  evalRoot as root,
+  loadClients,
+  loadScenarios,
+  meteredClient,
+  parseModels,
+  positiveInt,
+} from './live-common.js';
+
+const clients = loadClients();
+
+const { values: args } = parseArgs({
+  options: {
+    models: { type: 'string', default: 'haiku,gpt-luna,gemini-flash-lite' },
+    repeats: { type: 'string', default: '2' },
+    scenarios: { type: 'string' },
+    concurrency: { type: 'string', default: '4' },
+    'max-usd': { type: 'string' },
+  },
+});
+
+if (args['max-usd'] === undefined) throw new Error('--max-usd is required');
+const maxUsd = Number(args['max-usd']);
+if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be a positive number');
+const repeats = positiveInt('repeats', args.repeats);
+const concurrency = positiveInt('concurrency', args.concurrency);
+
+const keyed = modelsWithKeys(parseModels(args.models), (p) => Boolean(clients[p]), false);
+for (const w of keyed.warnings) console.log(w);
+const { models } = keyed;
+if (models.length === 0) {
+  console.log('No requested model has a provider key — info-repair skipped');
+  process.exit(0);
+}
+const scenarios = loadScenarios(args.scenarios);
+
+const runId = new Date().toISOString().replace(/[:.]/g, '-');
+const outDir = join(root, 'results', 'live', runId);
+mkdirSync(join(outDir, 'outputs'), { recursive: true });
+
+const budget = new Budget(maxUsd);
+const jobs = models.flatMap((model) =>
+  scenarios.flatMap((s) =>
+    Array.from({ length: repeats }, (_, i) => ({ s, model, repeat: i + 1 })),
+  ),
+);
+const records: InfoRepairRecord[] = [];
+let next = 0;
+
+const pass = (a?: { ok: boolean; score?: { passed: boolean } }) =>
+  a ? (a.ok ? (a.score?.passed ? 'PASS' : 'fail') : 'ERROR') : '-';
+
+async function worker() {
+  while (next < jobs.length) {
+    if (budget.exhausted) {
+      budget.cutShort = true;
+      return;
+    }
+    const { s, model, repeat } = jobs[next++]!;
+    const r = await runInfoRepairJob(
+      meteredClient(clients[modelOption(model).provider]!, budget).llm,
+      awsCatalog,
+      s,
+      model,
+      repeat,
+      (name, project) =>
+        writeFileSync(
+          join(outDir, 'outputs', `${model}-${s.id}-${repeat}.${name}.project.json`),
+          JSON.stringify(project, null, 2),
+        ),
+    );
+    records.push(r);
+    console.log(
+      `${r.model.padEnd(17)} ${r.scenarioId.padEnd(28)} #${r.repeat} ` +
+        (r.ok
+          ? `W ${pass(r.arms?.W)} I ${pass(r.arms?.I)} info ${r.infoSent}`
+          : `ERROR ${r.error}`) +
+        ` $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
+    );
+  }
+}
+await Promise.all(Array.from({ length: concurrency }, worker));
+
+writeFileSync(join(outDir, 'records.json'), JSON.stringify(records, null, 2));
+writeFileSync(
+  join(outDir, 'summary.json'),
+  JSON.stringify(
+    {
+      runId,
+      repeats,
+      scenarios: scenarios.length,
+      models,
+      maxUsd,
+      spentUsd: budget.spentMicro / 1e6,
+      cutShort: budget.cutShort,
+    },
+    null,
+    2,
+  ),
+);
+console.log(
+  `total spent: $${(budget.spentMicro / 1e6).toFixed(4)}${budget.cutShort ? ' (stopped at --max-usd)' : ''}; results: ${outDir}`,
+);
