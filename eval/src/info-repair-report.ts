@@ -18,7 +18,6 @@ import {
   recommend,
   summarizeModel,
   type Interval,
-  type JobMetrics,
   type MetricKey,
 } from './info-repair-stats.js';
 import { ruleHitTable } from './rule-hits.js';
@@ -28,6 +27,8 @@ export interface ReportInput {
   summary: { cutShort: boolean; spentUsd: number };
   /** Blind-review model summaries, keyed `<model>~W` / `<model>~I`. */
   blind?: Record<string, { blindScore: number }>;
+  /** False when the review panel was cut short: criterion 5 is then undecided. Default true. */
+  blindComplete?: boolean;
   seed: number;
 }
 
@@ -47,7 +48,7 @@ const ROWS: { key: MetricKey; label: string; digits?: number }[] = [
 ];
 
 export function renderReport(input: ReportInput): string {
-  const { records, summary, blind, seed } = input;
+  const { records, summary, blind, blindComplete = true, seed } = input;
   const models = [...new Set(records.map((r) => r.model))];
   const out: string[] = [
     '# Info-repair experiment report',
@@ -74,13 +75,16 @@ export function renderReport(input: ReportInput): string {
     );
     for (const row of ROWS) {
       const d = row.digits ?? 2;
-      const pool = row.key === 'passed' ? mine : paired;
-      const diff = pairedBootstrap(
-        pool.map((r) => jobMetrics(r, 'I')[row.key] - jobMetrics(r, 'W')[row.key]),
-        seed,
-      );
+      // summarizeModel owns the pool rule; only the two metrics it does not diff are bootstrapped here.
+      const diff =
+        row.key in s.diff
+          ? s.diff[row.key as keyof typeof s.diff]
+          : pairedBootstrap(
+              paired.map((r) => jobMetrics(r, 'I')[row.key] - jobMetrics(r, 'W')[row.key]),
+              seed,
+            );
       out.push(
-        `| ${row.label} | ${f(s.meanW[row.key as keyof JobMetrics], d)} | ${f(s.meanI[row.key as keyof JobMetrics], d)} | ${ci(diff, d)} |`,
+        `| ${row.label} | ${f(s.meanW[row.key], d)} | ${f(s.meanI[row.key], d)} | ${ci(diff, d)} |`,
       );
     }
     const nf = s.noiseFloor;
@@ -117,8 +121,11 @@ export function renderReport(input: ReportInput): string {
     const i = blind?.[`${model}~I`]?.blindScore;
     const criteria = evaluateCriteria(
       s,
-      w !== undefined && i !== undefined ? { W: w, I: i } : undefined,
+      blindComplete && w !== undefined && i !== undefined ? { W: w, I: i } : undefined,
+    ).map((c) =>
+      c.id === 5 && !blindComplete ? { ...c, met: undefined, detail: 'partial review panel' } : c,
     );
+    const undecided = criteria.filter((c) => c.id <= 5 && c.met === undefined).map((c) => c.id);
     for (const c of criteria) {
       out.push(
         `- Criterion ${c.id}: ${c.met === undefined ? 'undecided' : c.met ? 'met' : 'not met'}. ${c.detail}`,
@@ -132,9 +139,11 @@ export function renderReport(input: ReportInput): string {
       '',
       summary.cutShort
         ? 'Recommendation: partial run: no recommendation.'
-        : recommend(criteria)
-          ? 'Recommendation: adopt arm I (criteria 1-5 met).'
-          : 'Recommendation: keep arm W (criteria 1-5 not all met).',
+        : undecided.length
+          ? `Recommendation: undecided (criterion ${undecided.join(', ')} has no data).`
+          : recommend(criteria)
+            ? 'Recommendation: adopt arm I (criteria 1-5 met).'
+            : 'Recommendation: keep arm W (criteria 1-5 not all met).',
       '',
     );
   }
@@ -161,10 +170,18 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const read = <T>(file: string) => JSON.parse(readFileSync(file, 'utf8')) as T;
   const records = read<InfoRepairRecord[]>(join(dir, 'records.json'));
   const summary = read<{ cutShort: boolean; spentUsd: number }>(join(dir, 'summary.json'));
-  const blind = values.review
-    ? read<{ models: Record<string, { blindScore: number }> }>(
+  const review = values.review
+    ? read<{ models: Record<string, { blindScore: number }>; complete?: boolean }>(
         join(resolve(values.review), 'summary.json'),
-      ).models
+      )
     : undefined;
-  console.log(renderReport({ records, summary, blind, seed }));
+  console.log(
+    renderReport({
+      records,
+      summary,
+      blind: review?.models,
+      blindComplete: review ? review.complete !== false : undefined,
+      seed,
+    }),
+  );
 }

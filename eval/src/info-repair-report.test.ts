@@ -73,6 +73,7 @@ describe('renderReport', () => {
   it('shows "no blind data" for criterion 5 when no review is given', () => {
     const md = renderReport({ records, summary: complete, seed: 1 });
     expect(md).toContain('no blind review data');
+    expect(md).toContain('Recommendation: undecided (criterion 5 has no data)');
     expect(md).not.toContain('Recommendation: adopt arm I');
   });
 
@@ -85,5 +86,18 @@ describe('renderReport', () => {
     expect(md).toMatch(/sameRequest jobs: 1/);
     expect(md).toMatch(/pooled/);
     expect(md).toMatch(/failed arms \(W\/I\): 0\/0/);
+  });
+
+  it('treats criterion 5 as undecided when the review panel was partial', () => {
+    const md = renderReport({
+      records,
+      summary: complete,
+      blind: { 'haiku~W': { blindScore: 3 }, 'haiku~I': { blindScore: 4 } },
+      blindComplete: false,
+      seed: 1,
+    });
+    expect(md).toContain('partial review panel');
+    expect(md).toContain('Recommendation: undecided (criterion 5 has no data)');
+    expect(md).not.toContain('adopt arm I');
   });
 });

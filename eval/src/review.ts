@@ -118,10 +118,14 @@ if (args.arms) {
   if (!existsSync(join(dir, 'records.json'))) throw new Error(`Unknown run ${args.arms}`);
   const records = JSON.parse(readFileSync(join(dir, 'records.json'), 'utf8')) as InfoRepairRecord[];
   armPairs = {};
+  let skippedJobs = 0;
   for (const r of sampleReviewJobs(records, perModel, seed)) {
     const file = (arm: 'W' | 'I') =>
       join(dir, 'outputs', `${r.model}-${r.scenarioId}-${r.repeat}.${arm}.project.json`);
-    if (!existsSync(file('W')) || !existsSync(file('I'))) continue;
+    if (!existsSync(file('W')) || !existsSync(file('I'))) {
+      skippedJobs++;
+      continue;
+    }
     for (const arm of ['W', 'I'] as const) {
       runs.push({
         model: `${r.model}~${arm}`,
@@ -133,6 +137,7 @@ if (args.arms) {
     armPairs[`${r.model}~W`] = `${r.model}~I`;
     armPairs[`${r.model}~I`] = `${r.model}~W`;
   }
+  if (skippedJobs) console.log(`${skippedJobs} sampled jobs skipped: arm files missing`);
 } else {
   for (const runId of args.runs!.split(',')) {
     const dir = join(root, 'results', 'live', runId);
