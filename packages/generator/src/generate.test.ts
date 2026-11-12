@@ -11,8 +11,10 @@ import {
   buildRequirements,
   draftArchitecture,
   generateArchitecture,
+  prioritizedRepairMessage,
   repairDraft,
   repairFindings,
+  repairMessageFor,
   type GenerateInput,
 } from './generate.js';
 import { GenerationError, type LlmClient, type LlmRequest } from './llm.js';
@@ -291,7 +293,7 @@ describe('generateArchitecture', () => {
   });
 });
 
-describe('info findings in the repair turn (GPT Luna only)', () => {
+describe('info findings in the repair turn (no model sends them)', () => {
   const g = graph(true);
   // An unencrypted DynamoDB table: VR-008 (info), no error or warning.
   const infoOnly = { ...g, nodes: [...g.nodes, node('table', 'aws.dynamodb', ['R1'])] };
@@ -307,20 +309,7 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     ],
   };
 
-  it('sends info findings to repair for GPT Luna, with the info sentence', async () => {
-    const { llm, requests } = fake(infoOnly, g);
-    const r = await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
-    expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-008');
-    expect(requests).toHaveLength(2);
-    expect(r.repairTurnsUsed).toBe(1);
-    const repair = requests[1]?.messages[2]?.content ?? '';
-    expect(repair).toContain('VR-008 info');
-    expect(repair).toContain(
-      'Apply each info finding if it fits the requirements; otherwise leave it and say why in assumptions.',
-    );
-  });
-
-  it('never sends VR-015 for GPT Luna', async () => {
+  it('never sends VR-015', async () => {
     const { llm, requests } = fake(unresolvedOnly);
     const r = await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
     expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-015');
@@ -328,7 +317,7 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     expect(r.repairTurnsUsed).toBe(0);
   });
 
-  it('keeps the errors-and-warnings message for GPT Luna when no info finding is sent', async () => {
+  it('keeps the errors-and-warnings message for GPT Luna', async () => {
     const { llm, requests } = fake(graph(false), graph(true));
     await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
     const repair = requests[1]?.messages[2]?.content ?? '';
@@ -336,8 +325,8 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     expect(repair).not.toContain('info finding');
   });
 
-  it('leaves Haiku and Flash-Lite unchanged: info findings alone trigger no repair', async () => {
-    for (const model of ['haiku', 'gemini-flash-lite'] as const) {
+  it('info findings alone trigger no repair for any economical model', async () => {
+    for (const model of ['haiku', 'gpt-luna', 'gemini-flash-lite'] as const) {
       const { llm, requests } = fake(infoOnly);
       const r = await generateArchitecture(llm, awsCatalog, input({ model }));
       expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-008');
@@ -363,6 +352,36 @@ describe('repairFindings', () => {
       'VR-004',
       'VR-008',
     ]);
+  });
+});
+
+describe('prioritizedRepairMessage', () => {
+  const f = (severity: 'error' | 'warning' | 'info', ruleId: string) =>
+    ({ severity, ruleId, explanation: ruleId, nodeIds: [], edgeIds: [] }) as unknown as Finding;
+
+  it('lists errors and warnings before info findings and asks for info only after them', () => {
+    const msg = prioritizedRepairMessage([
+      f('info', 'VR-008'),
+      f('warning', 'VR-018'),
+      f('error', 'VR-009'),
+    ]);
+    expect(msg.indexOf('VR-009')).toBeLessThan(msg.indexOf('VR-008'));
+    expect(msg.indexOf('VR-018')).toBeLessThan(msg.indexOf('Lower priority (info findings):'));
+    expect(msg.indexOf('Lower priority (info findings):')).toBeLessThan(msg.indexOf('VR-008'));
+    expect(msg).toContain(
+      'Only then apply each info finding, if it fits the requirements and does not undo an error or warning fix',
+    );
+  });
+
+  it('equals the plain repair message when no info finding is sent', () => {
+    const sent = [f('warning', 'VR-018'), f('error', 'VR-009')];
+    expect(prioritizedRepairMessage(sent)).toBe(repairMessageFor(sent));
+  });
+
+  it('omits the errors and warnings list when only info findings are sent', () => {
+    const msg = prioritizedRepairMessage([f('info', 'VR-008')]);
+    expect(msg).not.toContain('Errors and warnings:');
+    expect(msg).toContain('Lower priority (info findings):');
   });
 });
 

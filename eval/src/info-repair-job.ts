@@ -20,12 +20,13 @@ import {
 import {
   classifyChanges,
   diffDesigns,
+  leftUnfixed,
   regressions,
   type Change,
   type ChangeKind,
 } from './design-diff.js';
 import { scoreCandidate, type Scenario, type ScenarioResult } from './harness.js';
-import { armFindings, messageFor, type Arm } from './info-repair-arms.js';
+import { armFindings, messageFor, type Arm, type InfoMessage } from './info-repair-arms.js';
 import { Budget, extractWithAnswers, meteredClient, type CallRecord } from './live-common.js';
 import { countByRule, type FindingsByRule } from './rule-hits.js';
 
@@ -40,6 +41,9 @@ export interface ArmResult {
   collateral: number;
   changesByKind: Partial<Record<ChangeKind, number>>;
   regressions: number;
+  /** First-draft errors and warnings still present in this arm's final design (absent in runs
+   * made before 2026-11-12). */
+  unfixed?: number;
   score?: ScenarioResult;
   /** Extraction + draft + this arm's repair. */
   costUsd: number;
@@ -51,6 +55,8 @@ export interface InfoRepairRecord {
   scenarioId: string;
   model: ModelChoice;
   repeat: number;
+  /** How arm I's message was worded (absent in runs made before 2026-11-12: plain). */
+  infoMessage?: InfoMessage;
   /** False when extraction or the draft failed. */
   ok: boolean;
   error?: string;
@@ -90,11 +96,12 @@ export async function runInfoRepairJob(
   save: (name: SaveName, project: Project) => void,
   /** Receives the model's rejected text when the first draft fails schema validation. */
   saveRejectedDraft: (text: string) => void = () => {},
+  infoMessage: InfoMessage = 'plain',
 ): Promise<InfoRepairRecord> {
   const started = Date.now();
   // Local meter only: the caller's client enforces any spend cap.
   const { llm: metered, meter } = meteredClient(llm, new Budget(Infinity));
-  const base = { scenarioId: scenario.id, model, repeat };
+  const base = { scenarioId: scenario.id, model, repeat, infoMessage };
   const done = () => ({
     costUsd: meter.jobMicro / 1e6,
     latencyMs: Date.now() - started,
@@ -114,7 +121,7 @@ export async function runInfoRepairJob(
     save('draft', draft.project);
 
     const runArm = async (arm: Arm): Promise<{ result: ArmResult; final: Project | null }> => {
-      const message = messageFor(arm, draft.findings);
+      const message = messageFor(arm, draft.findings, infoMessage);
       const sent = armFindings(draft.findings, arm);
       let repaired: Draft;
       const repairStarted = Date.now();
@@ -135,6 +142,7 @@ export async function runInfoRepairJob(
               collateral: 0,
               changesByKind: {},
               regressions: 0,
+              unfixed: 0,
               score: scoreCandidate(scenario, null),
               costUsd: (extractionMicro + sumMicro(err.usage)) / 1e6,
               latencyMs: latencyMs(),
@@ -160,6 +168,7 @@ export async function runInfoRepairJob(
           collateral: collateral.length,
           changesByKind: countByKind(changes),
           regressions: regressions(draft.findings, repaired.findings).length,
+          unfixed: leftUnfixed(draft.findings, repaired.findings).length,
           score: scoreCandidate(scenario, repaired.project),
           costUsd: (extractionMicro + sumMicro(repaired.usage)) / 1e6,
           latencyMs: armLatencyMs,
@@ -182,7 +191,8 @@ export async function runInfoRepairJob(
       ok: true,
       firstDraftFindingsByRule: countByRule(draft.findings),
       infoSent,
-      sameRequest: messageW !== undefined && messageW === messageFor('I', draft.findings),
+      sameRequest:
+        messageW !== undefined && messageW === messageFor('I', draft.findings, infoMessage),
       differ: both ? graphContentHash(both.w) !== graphContentHash(both.i) : false,
       ...(both ? { armsDiff: diffDesigns(both.w, both.i).length } : {}),
       arms: { W: w.result, I: i.result },

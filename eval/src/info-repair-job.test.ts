@@ -94,7 +94,7 @@ function fake(answers: { draft: unknown; W?: unknown; I?: unknown }) {
         ? extraction
         : requests.length === 2
           ? answers.draft
-          : last.includes('Apply each info finding')
+          : last.includes('Apply each info finding') || last.includes('Lower priority')
             ? answers.I
             : answers.W;
     if (body instanceof Error) throw body;
@@ -151,6 +151,32 @@ describe('runInfoRepairJob', () => {
     // Each arm pays for extraction, the draft and its own repair only.
     expect(r.arms!.W.costUsd).toBeCloseTo(r.calls[0]!.costUsd * 3, 9);
     expect(r.arms!.W.costUsd).toBeLessThan(r.costUsd);
+  });
+
+  it('words arm I with the prioritized message and counts warnings left unfixed', async () => {
+    // Arm W fixes the missing DLQ (VR-004); arm I adds monitoring but leaves the warning.
+    const { llm, requests } = fake({
+      draft: graph(false, false),
+      W: graph(true, false),
+      I: graph(false, true),
+    });
+    const r = await runInfoRepairJob(
+      llm,
+      awsCatalog,
+      scenario,
+      'haiku',
+      1,
+      () => {},
+      () => {},
+      'prioritized',
+    );
+
+    const user = requests.slice(2).map((q) => q.messages[2]!.content);
+    expect(user.filter((m) => m.includes('Lower priority (info findings):'))).toHaveLength(1);
+    expect(user.some((m) => m.includes('Apply each info finding'))).toBe(false);
+    expect(r.infoMessage).toBe('prioritized');
+    expect(r.arms?.W.unfixed).toBe(0);
+    expect(r.arms?.I.unfixed).toBe(1);
   });
 
   it('skips the W repair for an info-only draft', async () => {

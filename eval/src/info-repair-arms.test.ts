@@ -100,3 +100,21 @@ describe('sampleReviewJobs', () => {
     expect(a.filter((j) => j.model === 'm2')).toHaveLength(4);
   });
 });
+
+describe('messageFor with the prioritized info message', () => {
+  it('uses the prioritized message for arm I only, and only when info is sent', () => {
+    const mixed = [f('VR-008', 'info'), f('VR-018', 'warning')];
+    const p = messageFor('I', mixed, 'prioritized')!;
+    expect(p).toContain('Lower priority (info findings):');
+    expect(p.indexOf('VR-018')).toBeLessThan(p.indexOf('VR-008'));
+    expect(messageFor('W', mixed, 'prioritized')).toBe(messageFor('W', mixed));
+    const warning = [f('VR-018', 'warning')];
+    expect(messageFor('I', warning, 'prioritized')).toBe(messageFor('W', warning));
+  });
+
+  it('defaults to the plain info message', () => {
+    const mixed = [f('VR-008', 'info'), f('VR-018', 'warning')];
+    expect(messageFor('I', mixed)).toBe(messageFor('I', mixed, 'plain'));
+    expect(messageFor('I', mixed)).toContain('Apply each info finding');
+  });
+});

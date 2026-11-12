@@ -186,3 +186,11 @@ export function regressions(firstDraft: Finding[], repaired: Finding[]): Finding
   const known = new Set(firstDraft.map(findingKey));
   return repaired.filter((f) => !known.has(findingKey(f)));
 }
+
+/** First-draft errors and warnings whose key is still among the repaired design's findings. */
+export function leftUnfixed(firstDraft: Finding[], repaired: Finding[]): Finding[] {
+  const still = new Set(repaired.map(findingKey));
+  return firstDraft.filter(
+    (f) => (f.severity === 'error' || f.severity === 'warning') && still.has(findingKey(f)),
+  );
+}

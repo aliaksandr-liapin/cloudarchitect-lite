@@ -5,6 +5,8 @@
  *
  * Usage: pnpm --filter @cloudarchitect/eval info-repair --max-usd <n>
  *        [--models haiku,gpt-luna,gemini-flash-lite] [--repeats 2] [--scenarios id,id] [--concurrency 4]
+ *        [--info-message plain|prioritized]
+ * --info-message prioritized words arm I warnings first, info findings after (the Luna follow-up).
  * --max-usd is required: one shared cap, so a run can never start uncapped. A requested model whose
  * provider key is missing fails the run before any call. Results go to
  * eval/results/live/<runId>/. Console output carries ids, counts, cost and latency only.
@@ -15,6 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { modelsWithKeys } from './gate.js';
+import type { InfoMessage } from './info-repair-arms.js';
 import { runInfoRepairJob, type InfoRepairRecord } from './info-repair-job.js';
 import {
   Budget,
@@ -35,6 +38,7 @@ const { values: args } = parseArgs({
     scenarios: { type: 'string' },
     concurrency: { type: 'string', default: '4' },
     'max-usd': { type: 'string' },
+    'info-message': { type: 'string', default: 'plain' },
   },
 });
 
@@ -42,6 +46,10 @@ if (args['max-usd'] === undefined) throw new Error('--max-usd is required');
 const maxUsd = Number(args['max-usd']);
 if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be a positive number');
 const repeats = positiveInt('repeats', args.repeats);
+const infoMessageArg = args['info-message'];
+if (infoMessageArg !== 'plain' && infoMessageArg !== 'prioritized')
+  throw new Error('--info-message must be plain or prioritized');
+const infoMessage: InfoMessage = infoMessageArg;
 const concurrency = positiveInt('concurrency', args.concurrency);
 
 // Every requested model must have its key: a run that silently drops a model is not the experiment.
@@ -88,6 +96,7 @@ async function worker() {
         writeFileSync(file(`${name}.project.json`), JSON.stringify(project, null, 2)),
       // The rejected answer stays in the local, git-ignored results folder for diagnosis.
       (text) => writeFileSync(file('rejected.txt'), text),
+      infoMessage,
     );
     records.push(r);
     console.log(
@@ -108,6 +117,7 @@ writeFileSync(
     {
       runId,
       repeats,
+      infoMessage,
       scenarios: scenarios.length,
       models,
       maxUsd,

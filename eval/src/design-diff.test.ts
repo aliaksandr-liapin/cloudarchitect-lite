@@ -6,6 +6,7 @@ import {
   classifyChanges,
   diffDesigns,
   findingKey,
+  leftUnfixed,
   regressions,
   RULE_REQUESTED_SERVICES,
 } from './design-diff.js';
@@ -243,6 +244,26 @@ describe('RULE_REQUESTED_SERVICES', () => {
       expect(IMPLEMENTED_RULE_IDS, rule).toContain(rule);
       for (const id of ids) expect(services.has(id), id).toBe(true);
     }
+  });
+});
+
+describe('leftUnfixed', () => {
+  it('returns first-draft errors and warnings still present after the repair', () => {
+    const warn = finding({ ruleId: 'VR-018', severity: 'warning', nodeIds: ['lb'] });
+    const err = finding({ ruleId: 'VR-009', severity: 'error', nodeIds: ['db'] });
+    const info = finding({ ruleId: 'VR-008', severity: 'info', nodeIds: ['db'] });
+    const fixed = finding({ ruleId: 'VR-003', severity: 'warning', nodeIds: ['fn'] });
+    const fresh = finding({ ruleId: 'VR-012', severity: 'warning', nodeIds: ['x'] });
+    const warnAgain = finding({
+      id: 'other',
+      ruleId: 'VR-018',
+      severity: 'warning',
+      nodeIds: ['lb'],
+    });
+    expect(leftUnfixed([warn, err, info, fixed], [warnAgain, err, info, fresh])).toEqual([
+      warn,
+      err,
+    ]);
   });
 });
 
