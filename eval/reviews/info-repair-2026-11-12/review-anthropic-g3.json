@@ -1,0 +1,228 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Authors upload photos straight to the Photo Uploads Bucket with no authenticated mechanism. Cognito only protects the REST API, so nothing authorizes the S3 write. The bucket would need public or unauthenticated write access, or a credential path the design never shows.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Thumbnail DLQ and the Cognito node have no edges. The DLQ is not wired to the Thumbnail Generator as an on-failure destination or DLQ. Cognito is only represented by the API authorizer setting.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API Handler only reads from DynamoDB, so there is no write path that creates subscribers. The DynamoDB Streams welcome-email trigger therefore never fires. Posts are also never written.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Thumbnails are written back to the same bucket that triggers the generator, which risks recursive invocation unless prefix filters are used.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A reasonable serverless blog with versioning and PITR in place, but it has an unauthenticated direct-to-S3 upload path and an unconnected DLQ."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The Thumbnail DLQ is not connected to the Thumbnail Generator, so its role as an on-failure target is only implied.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API Handler only reads from DynamoDB, so there is no write path that creates subscribers. The DynamoDB Streams welcome-email trigger therefore never fires. Posts are also never written.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Thumbnails are written back to the same bucket that triggers the generator, which risks recursion unless prefix filters are used.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Better-secured blog design: presigned URLs obtained through the Cognito-protected API replace direct bucket writes, and backup and versioning requirements are met."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Audit records must be immutable (R10), but the audit bucket relies only on versioning and KMS. There is no S3 Object Lock or retention configuration, so records can be altered or deleted.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned PUT URLs cannot enforce file size or type limits. R15 needs presigned POST policies or validation after upload, and the design does not say which.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The audit bucket and CloudTrail use KMS, but there is no edge or key-policy mention for them. The Step Functions workflow type is not stated, and a 14-day wait requires Standard.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Strong Step Functions task-token workflow with DLQ, audit trail and WAF; audit immutability is not actually enforced."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Audit records must be immutable (R10), but the audit bucket relies only on versioning and KMS. There is no S3 Object Lock or retention configuration, so records can be altered or deleted.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned PUT URLs cannot enforce file size or type limits. The design does not say how R15 is met.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The web form bucket has no encryption setting listed. The workflow type is not stated, and a 14-day wait requires Standard.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Nearly identical to A, with a sound task-token workflow and DLQ; it shares the immutability gap and omits the web bucket encryption setting."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The outbox poller Lambda must read RDS in a private subnet, but it is placed in the region rather than the VPC, so it has no network path to the database. No trigger such as a schedule is shown either.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks in private subnets must reach DynamoDB, OpenSearch, CloudWatch and ECR, but no NAT gateway or VPC endpoints are shown.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Against the minimize-cost priority, the design uses Multi-AZ RDS, two always-on Fargate tasks, an always-on OpenSearch domain and an ALB. It does not call out that none of these scales to zero. A duplicate ALB node for the second AZ could be read as two load balancers.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge RDS to OpenSearch (bulk export) has no loader component. Requiring Cognito login for anonymous product search adds cost and friction.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally complete search and outbox design that includes a DLQ and monitoring, but its networking gaps and always-on components weaken it against the cost priority."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The outbox poller Lambda must read RDS in a private subnet, but it is placed in the region rather than the VPC, so it has no network path to the database. No trigger such as a schedule is shown either.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate tasks in private subnets must reach DynamoDB, OpenSearch, CloudWatch and ECR, but no NAT gateway or VPC endpoints are shown.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito to ALB edge is drawn in the wrong direction. The ALB redirects to Cognito and performs the authentication action. Always-on Multi-AZ RDS, two Fargate tasks and an OpenSearch domain are not reconciled with the minimize-cost priority.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge RDS to OpenSearch (bulk export) has no loader component. Requiring Cognito login for anonymous product search adds cost and friction.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially the same architecture as A with a single ALB node and explicit encryption settings, sharing the networking gaps and cost weaknesses."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "B uses authenticated presigned URLs issued through the Cognito-protected API for photo uploads, while A lets users write directly to the bucket with no authorization path."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "tie",
+      "why": "The two designs are nearly identical. Both use Step Functions task tokens, a DLQ and an audit bucket without Object Lock, and the differences are cosmetic."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "tie",
+      "why": "The architectures are the same, with the same networking gaps and non-scale-to-zero components. B models the ALB more cleanly and lists encryption, while A draws the ALB to Cognito edge in the more accurate direction."
+    }
+  ]
+}

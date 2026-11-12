@@ -1,0 +1,263 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Application Load Balancer and Amazon EKS Cluster nodes are each placed in only a single subnet/Availability Zone (Public Subnet AZ2 and Private Subnet AZ1 respectively, leaving Public Subnet AZ1 unused), which contradicts both AWS service requirements for multi-AZ ALB/EKS and the user priority of having no single point of failure across at least two Availability Zones.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Amazon EKS Cluster is in a private subnet and connects directly to Amazon CloudWatch and AWS X-Ray over HTTPS, but the VPC lacks a NAT Gateway (with an Internet Gateway) or VPC Interface Endpoints required for private subnet workloads to reach AWS APIs and pull container images.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edges from Amazon EKS Cluster to Amazon RDS MySQL and Amazon ElastiCache Redis are typed as read-only rather than read/write.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Certificate Manager (ACM) is omitted for provisioning and managing the HTTPS TLS certificate on the Application Load Balancer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R7 is left phrased as an unanswered question rather than stating the architect's assumed traffic scale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects appropriate managed AWS services (EKS, Multi-AZ RDS MySQL, Multi-AZ ElastiCache Redis, ALB, CloudWatch, and X-Ray) for migrating Helm-based microservices, but places compute and load balancing in single subnets and omits private subnet egress/endpoint networking."
+    },
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Application Load Balancer and Amazon EKS Cluster are placed in single subnets (Public Subnet AZ2 and Private Subnet AZ1), and both data stores (RDS and ElastiCache) are grouped into Private Subnet AZ2, leaving Public Subnet AZ1 unused and failing to model multi-AZ subnet placement.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+        },
+        {
+          "severity": "major",
+          "description": "Workloads in the private subnet have edges to public AWS services (CloudWatch and X-Ray) over HTTPS without a NAT Gateway or VPC Endpoints in the VPC.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/private-clusters.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The connections from Amazon EKS Cluster to RDS MySQL and ElastiCache Redis only specify read operations instead of read and write.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Certificate Manager (ACM) is not included to manage the HTTPS certificate on the Application Load Balancer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R7 remains formatted as a clarifying question without documenting the assumed scale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses the right core services for an EKS microservice migration with Multi-AZ RDS and ElastiCache, but models single-subnet placement for the ALB, EKS, and data tier and omits NAT/VPC endpoint connectivity for private subnets."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Mobile App uploads photos to the S3 Bucket using a presigned URL, but there is no edge or permission path from Workout Lambda (or a dedicated Lambda function) to Amazon S3 to generate and sign those presigned URLs.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The edge from Workout Lambda to DynamoDB Table only indicates write operations, whereas reading existing records is required to determine if a user beat a friend's record and to view workout history.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Amazon CloudWatch node has no incoming edges from API Gateway or Workout Lambda, and no dead-letter queue or retry policy is mentioned for asynchronous notification failures.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Requirements R10, R11, and R12 are listed as raw questions in the requirements list, although R11 and R12 assumptions are explained in the S3 and DynamoDB node rationales.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A provides a clean, serverless, pay-per-use mobile backend using Cognito, API Gateway, Lambda, DynamoDB, S3, and SNS and documents its retention and image-processing assumptions in the node rationales, missing only the backend flow to generate S3 presigned URLs."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Mobile App connects to the S3 Bucket via a Presigned URL Upload edge, but there is no backend interaction from Lambda to S3 to generate the presigned URLs for the client.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Workout Lambda only has a write edge to the DynamoDB Table, omitting read access needed to compare a new workout against a friend's record.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarifying requirements R10, R11, and R12 are left as unanswered questions in the requirements list and are not addressed in the node rationales.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The CloudWatch node is disconnected from the rest of the architecture.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses a well-suited serverless stack for a spiky mobile backend, but omits the backend flow to generate S3 presigned URLs and fails to document the architect's decisions for the inferred clarifying questions."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Owner sign-in -> Dashboard API (invoke, JWT)' reverses the authentication flow: Amazon Cognito does not invoke API Gateway; rather, the client obtains a JWT from Cognito and sends it in requests to API Gateway, which validates the token.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "major",
+          "description": "Routing 50,000 devices publishing every minute (833 messages/second, ~2.16 billion messages/month) directly to an unbatched Lambda function that performs individual DynamoDB lookups and Timestream writes per message is inefficient compared to using IoT Core rules with batching (such as Kinesis/SQS) or direct integration.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/iot-lens/telemetry-ingestion-layer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The web dashboard (Dashboard client) is modeled strictly as an external client application with no AWS hosting service (such as S3 and CloudFront or AWS Amplify) to serve it.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS IoT Core and Amazon Timestream for LiveAnalytics are marked as UNRESOLVED service types, and Timestream lacks explicit lifecycle/retention configuration for requirement R10.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "No IoT Rule error action or Lambda dead-letter queue is included to capture failed telemetry messages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A covers the core IoT ingestion, alerting, and owner-scoped dashboard query workflows and configures DynamoDB encryption, but models an incorrect Cognito-to-API Gateway invocation edge and relies on unbatched per-message Lambda execution at 2.16 billion messages per month."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Owner sign-in -> Dashboard API (invoke, JWT)' is incorrect because Amazon Cognito does not invoke API Gateway; the client application passes the Cognito-issued JWT to API Gateway.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
+        },
+        {
+          "severity": "major",
+          "description": "Invoking Lambda and reading DynamoDB individually for every single MQTT message (833 requests/sec, ~2.16 billion/month) without stream buffering or batching creates unnecessary cost and scaling pressure.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/iot-lens/telemetry-ingestion-layer.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Unlike Design A, the Device and owner registry (Amazon DynamoDB) omits the encryption configuration property, even though it stores PII (owner phone numbers).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The web dashboard is treated only as an external client with no AWS frontend hosting component.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "AWS IoT Core and Amazon Timestream for LiveAnalytics are marked as UNRESOLVED service types, and R8-R10 remain phrased as questions without documented retention settings.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B is identical to Design A except that it omits the encryption configuration on the DynamoDB registry table storing owner phone numbers, while sharing the same flawed Cognito-to-API Gateway edge and unbatched per-message Lambda processing."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "better": "A",
+      "why": "Both designs are nearly identical, but Design A distributes the private data stores across Private Subnet AZ1 and Private Subnet AZ2 rather than placing both RDS and ElastiCache into Private Subnet AZ2 as Design B does."
+    },
+    {
+      "scenario": "mobile-backend",
+      "better": "A",
+      "why": "Design A explicitly documents the architect's decisions for the clarifying questions (long-term retention, no image pre-processing, and Cognito authorizer protection) in the component rationales, whereas Design B omits those explanations."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "better": "A",
+      "why": "Both designs share the same architecture and edges, but Design A explicitly configures encryption at rest on the DynamoDB table storing owner phone numbers and device registry data, which Design B omits."
+    }
+  ]
+}

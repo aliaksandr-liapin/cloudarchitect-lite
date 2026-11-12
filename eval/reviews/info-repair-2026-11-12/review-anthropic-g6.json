@@ -1,0 +1,198 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The EKS cluster and the ALB are each placed in a single subnet (EKS in Private AZ1, ALB in Public AZ2). This contradicts the 'no single point of failure across at least two AZs' priority and the stated rationale that the ALB spans AZs. ALBs need subnets in at least two AZs, and EKS needs subnets in at least two AZs, with worker nodes spread across them.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The EKS->RDS and EKS->ElastiCache edges are typed 'read', but the services need read/write access. The design does not specify node groups, an ingress controller (AWS Load Balancer Controller), NAT or VPC endpoints, security groups, or Redis in-transit encryption.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design uses X-Ray and CloudWatch with no mention of the OpenTelemetry/Container Insights agents. There is no mention of alarms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A reasonable EKS + Multi-AZ RDS/ElastiCache + ALB design, but compute and ALB are drawn in a single subnet and the operational detail is thin."
+    },
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The EKS cluster and the ALB are each placed in a single subnet (EKS in Private AZ1, ALB in Public AZ2). This contradicts the 'no single point of failure across at least two AZs' priority and the stated rationale that the ALB spans AZs. ALBs need subnets in at least two AZs, and EKS needs subnets in at least two AZs, with worker nodes spread across them.",
+          "evidence": "https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The EKS->RDS and EKS->ElastiCache edges are typed 'read', but the services need read/write access. There is no mention of node groups, an ingress controller, NAT or VPC endpoints, security groups, or alarms.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Functionally identical to A, with ElastiCache drawn in AZ2 instead of AZ1, and it has the same single-subnet placement weaknesses."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design never shows how the presigned S3 URL is generated (there is no Lambda->S3 or API path). It also does not specify how Cognito federates with Google. Push delivery via SNS needs platform application endpoints (APNs/FCM) and device-token storage, which are not modeled.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no DLQ or retry configuration on Lambda, and no mention of a bucket policy that blocks public access. The S3 upload edge is labeled 'write' from the app, but the app needs authorization.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Mobile App is linked to R10 (peak users) on its edges, which is not a meaningful mapping.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Appropriate serverless stack with Cognito, API Gateway, Lambda, DynamoDB, S3 and SNS; it explicitly states the Cognito authorizer, but the presigned URL and push-endpoint flows are unmodeled."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The presigned URL generation path is not modeled (no Lambda->S3 edge). Google federation and SNS mobile platform endpoints/device tokens are also not modeled.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no DLQ or retry configuration and no S3 public access block mentioned. Rationales are terser, and the Cognito authorizer is only in config, not in the API Gateway rationale.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same serverless architecture as A with slightly terser rationales; it shares the same gaps in the upload and push flows."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Amazon Timestream for LiveAnalytics is no longer open to new customers, so selecting it for a new build is risky. Timestream for InfluxDB or DynamoDB with TTL would be safer choices.",
+          "evidence": "https://docs.aws.amazon.com/timestream/latest/developerguide/what-is-timestream.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The out-of-range alert path has no dedupe/cooldown, so a persistent fault sends an SMS every minute. SNS SMS needs an origination identity and has sandbox/spend limits. There is no DLQ or retry on the IoT rule or Lambda. Thing registry, IoT policies and provisioning are not described. The dashboard hosting is unmodeled, and the HTTP API 'Cognito authorizer' is actually a JWT authorizer.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Per-reading Lambda invocation at 50,000 devices (~830 msg/s) is workable, but the DynamoDB registry lookup on every reading could be cached.",
+          "evidence": ""
+        }
+      ],
+      "summary": "IoT Core with certificate auth plus Lambda, DynamoDB, SNS and a Cognito-protected dashboard API fits the requirements, but the time-series store choice is questionable and alert handling lacks resilience detail."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Amazon Timestream for LiveAnalytics is no longer open to new customers, so selecting it for a new build is risky. Timestream for InfluxDB or DynamoDB with TTL would be safer choices.",
+          "evidence": "https://docs.aws.amazon.com/timestream/latest/developerguide/what-is-timestream.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The alert path has no dedupe/cooldown or DLQ. SNS SMS needs an origination identity. The registry does not list encryption in the design (it is encrypted by default). Dashboard hosting and IoT provisioning are unmodeled.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially identical to A, except the registry's encryption is not explicitly configured; it shares the same questionable time-series store and thin alert resilience."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "better": "tie",
+      "why": "The designs are effectively identical and share the same single-subnet placement flaws; only the ElastiCache subnet drawing differs."
+    },
+    {
+      "scenario": "mobile-backend",
+      "better": "tie",
+      "why": "The architectures and edges are the same; A's rationales are slightly more explicit, B's requirement mapping is slightly cleaner, and neither difference is material."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "better": "tie",
+      "why": "The designs are identical apart from A's explicit DynamoDB encryption flag, which is on by default anyway."
+    }
+  ]
+}

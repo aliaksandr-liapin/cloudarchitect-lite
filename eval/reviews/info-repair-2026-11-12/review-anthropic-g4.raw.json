@@ -1,0 +1,213 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The thumbnail generator writes thumbnails back to the same bucket that triggers it. A prefix or suffix filter on the S3 event is needed to avoid a recursive invocation loop, and the design does not say so.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency (R18) is claimed on the stream consumer, but no mechanism is shown, such as a sent flag or conditional write. DLQ-on-failure and batch-failure handling are also not specified.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito user pool is a store of author identities with no backup or export strategy. The SQS DLQ has no stated encryption. SES sandbox and verified identity setup are not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The photo bucket is a CloudFront origin, but OAC is only mentioned for the static bucket. WAF is attached only to API Gateway, not CloudFront.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design covers all requirements, including PITR on both tables, versioning on both buckets, a DLQ with alarm, and explicit encryption on every store. It has only minor gaps around idempotency detail and the S3 trigger loop."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not stated for the DynamoDB tables and S3 buckets. The defaults still encrypt them, but the design is less explicit than it should be.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The thumbnail generator writes thumbnails to the same bucket that triggers it, so the S3 event needs a prefix filter to avoid a recursive loop. The design does not mention this.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Idempotency (R18) is claimed with no mechanism shown. The Cognito user pool has no backup strategy, and SES sandbox setup is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design is functionally identical to A, with PITR, versioning and a DLQ alarm. It omits explicit encryption settings and has the same minor gaps."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The upload path shows only a Lambda to bucket 'write' edge for issuing the presigned URL. The actual client PUT to S3 is described only in the edge label, and S3 CORS is not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome email is sent synchronously from the API Lambda, with no retry or DLQ for SES failures. The thumbnail DLQ covers only thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The single bucket for site and media needs a prefix filter on the S3 trigger to avoid a recursive loop. Subscription dedupe is claimed but not shown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is a sound, cost-efficient serverless design with CloudFront, a private S3 bucket, a WAF-protected REST API with a Cognito authorizer, and a thumbnail DLQ. It states encryption explicitly and has minor gaps around the email path and the presigned upload flow."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Encryption settings are not stated for S3 and DynamoDB. The defaults still encrypt them.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edge shows 'Readers and authors' writing to the bucket, which implies readers can upload. This is only valid through an API-authorized presigned URL, and the Lambda to bucket permission edge is missing.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome email is sent synchronously, with no failure handling for SES. The single bucket needs a prefix filter on the S3 trigger to avoid a recursive loop.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design is essentially equivalent to A and models the client-to-S3 presigned upload explicitly. It omits explicit encryption and shares the same minor gaps."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "ALB, RDS and EFS are each placed in a single subnet or AZ even though they span two AZs (ALB in both public subnets, Multi-AZ RDS, EFS mount targets in both AZs). This is ambiguous in the diagram.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no migration tooling for R14 (for example DMS or DataSync) and no Auto Scaling group or auto-recovery for the two fixed EC2 instances. The ALB rationale also suggests Cognito/OIDC authentication that does not appear in the diagram, and edges are labelled 'Authenticated', which adds unplanned scope for a three-month, minimal-change move.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "HTTPS to the ALB needs an ACM certificate. Security groups, NAT or endpoints for outbound traffic, and EFS/RDS access controls are not described.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design is a sensible lift-and-shift with ALB, two EC2 instances in separate AZs, Multi-AZ RDS with 30-day backups, EFS and encryption stated. It lacks migration tooling and Auto Scaling and is ambiguous about placement."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Encryption at rest is not specified for RDS or EFS. RDS encryption can only be set at creation and cannot be enabled later on an existing instance, so omitting it risks an unencrypted production database and share. A careful architect would specify encryption at creation.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "ALB, RDS and EFS are shown in a single subnet or AZ although they span two AZs. There is no migration tooling (DMS or DataSync), no Auto Scaling group, and no certificate or security group detail.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This design has the same lift-and-shift topology as A with Multi-AZ RDS and 30-day backups, but it omits encryption settings on RDS and EFS."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "A",
+      "why": "The two designs have identical topology, with PITR, versioning and a DLQ alarm in both, but A states encryption explicitly on every data store while B omits it."
+    },
+    {
+      "scenario": "myblog",
+      "better": "tie",
+      "why": "The designs are nearly identical. A states encryption explicitly, while B models the client-to-S3 presigned upload more accurately. These differences offset each other."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "A",
+      "why": "Same topology, but A specifies encryption at rest on RDS and EFS, which matters because RDS encryption must be chosen at creation. A also notes authentication at the ALB, although that adds some unplanned scope."
+    }
+  ]
+}

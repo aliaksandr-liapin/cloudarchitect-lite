@@ -1,0 +1,248 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Photo bucket stores both original uploads and generated thumbnails and triggers the Thumbnail generator Lambda on ObjectCreated, but neither the node nor the edge specifies S3 key prefix/suffix filtering to prevent an infinite recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "API Gateway REST API is configured with a Cognito user pool authorizer for author routes, but there is no edge connecting API Gateway REST API and Cognito user pool.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned S3 upload URL is a local cryptographic signing operation using IAM credentials in the Lambda function rather than a network write to S3, so modeling 'Posts API (Lambda) -> Photo bucket (write): Issue presigned upload URL' alongside the client's direct upload edge is redundant.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Several node rationales contain internal prompt reference tokens such as (FACT-001), (FACT-006), and (I1).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-architected, low-cost serverless global blog that satisfies all functional and backup/versioning requirements, with explicit encryption configuration on all data stores and only minor graph modeling issues."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Photo bucket stores both original uploads and generated thumbnails and triggers the Thumbnail generator Lambda on ObjectCreated, but neither the node nor the edge specifies S3 key prefix/suffix filtering to prevent an infinite recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Unlike Design A, explicit encryption-at-rest configuration metadata is omitted on the Posts table, Subscribers table, Static site bucket, and Photo bucket (though S3 and DynamoDB encrypt at rest by default).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "API Gateway REST API is configured with a Cognito user pool authorizer for author routes, but there is no edge connecting API Gateway REST API and Cognito user pool.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Issuing a presigned S3 upload URL is a local signing operation in Lambda rather than a write call to S3, making the 'Posts API (Lambda) -> Photo bucket (write)' edge inaccurate alongside the direct client upload edge.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Several node rationales contain internal prompt reference tokens such as (FACT-001), (FACT-006), and (I1).",
+          "evidence": ""
+        }
+      ],
+      "summary": "A strong serverless global blog architecture that properly implements PITR and S3 versioning as requested, but omits explicit encryption configuration metadata on its four data stores and lacks prefix filtering details on the shared photo bucket."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The direct-to-S3 photo upload is modeled as an edge from 'Blog API functions -> Private site and media bucket (write, HTTPS)' with no upload edge from 'Readers and authors' to S3, even though presigned URL generation is local to Lambda and the client performs the HTTPS PUT directly to S3.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Blog API functions invokes Amazon SES synchronously during the subscription API call rather than decoupling email delivery via DynamoDB Streams or an SQS queue with a DLQ; if the SES call fails after the idempotent subscriber record is written, retries may suppress the welcome email.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarifying questions R11 and R12 are retained verbatim as '[functional, inferred]' requirements alongside their architectural decisions R13 and R14.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A cost-effective serverless blog design that includes explicit encryption configurations and avoids S3 trigger recursion with separate prefixes, but mismodels the presigned S3 upload edge as originating from Lambda rather than the user client."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Blog API functions invokes Amazon SES synchronously on the subscription request path rather than asynchronously with a retry/DLQ mechanism, coupling subscription latency and partial-failure handling to SES availability.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Explicit encryption-at-rest configuration metadata is omitted on the S3 bucket and DynamoDB table (though both services encrypt data at rest by default in AWS).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Clarifying questions R11 and R12 are left as '[functional, inferred]' items in the requirements list alongside their corresponding decisions R13 and R14.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, accurate serverless blog architecture that properly models direct client-to-S3 presigned URL uploads, Cognito authorization, and separate S3 prefixes to prevent recursive thumbnail triggers."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Requirement R14 calls for migrating existing MySQL data and shared NFS files to AWS and nodes N5/N6 claim to satisfy it, but no migration services (such as AWS DMS or AWS DataSync) or on-premises connectivity are included.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Application Load Balancer rationale instructs to 'configure Cognito or OIDC authentication at the ALB before internet exposure', which introduces an unmodeled authentication service not present in the diagram and potentially conflicts with minimal changes to a legacy monolith.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edges from the EC2 instances to Amazon RDS for MySQL and Amazon EFS are typed as 'read' only, even though the monolith performs both reads and writes (as noted in the EFS edge label 'Read and write shared uploads').",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EC2 instances in private subnets send logs and metrics to Amazon CloudWatch, but neither a NAT Gateway/Internet Gateway nor CloudWatch VPC interface endpoints are included to provide private-subnet connectivity to CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The two EC2 instances are standalone resources without an EC2 Auto Scaling group to automatically replace failed instances and maintain the 99.9% availability target.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A practical lift-and-shift architecture using ALB, cross-AZ EC2, Multi-AZ RDS for MySQL with 30-day backups, and EFS with encryption at rest enabled on both data stores, marred slightly by an unmodeled ALB Cognito/OIDC claim and missing data-transfer tooling."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Amazon RDS for MySQL and Amazon EFS omit encryption-at-rest configuration; unlike S3 and DynamoDB, RDS instances and EFS file systems are not encrypted by default at the API/IaC level and encryption at rest can only be enabled at resource creation time.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Requirement R14 calls for migrating existing MySQL data and shared NFS files to AWS and nodes N5/N6 claim to satisfy it, but no migration services (such as AWS DMS or AWS DataSync) or on-premises connectivity are included.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The edges from the EC2 instances to Amazon RDS for MySQL and Amazon EFS are typed as 'read' only, despite the application performing both read and write operations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "EC2 instances in private subnets send logs and metrics to Amazon CloudWatch, but neither a NAT Gateway/Internet Gateway nor CloudWatch VPC interface endpoints are included to allow outbound communication to CloudWatch.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The two EC2 instances are standalone resources without an EC2 Auto Scaling group to automatically recover from instance failures.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A straightforward lift-and-shift design with clean explanations that meets the Multi-AZ, NFS, and managed backup requirements, but omits creation-time encryption at rest on RDS and EFS."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "A",
+      "why": "Design A explicitly configures encryption at rest on both DynamoDB tables and both S3 buckets in addition to PITR and versioning, whereas Design B is otherwise identical but omits the encryption configurations."
+    },
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "Design B accurately models the direct-to-S3 presigned URL photo upload as an HTTPS write edge from 'Readers and authors' to the S3 bucket, whereas Design A erroneously draws the upload edge from 'Blog API functions' to S3 while claiming in the label that the author uploads directly."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "A",
+      "why": "Design A explicitly enables encryption at rest on both Amazon RDS for MySQL and Amazon EFS—which in AWS must be configured at creation time—whereas Design B leaves encryption unconfigured on both stateful data stores, outweighing Design A's minor unmodeled suggestion of ALB authentication."
+    }
+  ]
+}

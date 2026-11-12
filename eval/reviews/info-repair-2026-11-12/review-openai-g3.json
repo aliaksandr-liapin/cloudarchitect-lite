@@ -1,0 +1,338 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The direct author-to-S3 upload path has no defined authorization mechanism. A Cognito user pool authenticates users but does not itself supply S3 credentials; add an authenticated API that issues narrowly scoped presigned URLs, or an appropriately restricted identity-pool flow.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes into its triggering bucket, but no input-prefix or suffix filter is specified. Define disjoint original/thumbnail prefixes with notification filtering, or separate buckets, to prevent recursive thumbnail invocations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The subscription creation path is missing: the only API-to-DynamoDB operation shown is a read. Define the subscriber write that produces the stream event, including validation and duplicate-subscription handling.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail DLQ is an isolated node. No Lambda asynchronous dead-letter configuration or on-failure destination connects failed thumbnail invocations to it, so the claimed failure-retention mechanism is not specified.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "major",
+          "description": "S3 access restrictions are not defined. Specify a private static-site bucket with CloudFront origin access control and a restrictive bucket policy, and keep the uploads bucket private with narrowly scoped upload permissions.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome-email consumer needs subscriber-specific event selection and duplicate-processing protection; the shared table also contains posts and comments, and stream processing can retry records.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront is connected to the API, but cacheable methods, TTLs, cache keys, and separation of public reads from authenticated or personalized responses are unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed services and explicit S3 versioning/DynamoDB PITR fit the blog, but upload authorization, subscription creation, and asynchronous processing safeguards remain incomplete."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes into its triggering bucket, but no input-prefix or suffix filter is specified. Define disjoint original/thumbnail prefixes with notification filtering, or separate buckets, to prevent recursive thumbnail invocations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The subscription creation path is missing: the only API-to-DynamoDB operation shown is a read. Define the subscriber write that produces the stream event, including validation and duplicate-subscription handling.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail DLQ is an isolated node. No Lambda asynchronous dead-letter configuration or on-failure destination connects failed thumbnail invocations to it, so encryption of the queue does not establish the claimed failure-handling path.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "major",
+          "description": "Presigned uploads are a sound authorization choice, but bucket access restrictions remain unspecified. Define private buckets, CloudFront origin access control for the static origin, and restrictive bucket and signing-role policies.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The welcome-email consumer needs subscriber-specific event selection and duplicate-processing protection; the shared table also contains posts and comments, and stream processing can retry records.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudFront is connected to the API, but cacheable methods, TTLs, cache keys, and separation of public reads from authenticated or personalized responses are unspecified.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The presigned-upload flow improves the security design while retaining appropriate backup settings, but subscription creation, thumbnail isolation, and failure handling still need completion."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Immutable audit retention is asserted without an enforcement mechanism. S3 versioning and KMS encryption alone do not prevent permanent version deletion; define Object Lock retention and its governance/compliance controls, or a documented equivalent.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "major",
+          "description": "Each uploaded object can start a claim workflow, but no claim-level readiness barrier or idempotent execution-start mechanism is described. Multiple attachments and duplicate S3 notifications could start premature or repeated claim processing.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+        },
+        {
+          "severity": "major",
+          "description": "Durable workflow state is not a complete recovery design. Retry/Catch behavior and recovery paths for failed checks, audit writes, callbacks, and email delivery are unspecified; a failed execution does not automatically resume successfully merely because Step Functions retains its state.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "Conditional DynamoDB writes do not make decision persistence, SendTaskSuccess, audit writes, and SES delivery one atomic operation. Define idempotency keys, recoverable intermediate states, and reconciliation for failures between these actions, including ambiguous email-send outcomes.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the human-wait implementation explicit: use a Standard workflow, identify the callback-token task and secure token storage/retrieval, configure the 14-day timeout, and define the customer-facing outcome when that timeout expires.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Decision handler-to-Claims table edge is typed as read even though its label and purpose include recording a decision; represent both the conditional write and the read.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The upload requirements promise short-lived URLs and size/type restrictions, but no expiration or signed upload constraints are selected; post-upload validation alone does not prevent oversized objects from being uploaded.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless workflow components are well chosen, but immutable auditing, claim-level start coordination, and recoverable cross-service side effects need concrete implementation."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Immutable audit retention is asserted without an enforcement mechanism. S3 versioning and KMS encryption alone do not prevent permanent version deletion; define Object Lock retention and its governance/compliance controls, or a documented equivalent.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+        },
+        {
+          "severity": "major",
+          "description": "Each uploaded object can start a claim workflow, but no claim-level readiness barrier or idempotent execution-start mechanism is described. Multiple attachments and duplicate S3 notifications could start premature or repeated claim processing.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+        },
+        {
+          "severity": "major",
+          "description": "Durable workflow state is not a complete recovery design. Retry/Catch behavior and recovery paths for failed checks, audit writes, callbacks, and email delivery are unspecified; a failed execution does not automatically resume successfully merely because Step Functions retains its state.",
+          "evidence": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "Conditional DynamoDB writes do not make decision persistence, SendTaskSuccess, audit writes, and SES delivery one atomic operation. Define idempotency keys, recoverable intermediate states, and reconciliation for failures between these actions, including ambiguous email-send outcomes.",
+          "evidence": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the human-wait implementation explicit: use a Standard workflow, identify the callback-token task and secure token storage/retrieval, configure the 14-day timeout, and define the customer-facing outcome when that timeout expires.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Decision handler-to-Claims table edge is typed as read even though its label and purpose include recording a decision; represent both the conditional write and the read.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The upload requirements promise short-lived URLs and size/type restrictions, but no expiration or signed upload constraints are selected; post-upload validation alone does not prevent oversized objects from being uploaded.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The explicit validation on-failure destination is appropriate, but the workflow still needs enforced audit immutability, claim-level coordination, and a complete idempotent recovery strategy."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The outbox poller is shown only at regional scope while its RDS target is private. Define the Lambda VPC attachment, subnet routing, and security-group permissions needed to reach the database; regional placement alone does not establish that connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-rds.html"
+        },
+        {
+          "severity": "major",
+          "description": "Idempotent document upserts do not prevent an older product update from overwriting a newer price. The queue has no stated ordering guarantee; add product-version checks, ordered per-product processing, or authoritative re-reads that prevent stale events from regressing the index and cache.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The promised short cache expiry needs application-side enforcement. DynamoDB TTL deletion is asynchronous and can take days, so readers must check the expiry timestamp rather than treat record existence as a valid cache hit; cache-miss population is also not shown.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html"
+        },
+        {
+          "severity": "major",
+          "description": "OpenSearch access protection is unspecified. Define the domain's network exposure, restrictive access policies and workload permissions, encryption at rest, and node-to-node encryption rather than leaving the search endpoint's security configuration implicit.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security.html"
+        },
+        {
+          "severity": "major",
+          "description": "RDS automated backups and Multi-AZ are specified, but encryption at rest is not. Explicitly enable encryption for the authoritative database and its associated snapshots and backups.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The one-minute freshness target is not translated into an operational latency budget: specify the poller's invocation mechanism and cadence, queue batching/concurrency, index refresh behavior, and an end-to-end freshness alarm.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cost-first priority needs a clearer baseline: size and price the continuously running Fargate, ALB, Multi-AZ RDS, and search capacity, and identify which components can realistically scale to zero without violating latency or availability assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The relational-database-to-poller read arrow is reversed relative to the initiating actor, and the initial-load arrow omits the export/indexing worker and its handoff to live changes; clarify these logical flows without implying a native generic RDS-to-OpenSearch bulk integration.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The outbox, queue, and derived search index form a sensible foundation, but database connectivity, update ordering, cache expiry, security configuration, and cost sizing remain unfinished."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The outbox poller is shown only at regional scope while its RDS target is private. Define the Lambda VPC attachment, subnet routing, and security-group permissions needed to reach the database; regional placement alone does not establish that connectivity.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/services-rds.html"
+        },
+        {
+          "severity": "major",
+          "description": "Idempotent document upserts do not prevent an older product update from overwriting a newer price. The queue has no stated ordering guarantee; add product-version checks, ordered per-product processing, or authoritative re-reads that prevent stale events from regressing the index and cache.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The promised short cache expiry needs application-side enforcement. DynamoDB TTL deletion is asynchronous and can take days, so readers must check the expiry timestamp rather than treat record existence as a valid cache hit; cache-miss population is also not shown.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html"
+        },
+        {
+          "severity": "major",
+          "description": "OpenSearch access protection is unspecified. Define the domain's network exposure, restrictive access policies and workload permissions, encryption at rest, and node-to-node encryption rather than leaving the search endpoint's security configuration implicit.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security.html"
+        },
+        {
+          "severity": "minor",
+          "description": "The one-minute freshness target is not translated into an operational latency budget: specify the poller's invocation mechanism and cadence, queue batching/concurrency, index refresh behavior, and an end-to-end freshness alarm.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The cost-first priority needs a clearer baseline: size and price the continuously running Fargate, ALB, Multi-AZ RDS, and search capacity, and identify which components can realistically scale to zero without violating latency or availability assumptions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The relational-database-to-poller read arrow is reversed relative to the initiating actor, and the initial-load arrow omits the export/indexing worker and its handoff to live changes; clarify these logical flows without implying a native generic RDS-to-OpenSearch bulk integration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-ALB invoke arrow misrepresents the authentication flow. The node rationale identifies the intended ALB authentication integration, but the diagram should show the ALB's authentication action and browser redirects rather than Cognito initiating API requests.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Explicit RDS encryption improves the baseline, while the otherwise appropriate search pipeline still needs private database connectivity, ordering safeguards, enforced cache expiry, and cost validation."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "B supplies an authenticated presigned-upload path that A lacks, while preserving the same appropriate services and explicit backup settings; both retain significant subscription and asynchronous-processing gaps."
+    },
+    {
+      "scenario": "claims-approval-workflow",
+      "better": "tie",
+      "why": "The designs are materially equivalent against the request: B names the validation on-failure destination more explicitly, but both share the same unresolved audit immutability, workflow-start coordination, and recovery weaknesses."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "B",
+      "why": "B has a small security advantage through explicit RDS encryption, with essentially the same cost profile and shared implementation gaps; its reversed authentication arrow is a correctable notation issue, not a different architecture."
+    }
+  ]
+}

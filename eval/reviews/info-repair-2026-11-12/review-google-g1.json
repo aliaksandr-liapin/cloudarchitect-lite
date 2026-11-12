@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Unlike Design B, the S3 buckets and DynamoDB table do not explicitly declare server-side encryption configurations in their node metadata (though AWS encrypts S3 and DynamoDB by default).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "A single SQS failed-invocation queue is shared between the S3-triggered Thumbnail Lambda (asynchronous invocation) and the DynamoDB Stream-triggered Welcome email Lambda (event source mapping), mixing two different event schemas in one queue and describing both as asynchronous Lambda invocations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch logging/metrics edges are only drawn from Blog API Lambda and the SQS queue, omitting Thumbnail Lambda, Welcome email Lambda, and API Gateway.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-architected, cost-effective serverless blog design that meets all functional, caching, latency, and backup/versioning requirements, missing only explicit encryption configuration metadata."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "A single SQS failed-invocation queue is shared between the S3-triggered Thumbnail Lambda (asynchronous invocation) and the DynamoDB Stream-triggered Welcome email Lambda (event source mapping), mixing different payload schemas in one DLQ and labeling both as asynchronous invocations.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch edges are only drawn from Blog API Lambda and the SQS queue, omitting Thumbnail Lambda, Welcome email Lambda, and API Gateway.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An excellent, production-ready serverless architecture that satisfies all functional, global latency, cost, backup, and encryption-at-rest requirements."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Search indexer Lambda function is placed in the Region container outside the VPC, yet it connects directly to RDS Proxy and ElastiCache in Private subnet A (and the NAT Gateway rationale states the indexer uses the NAT Gateway); Lambda must be configured to attach to VPC private subnets to reach private RDS Proxy and ElastiCache endpoints.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The VPC only defines a single private subnet (Private subnet A in AZ A), whereas Amazon RDS and RDS Proxy require a DB subnet group spanning at least two Availability Zones, and single-AZ placement leaves all compute and data tiers without zone fault tolerance.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"
+        },
+        {
+          "severity": "major",
+          "description": "Despite the user priority to minimize cost, the design includes Amazon RDS Proxy (which carries continuous per-vCPU hourly charges) for a containerized API that can pool connections natively and a single Lambda function that runs only once per minute, and incorrectly claims AWS Fargate behind an ALB has scale-to-zero-friendly billing.",
+          "evidence": "https://aws.amazon.com/rds/proxy/pricing/"
+        },
+        {
+          "severity": "minor",
+          "description": "The diagram models two separate Application Load Balancer nodes (one in Public subnet A and one in Public subnet B) even though an ALB is a single multi-AZ logical resource and all target containers exist only in Private subnet A.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Storing the database synchronization watermark in ElastiCache risks losing sync state on cache eviction or node restart, which could cause missed updates or require a full 2-million-product re-index.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not explicitly configured on the RDS database, ElastiCache cluster, or OpenSearch domain.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the search, caching, and 1-minute sync requirements, but suffers from VPC placement errors for the indexer Lambda, a single private subnet, redundant ALB nodes, and unnecessary fixed costs from RDS Proxy."
+    },
+    {
+      "scenario": "product-search-cost",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The Search indexer Lambda function is placed in the Region container outside the VPC, but it connects to RDS Proxy and ElastiCache in Private subnet A (and the NAT Gateway rationale states the indexer uses the NAT Gateway); Lambda must be attached to the VPC private subnets to access private RDS Proxy and ElastiCache endpoints.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html"
+        },
+        {
+          "severity": "major",
+          "description": "The VPC only includes a private subnet in Availability Zone A (Private subnet A), whereas Amazon RDS and RDS Proxy require subnets in at least two Availability Zones and placing all containers, cache, and database resources in one AZ creates a single point of failure.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"
+        },
+        {
+          "severity": "major",
+          "description": "Despite the enabled priority to minimize cost, the design adds Amazon RDS Proxy (incurring continuous hourly per-vCPU charges) for a containerized API that pools connections natively and a single Lambda running once per minute, and misleadingly claims Fargate behind an ALB offers scale-to-zero-friendly billing.",
+          "evidence": "https://aws.amazon.com/rds/proxy/pricing/"
+        },
+        {
+          "severity": "minor",
+          "description": "Storing the database synchronization watermark in ElastiCache is fragile because cache evictions or restarts would lose the watermark state.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid core pattern for product search and caching with explicit encryption at rest and a single logical ALB, though held back by placing the VPC-dependent Lambda outside the VPC, defining only one private subnet, and adding unnecessary RDS Proxy costs."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design invents a requirement (R15) to enforce Amazon Cognito authentication at the Application Load Balancer in front of a legacy Java monolith being lifted and shifted in three months with minimal code changes; forcing ALB-level Cognito login alters the application's existing authentication behavior and requires user migration or header integration not requested by the user.",
+          "evidence": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html"
+        },
+        {
+          "severity": "major",
+          "description": "The architecture places a single NAT Gateway in Public subnet A to serve instances across two Availability Zones, creating a single-AZ point of failure that violates the multi-AZ high-availability requirement (R3), and leaves the NAT Gateway node completely disconnected with no edges.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Database Migration Service and AWS DataSync are placed in the Region container with no network connectivity (such as Site-to-Site VPN or Direct Connect) shown between the legacy data center and the VPC.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch has an incoming edge only from Java monolith instance A, omitting Java monolith instance B, RDS, and the Application Load Balancer despite its stated purpose.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the core lift-and-shift components (EC2, RDS Multi-AZ, EFS, DMS, DataSync) but introduces an unrequested and disruptive ALB Cognito authentication layer and relies on a single, disconnected NAT Gateway across two AZs."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design provisions only a single NAT Gateway in Public subnet A for a two-AZ high-availability architecture, creating an Availability Zone single point of failure for outbound traffic from Private subnet B, and leaves the NAT Gateway node completely disconnected with zero edges.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "minor",
+          "description": "AWS Database Migration Service and AWS DataSync are placed in the Region container without showing private network connectivity (VPN or Direct Connect) from the legacy data center or VPC placement for the DMS replication instance.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch only has an incoming edge from Java monolith instance A, omitting Instance B, RDS, and the ALB.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A clean, practical lift-and-shift architecture using EC2 across two AZs, RDS Multi-AZ for MySQL, EFS for shared NFS uploads, and DMS/DataSync for migration, with minor graph connectivity gaps around the NAT Gateway and CloudWatch."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "Design B is identical to Design A in topology and service selection but explicitly specifies server-side encryption on all three S3 buckets and the DynamoDB table."
+    },
+    {
+      "scenario": "product-search-cost",
+      "better": "B",
+      "why": "Design B correctly models a single logical Application Load Balancer instead of duplicating two ALB nodes as in Design A, and explicitly configures encryption at rest on RDS and ElastiCache."
+    },
+    {
+      "scenario": "legacy-lift-and-shift",
+      "better": "B",
+      "why": "Design B stays faithful to the 3-month lift-and-shift with minimal code changes, whereas Design A injects an unrequested Amazon Cognito authentication layer at the ALB that would conflict with a legacy monolith."
+    }
+  ]
+}

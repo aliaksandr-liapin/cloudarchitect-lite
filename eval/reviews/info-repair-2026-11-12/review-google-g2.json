@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail Generator Lambda writes thumbnails back to the same Photo Uploads Bucket that triggers it on S3 ObjectCreated events without specifying prefix/suffix filtering or a separate destination bucket, creating a risk of infinite recursive invocation loops.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The user explicitly requested a REST API with caching and low global latency, but no API Gateway caching or CloudFront distribution path is configured for the REST API, nor is CloudFront connected to the Photo Uploads Bucket to serve images globally.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito User Pool (N2), Subscriber DLQ (N10), and CloudWatch (N14) are orphan nodes with no edges connecting them to the rest of the architecture.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Users has a direct write edge to Photo Uploads Bucket without showing how presigned URLs are obtained via the authenticated API, encryption at rest is not explicitly configured on data stores, and Thumbnail Generator Lambda lacks a dead-letter queue.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A cost-effective serverless blog design that satisfies the backup and versioning priority, but omits REST API caching, leaves three nodes disconnected, and risks recursive S3-Lambda triggers on photo uploads."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail Generator Lambda writes generated thumbnails back to the same Photo Uploads Bucket that triggers it on ObjectCreated events without specifying prefix/suffix filters or a separate output bucket, risking a recursive trigger loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The prompt requires a REST API with caching and low latency globally, but REST API is accessed directly in us-east-1 without API Gateway stage caching or CloudFront caching, and Photo Uploads Bucket is not connected to CloudFront.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito User Pool (N15), Subscriber Queue DLQ (N9), Thumbnail DLQ (N13), and CloudWatch (N14) have zero connecting edges in the architecture graph.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Users writes directly to Photo Uploads Bucket without illustrating an authenticated presigned URL generation flow through the API.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid serverless selection that improves on Design A by configuring encryption at rest and adding a thumbnail DLQ node, but still omits REST API caching, leaves four auxiliary nodes disconnected, and writes thumbnails back to the triggering S3 bucket."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design provisions an always-on NAT Gateway specifically for Fargate egress to S3 and CloudWatch instead of using a free Amazon S3 Gateway VPC Endpoint, adding over $30/month in fixed NAT hourly and data-processing costs to a 25-minute nightly job meant to be cheap.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Notify managers (N6) claims to satisfy idempotent email notifications across 40 managers on retry (R13), but includes no state store to track which managers have already been emailed if an invocation fails partway through.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Generating S3 presigned URLs inside a Lambda function at 02:00 binds the URL expiration to the Lambda execution role temporary STS session credentials, which may expire before managers open their emails later in the day.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Claims to prevent the 25-minute report query from degrading production Aurora workloads (R15) without specifying an Aurora Reader endpoint or read replica.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-connected EventBridge and Fargate batch architecture that meets all functional and security requirements, though using a 24/7 NAT Gateway for S3 access instead of a free S3 Gateway VPC endpoint undermines the low-cost goal."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Routes Fargate S3 traffic through a 24/7 NAT Gateway instead of a free S3 Gateway VPC Endpoint, adding unnecessary fixed monthly and per-GB charges to a simple 25-minute nightly batch job.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Omits encryption at rest configuration on Existing Aurora PostgreSQL (N3).",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Claims Notify managers (N6) achieves idempotent email delivery on Lambda retry (R13) without any persistent state store to record per-manager delivery status across partial failures.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Relies on Lambda IAM role temporary credentials to sign S3 presigned URLs at 02:00 without accounting for STS session expiration before managers read their emails, and does not specify an Aurora reader endpoint for R15.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Nearly identical to Design A with a clean EventBridge-to-Fargate workflow, but omits encryption configuration on Aurora and incurs unnecessary NAT Gateway charges for S3 access."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "PDF extraction and indexing worker (N8) is triggered by an S3 ObjectCreated event (which only supplies object metadata) but lacks a read edge to Manual PDF archive (N7) to fetch the PDF bytes and lacks an invoke edge to Managed foundation model (N6) to generate the vector embeddings it claims to create.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Uses Amazon OpenSearch Service to store and expire 30-day customer conversation history instead of Amazon DynamoDB with native item-level TTL, and builds a custom Lambda ingestion pipeline instead of using Amazon Bedrock Knowledge Bases.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Does not specify encryption at rest on Manual PDF archive (N7) or Manual search and conversation index (N9), and lacks an SQS buffer in front of the ingestion Lambda for the initial 20,000-PDF bulk load.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Covers the core RAG and authentication requirements using Cognito, API Gateway, Lambda, Bedrock, and OpenSearch, but omits the ingestion worker connections to S3 and Bedrock and overloads OpenSearch with 30-day chat history."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "PDF extraction and indexing worker (N8) claims to extract text from PDFs and generate embeddings, but has no read connection to Manual PDF archive (N7) to retrieve the PDF file after the S3 event notification and no invoke connection to Managed foundation model (N6) to create embeddings.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Stores 30-day customer conversation history in Amazon OpenSearch Service instead of Amazon DynamoDB with native TTL, and implements custom PDF chunking and indexing instead of leveraging Amazon Bedrock Knowledge Bases.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Omits encryption at rest configuration on Manual search and conversation index (N9), models CloudWatch metric monitoring on the failure queue as a write edge from SQS, and lacks a queue buffer in front of the ingestion Lambda for bulk-loading 20,000 PDFs.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Very similar to Design A with slightly better S3 encryption configuration, but shares the missing S3-read and Bedrock-embedding edges on the ingestion worker as well as the suboptimal use of OpenSearch for 30-day conversation history."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "B",
+      "why": "Both designs miss REST API caching and leave auxiliary nodes disconnected, but Design B explicitly configures encryption at rest on all S3 buckets and DynamoDB and includes a dead-letter queue node for failed thumbnail generation events."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "A",
+      "why": "The two designs are nearly identical, but Design A explicitly configures encryption at rest on the Aurora PostgreSQL database and has slightly more complete requirement mappings."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "B",
+      "why": "Both designs share the same architecture and missing ingestion worker edges, but Design B explicitly configures encryption at rest on the Manual PDF archive S3 bucket."
+    }
+  ]
+}

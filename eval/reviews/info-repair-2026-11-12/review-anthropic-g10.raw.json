@@ -1,0 +1,218 @@
+{
+  "reviews": [
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The presigned URLs are generated inside the Fargate task using temporary task-role credentials. A presigned URL made with temporary credentials stops working when those credentials expire, whatever expiry is requested. The managers' links may therefore die within hours, before they open the 02:00 email. The design does not say how long the links must last, or use a longer-lived signer such as a dedicated IAM user or a separate signing step.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A NAT gateway has a fixed monthly cost and per-GB processing charges that are large next to a one-job-a-night workload and a 'cheap' brief. An S3 gateway endpoint and interface endpoints, or a public-subnet task with tight security groups, would cost less. S3 traffic going through the NAT adds data-processing charges.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "There is no ECS cluster node, and the retry or failure path is thin. The CloudWatch alarm is only loosely described, with no failed-task alert, so a missed nightly run could go unnoticed. SES sandbox and verified-identity setup is not mentioned.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The S3 bucket and Aurora encryption settings are not stated, and public-access blocking is not explicit. S3 encrypts new objects by default, which limits the impact.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A workable, simple Fargate-based nightly job with S3 lifecycle retention and SES delivery, weakened by presigned-URL lifetime, NAT cost and thin failure alerting."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The presigned URLs are generated inside the Fargate task using temporary task-role credentials. A presigned URL made with temporary credentials stops working when those credentials expire, whatever expiry is requested. The managers' links may therefore die within hours, before they open the 02:00 email.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "A NAT gateway has a fixed monthly cost and per-GB processing charges that are large for one nightly job under a 'cheap' brief. VPC endpoints or a public-subnet task would cost less.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Aurora is marked 'AWS-managed' encryption, but it is an existing database whose encryption state is unknown. The failure alerting is thin, and SES sandbox setup is not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Essentially the same design as A, with encryption at rest stated for both Aurora and S3, but it shares the presigned-URL lifetime, NAT cost and thin alerting weaknesses."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design does not name Origin Access Control or a bucket policy as the way CloudFront reads the private bucket. It also does not say the ACM certificate must be in us-east-1, even though the node is placed in 'AWS Region'.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "S3 encryption is not stated, and CloudWatch monitoring is only a basic add-on. There is no mention of a default root object or custom error pages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A correct, minimal, low-cost CloudFront, S3, ACM and Route 53 static site that fits a bakery brochure, with only small omissions in how the origin is secured."
+    },
+    {
+      "scenario": "brochure-site",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design does not name Origin Access Control or a bucket policy as the way CloudFront reads the private bucket. It also does not say the ACM certificate must be in us-east-1.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch monitoring is only a basic add-on. There is no mention of a default root object or custom error pages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Identical to A in structure, but it explicitly states S3 encryption at rest, which is marginally clearer for the security baseline."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R12 (no duplicate emails or overwritten reports on a re-run) is claimed as satisfied by Step Functions and Fargate, but no mechanism implements it. There is no DynamoDB or S3 conditional write, no idempotency key, and no per-date marker. Step Functions retries can therefore re-run the task or re-send emails.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_mitigate_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "major",
+          "description": "The NAT gateway rationale is wrong. It says the Fargate task must reach SES and Step Functions, but SES is called by the Notifier Lambda and Step Functions orchestrates the task. The task actually needs S3, Secrets Manager, ECR and CloudWatch Logs. VPC endpoints, including a free S3 gateway endpoint, would avoid the NAT gateway's fixed cost and processing charges and contradict the 'cheap' goal less.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/vpc-endpoints.html"
+        },
+        {
+          "severity": "major",
+          "description": "Presigned URLs are created by the Notifier Lambda with temporary role credentials, so they expire when those credentials expire, whatever expiry is requested. The managers' links can therefore die within hours of being sent.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is wired only from Step Functions, although the node text claims task logs too. There is no DLQ or failure notification such as SNS for a failed notifier. SES sandbox setup and Aurora security-group rules are not mentioned.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A sensible EventBridge, Step Functions, Fargate and Lambda design that meets the serverless priority but overstates idempotency, misdescribes the NAT's purpose and has an expiring-link weakness."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "R12 (no duplicate emails or overwritten reports on a re-run) is claimed as satisfied, but no mechanism implements it. There is no DynamoDB or S3 conditional write, no idempotency key, and no per-date marker, so Step Functions retries can re-run the task or re-send emails.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_mitigate_interaction_failure_idempotent.html"
+        },
+        {
+          "severity": "major",
+          "description": "The NAT gateway rationale is wrong. It says the Fargate task must reach SES and Step Functions, but SES is called by the Notifier Lambda. The task actually needs S3, Secrets Manager, ECR and CloudWatch Logs. VPC endpoints would be cheaper and more accurate.",
+          "evidence": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/vpc-endpoints.html"
+        },
+        {
+          "severity": "major",
+          "description": "Presigned URLs are created with temporary Lambda role credentials, so they expire when those credentials expire, whatever expiry is requested. The managers' links can therefore die within hours of being sent.",
+          "evidence": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html"
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch is wired only from Step Functions, and there is no DLQ or SNS notification path. Aurora is marked 'AWS-managed' encryption although it is an existing database whose encryption state is unknown.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Same architecture as A with Aurora encryption stated explicitly, and it carries the same idempotency, NAT-rationale and presigned-URL weaknesses."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "nightly-reports",
+      "better": "B",
+      "why": "The designs are structurally identical and share the same defects. B marginally edges ahead by stating encryption at rest for both data stores."
+    },
+    {
+      "scenario": "brochure-site",
+      "better": "B",
+      "why": "The designs are structurally identical and both correct. B explicitly states S3 encryption, which is marginally better for the security baseline."
+    },
+    {
+      "scenario": "nightly-reports-serverless",
+      "better": "B",
+      "why": "The designs are structurally identical with the same major weaknesses. B marginally edges ahead by stating encryption at rest on Aurora."
+    }
+  ]
+}

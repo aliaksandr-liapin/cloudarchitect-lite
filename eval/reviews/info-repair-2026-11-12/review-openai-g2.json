@@ -1,0 +1,303 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog-backups",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The direct author-to-S3 upload path has no defined authorization mechanism. Cognito user-pool authentication does not itself provide AWS credentials for S3; specify author-scoped presigned uploads or an identity pool with restricted temporary credentials.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-identity.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes into its triggering bucket, but no input/output prefixes, notification filters, or handler guard are specified. Thumbnail writes therefore risk recursively triggering more thumbnail invocations.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Subscriber DLQ is listed but is not associated with the subscriber queue through a redrive policy. Define the dead-letter target and maxReceiveCount; merely creating the DLQ does not capture failed messages.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The S3-triggered thumbnail function has no post-retry failure destination or recovery path. Configure an asynchronous failure destination or DLQ and a replay procedure so exhausted events are not discarded.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Make the S3 access boundary explicit: use a private regular S3 origin with CloudFront origin access control, Block Public Access, and narrowly scoped application permissions. The packet does not establish that buckets are public, but it also does not specify these controls.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Only static-site caching is defined. Public REST reads still go directly to the regional backend, and photo delivery is unspecified; define safe read-cache policies and a CDN delivery path without caching subscriber or other private responses.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless service selection and required S3 versioning/DynamoDB PITR are sound, but upload authorization, thumbnail trigger isolation, and asynchronous failure handling need implementation-ready definitions."
+    },
+    {
+      "scenario": "myblog-backups",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 1,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The direct author-to-S3 upload path has no defined authorization mechanism. The Cognito user pool and API authorizer do not authorize these S3 writes; specify author-scoped presigned uploads or restricted identity-pool credentials.",
+          "evidence": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-identity.html"
+        },
+        {
+          "severity": "major",
+          "description": "The thumbnail function writes into its triggering bucket without a specified input/output prefix separation, notification filter, or handler guard. This risks recursive invocations when thumbnails are written.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Subscriber Queue DLQ has no defined source-queue redrive policy. Specify its association and maxReceiveCount so failed email messages actually reach it.",
+          "evidence": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Thumbnail DLQ is described as a failure destination but is not attached to the thumbnail function through an asynchronous invocation configuration. Define the OnFailure destination or Lambda DLQ association, permissions, and replay procedure.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-retain-records.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Encryption labels do not establish private access or least privilege. Specify a private S3 origin with CloudFront origin access control, Block Public Access, and restricted author and Lambda permissions.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Static assets are cached, but public REST reads still use the regional backend directly and photo delivery is unspecified. Define appropriate public-read caching and CDN photo delivery while excluding private responses.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design covers the core functions and backup priority, but its additional thumbnail DLQ remains unattached and the upload authorization and recursive-trigger risks remain unresolved."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A dedicated, continuously provisioned NAT Gateway adds hourly charges to a workload that runs for only about 25 minutes daily. A single NAT is cheaper than multiple NAT gateways, but does not substantiate the low-cost claim; compare reusing existing egress, a tightly restricted public-subnet task, or appropriately priced endpoints.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "major",
+          "description": "Notification idempotency is claimed but no durable run/manager send state or deduplication mechanism is defined. Duplicate asynchronous delivery or a retry after partially sending the 40 emails can resend notifications.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "Querying the existing Aurora cluster does not establish the claimed protection of production workload performance. Specify reader/replica selection where available and query concurrency, timeout, and load controls; a reader endpoint can offload read connections from the writer but is not itself a complete isolation guarantee.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Endpoints.Reader.html"
+        },
+        {
+          "severity": "major",
+          "description": "Least-privilege access is not defined for the task, notifier, or database connection. Specify restricted task/notifier IAM policies, a read-only database principal with protected authentication, and report-bucket access limited to the necessary prefixes and operations.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/permissions-management.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Presigned URLs are bearer links, not manager identity checks. Clarify that forwarding a link permits another holder to download it, choose an expiration compatible with the signing credentials, or add authenticated manager access if the inferred intended-recipient-only requirement is strict.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Specify the 02:00 timezone and the nightly completion alarm's evaluation window and missing-data behavior. Also document how task launch failures and nonzero container exits lead to a rerun rather than only an alert.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Fargate, S3 lifecycle retention, and SES fit the workload well, but dedicated NAT costs, unimplemented notification idempotency, and unspecified database access controls weaken the simple-and-cheap objective."
+    },
+    {
+      "scenario": "nightly-reports",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 3,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 1,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A dedicated NAT Gateway incurs hourly charges despite only about 25 minutes of daily task execution. The claim that one NAT keeps cost low needs a comparison with existing egress, a tightly restricted public-subnet task, or appropriately priced endpoints.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html"
+        },
+        {
+          "severity": "major",
+          "description": "The design marks notification idempotency as satisfied without defining durable per-run/per-manager send state. Duplicate asynchronous invocations and partial-batch retries can email managers again.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async-error-handling.html"
+        },
+        {
+          "severity": "major",
+          "description": "No reader/replica selection or query resource controls support the claim that reporting will not degrade production Aurora traffic. Define read routing and bounded query load, recognizing that reader connections alone do not guarantee complete workload isolation.",
+          "evidence": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Endpoints.Reader.html"
+        },
+        {
+          "severity": "major",
+          "description": "The task and notifier lack defined least-privilege IAM permissions, and database authentication and read-only privileges are unspecified. Define these controls together with restricted report-bucket access.",
+          "evidence": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/permissions-management.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Time-limited presigned URLs can be used by anyone possessing them. State the accepted bearer-link risk and expiration, or require authenticated manager authorization if access must be bound to the intended recipient.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Choose the schedule timezone, define the missing-completion alarm precisely, and document rerun handling for failed task launches and container exits. Alerting alone does not complete a failed nightly run.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The execution and storage approach is appropriate for a 25-minute nightly job, but fixed NAT expense and gaps in deduplication, permissions, and production-query protection remain."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The promised 30-day expiry is not backed by a concrete history-specific deletion mechanism. Define separate time-based history indices with an Index State Management deletion policy, or an explicit cleanup process, and a read-time cutoff; timestamps and a write-edge expiry label do not establish retention.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ism.html"
+        },
+        {
+          "severity": "major",
+          "description": "The OpenSearch domain contains customer conversations, but restricted domain access and encryption settings are unspecified. Define backend-only access, scoped IAM/domain permissions, HTTPS, encryption at rest and node-to-node encryption so clients cannot bypass the handler's customer-scoped access logic.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "For an HTTP API, express the Cognito integration as a JWT authorizer with the user-pool issuer, intended audience, and appropriate route scopes. The JWT edge suggests the correct intent, but 'Cognito user pool' is ambiguous with the distinct REST API authorizer type.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Embedding creation is stated without identifying an embedding model or invocation path, and query embedding generation is not described. Specify compatible ingestion/query embeddings and dimensions, or explicitly choose text-only retrieval.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The implementation assumes selectable-text PDFs without clearly recording that decision, and no concrete usage or ingestion-size assumptions are chosen. State the searchable-PDF assumption, handling of scanned or oversized files, bulk-load concurrency, and initial model/OpenSearch capacity and cost limits.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The failure queue and alarm are useful, but ingestion replay and idempotency are unspecified. Use deterministic document/chunk identifiers and version-aware replacement so duplicate events or reprocessing do not accumulate duplicate or stale passages.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed-model retrieval architecture supports authenticated, cited answers and includes useful ingestion failure handling, but history expiry, OpenSearch protection, and several retrieval implementation assumptions need clarification."
+    },
+    {
+      "scenario": "support-chatbot",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "A concrete mechanism for deleting conversation history after 30 days is missing. Specify history-only time-based indices and an Index State Management deletion policy, or explicit document cleanup, plus a read-time cutoff; ensure retention actions cannot delete the manual corpus.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ism.html"
+        },
+        {
+          "severity": "major",
+          "description": "Explicit S3 encryption does not address protection of the OpenSearch conversation store. Define restricted backend-only domain access, scoped IAM/domain permissions, HTTPS, encryption at rest and node-to-node encryption, preserving customer isolation against direct domain access.",
+          "evidence": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Configure the HTTP API with a JWT authorizer using the Cognito issuer and intended audience/scopes. The current 'Cognito user pool' label should not be interpreted as the REST API-specific authorizer type; the JWT edge otherwise indicates a valid approach.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The architecture does not identify the embedding model, its invocation path, or query embedding generation. Specify compatible document/query vectors and index dimensions, or state that retrieval is deliberately text-only.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Record the selectable-text PDF assumption and choose actual usage, file-size, bulk-ingestion concurrency, model/token budget, and OpenSearch sizing assumptions. Scanned or oversized PDFs need a defined rejection or alternate-processing path.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Define deterministic chunk identifiers, version-aware updates, and a failure-queue replay procedure. A failure destination preserves failed invocation records but does not itself prevent duplicate or stale indexed content during retries and reprocessing.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The design offers a suitable managed RAG foundation with authentication, citations, and ingestion failure capture, while leaving enforceable history retention, domain security, and retrieval sizing details unresolved."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog-backups",
+      "better": "tie",
+      "why": "Both satisfy the explicit S3 versioning and DynamoDB PITR priority and use the same core paths; B names an additional thumbnail DLQ but does not attach it, so it does not yet resolve the shared operational weaknesses."
+    },
+    {
+      "scenario": "nightly-reports",
+      "better": "tie",
+      "why": "The execution, retention, email, monitoring, and NAT-cost characteristics are effectively identical; A's additional encryption label on the existing database does not resolve the shared deduplication, access-control, or workload-isolation gaps."
+    },
+    {
+      "scenario": "support-chatbot",
+      "better": "tie",
+      "why": "Both have equivalent authenticated retrieval and failure-handling paths and the same retention and OpenSearch security gaps; B's explicit S3 encryption largely documents an existing service baseline rather than a material architectural improvement."
+    }
+  ]
+}

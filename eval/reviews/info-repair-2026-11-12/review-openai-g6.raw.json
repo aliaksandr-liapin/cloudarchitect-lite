@@ -1,0 +1,273 @@
+{
+  "reviews": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design claims cross-AZ availability but gives only one subnet placement for the ALB and EKS, with no worker-node or pod distribution specified. Explicitly document load-balancer subnet associations, worker capacity in both AZs, replica placement and disruption handling; the datastore multiAz flags do not establish compute resilience.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R9 calls for an ingress controller, but none is identified. Specify the controller, Kubernetes Service/Ingress resources, target registration and certificate provisioning rather than leaving ALB-to-EKS routing as an unexplained integration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Private placement and datastore encryption are useful, but workload IAM permissions, database credentials, security-group restrictions and database/cache transport encryption are not specified. Define service-level access boundaries and secret handling before implementation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch and X-Ray are destinations rather than a complete telemetry implementation. Identify log collectors, metric collection, application trace instrumentation/exporters, retention settings and actionable alarms.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The private-subnet design does not show how workloads reach container registries, telemetry endpoints or other required external dependencies. Document the intended outbound connectivity and its behavior during an AZ failure.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The service choices fit the Kubernetes migration, but compute HA and implementation details remain unresolved; documentation-dependent findings throughout this review are conservatively rated minor because official AWS documentation could not be checked."
+    },
+    {
+      "scenario": "k8s-microservices-ha",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The design claims cross-AZ availability but gives only one subnet placement for the ALB and EKS, with no worker-node or pod distribution specified. Explicitly document load-balancer subnet associations, worker capacity in both AZs, replica placement and disruption handling; the datastore multiAz flags do not establish compute resilience.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "R9 calls for an ingress controller, but none is identified. Specify the controller, Kubernetes Service/Ingress resources, target registration and certificate provisioning rather than leaving ALB-to-EKS routing as an unexplained integration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Private placement and datastore encryption are useful, but workload IAM permissions, database credentials, security-group restrictions and database/cache transport encryption are not specified. Define service-level access boundaries and secret handling before implementation.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "CloudWatch and X-Ray are destinations rather than a complete telemetry implementation. Identify log collectors, metric collection, application trace instrumentation/exporters, retention settings and actionable alarms.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The private-subnet design does not show how workloads reach container registries, telemetry endpoints or other required external dependencies. Document the intended outbound connectivity and its behavior during an AZ failure.",
+          "evidence": ""
+        }
+      ],
+      "summary": "This is an appropriate managed Kubernetes foundation, but it does not yet demonstrate the required multi-AZ compute resilience or specify the ingress, security and telemetry implementation."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The SNS-to-app HTTPS arrow leaves native push delivery underspecified. Identify the mobile push provider integration, platform application/endpoints, device-token registration and lifecycle, and recipient-specific subscriptions or publishing; clarify that the arrow represents logical delivery rather than an unexplained phone HTTPS subscription.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The direct upload is labelled presigned, but no authenticated URL-issuance operation is shown. Specify how the backend authorizes the upload, chooses an owner-scoped object key, limits URL lifetime and permissions, and keeps photos private.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The only database operation shown is saving a workout. The design does not explain friendship queries, trusted record comparisons, recipient selection, per-user data authorization or concurrent record updates, which are necessary to determine whose record was beaten and whom to notify.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Workout persistence and notification publication share one request-processing function without a stated recovery contract. Define request idempotency, handling of publication failure after a successful save, notification retries and failure capture, plus alarms for failed requests and delivery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not explicitly select DynamoDB on-demand capacity or settle the peak-traffic assumption. Document the billing mode, expected burst envelope, throttling/retry behavior and retention/lifecycle decisions so pay-per-use and New Year readiness are implementation choices rather than general service descriptions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The serverless service selection suits spiky mobile traffic, but native push delivery, authorized photo uploads and friend-record processing remain insufficiently specified."
+    },
+    {
+      "scenario": "mobile-backend",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "The SNS-to-app HTTPS arrow leaves native push delivery underspecified. Identify the mobile push provider integration, platform application/endpoints, device-token registration and lifecycle, and recipient-specific subscriptions or publishing; clarify that the arrow represents logical delivery rather than an unexplained phone HTTPS subscription.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The direct upload is labelled presigned, but no authenticated URL-issuance operation is shown. Specify how the backend authorizes the upload, chooses an owner-scoped object key, limits URL lifetime and permissions, and keeps photos private.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The only database operation shown is saving a workout. The design does not explain friendship queries, trusted record comparisons, recipient selection, per-user data authorization or concurrent record updates, which are necessary to determine whose record was beaten and whom to notify.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Workout persistence and notification publication share one request-processing function without a stated recovery contract. Define request idempotency, handling of publication failure after a successful save, notification retries and failure capture, plus alarms for failed requests and delivery.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The design does not explicitly select DynamoDB on-demand capacity or settle the peak-traffic assumption. Retention and photo preprocessing are also marked satisfied without concrete decisions; document these choices together with burst limits and throttling/retry behavior.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed serverless foundation matches the operating model, but the upload, native push and friend-record workflows need implementation-level decisions before deployment."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Per-device certificates are specified, but device authorization and lifecycle controls are not. Define certificate provisioning/revocation, device-scoped topic permissions, least-privilege rule and processor permissions, and how the processor binds the reading's device identity to an authenticated publisher rather than trusting an arbitrary payload identifier.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ingestion function combines registry lookup, persistence and SMS publication without explicit retry, failure-capture or idempotency behavior. Specify the IoT routing rule and recovery path, prevent duplicate readings/alerts on retries, and add alarms for ingestion failures, processing backlog and SMS delivery problems.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API JWT edge obscures the actual token flow. Show the dashboard obtaining a token and sending it with API requests, and specify the HTTP API authorizer's issuer, audience and claim handling rather than leaving 'Cognito' as the complete configuration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The 90-day window appears in purpose statements but not an explicit retention configuration. Define retention and deletion behavior, device/time query filtering, aggregation and pagination; one device produces 129,600 readings in 90 days, so an unrestricted raw-history response should not be the only dashboard query shape.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The fleet produces 72 million readings per day, yet the design gives no throughput or cost assumptions for per-reading Lambda execution, registry lookup and storage. Define acceptable repeated-alert behavior, SMS budgets and spending/delivery controls so prolonged out-of-range conditions do not create an uncontrolled notification bill.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The managed ingestion, ownership and dashboard components cover the main use cases, but device authorization, recovery, explicit retention and high-volume alert economics need further definition."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Per-device certificates are specified, but device authorization and lifecycle controls are not. Define certificate provisioning/revocation, device-scoped topic permissions, least-privilege rule and processor permissions, and how the processor binds the reading's device identity to an authenticated publisher rather than trusting an arbitrary payload identifier.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The ingestion function combines registry lookup, persistence and SMS publication without explicit retry, failure-capture or idempotency behavior. Specify the IoT routing rule and recovery path, prevent duplicate readings/alerts on retries, and add alarms for ingestion failures, processing backlog and SMS delivery problems.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Cognito-to-API JWT edge obscures the actual token flow. Show the dashboard obtaining a token and sending it with API requests, and specify the HTTP API authorizer's issuer, audience and claim handling rather than leaving 'Cognito' as the complete configuration.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The 90-day window appears in purpose statements but not an explicit retention configuration. Define retention and deletion behavior, device/time query filtering, aggregation and pagination; one device produces 129,600 readings in 90 days, so an unrestricted raw-history response should not be the only dashboard query shape.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The fleet produces 72 million readings per day, yet the design gives no throughput or cost assumptions for per-reading Lambda execution, registry lookup and storage. Define acceptable repeated-alert behavior, SMS budgets and spending/delivery controls so prolonged out-of-range conditions do not create an uncontrolled notification bill.",
+          "evidence": ""
+        }
+      ],
+      "summary": "The architecture addresses secure ingestion, owner-scoped history and SMS alerts at a conceptual level, but operational safeguards and concrete scale, retention and authorization decisions remain incomplete."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "k8s-microservices-ha",
+      "better": "tie",
+      "why": "Both select the same appropriate services and share the same unresolved compute-HA and implementation details; moving the Redis node's depicted placement between AZs does not establish a different resilience design when both specify multiAz."
+    },
+    {
+      "scenario": "mobile-backend",
+      "better": "tie",
+      "why": "The architectures and integration gaps are materially identical; A states somewhat clearer retention and preprocessing assumptions, but neither resolves native push delivery, presigned URL issuance or friend-record processing."
+    },
+    {
+      "scenario": "iot-telemetry",
+      "better": "tie",
+      "why": "Both implement the same ingestion, registry, storage, authorization and notification flows and share the same operational gaps; A's additional registry encryption annotation does not establish a materially different architecture."
+    }
+  ]
+}

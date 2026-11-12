@@ -1,0 +1,233 @@
+{
+  "reviews": [
+    {
+      "scenario": "order-events-cross-region",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Orders Table connects directly to Order Event Topic (SNS) via DynamoDB Streams, which is not a supported native integration; an AWS Lambda function or Amazon EventBridge Pipe is required between DynamoDB Streams and Amazon SNS.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Orders API is configured as an API Gateway HTTP API (apiType: HTTP) with a direct read edge to DynamoDB (Orders Table), but HTTP APIs do not support direct AWS service integrations with DynamoDB.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Email Lambda has no outbound connection to an email delivery service such as Amazon SES to send the confirmation emails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The dead-letter queue edges point from the DLQs to the source queues (SQS Redrive) rather than depicting the failure path from the source queues to the DLQs, and there is no replication edge shown between Orders Table and Orders Table DR.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A solid serverless fan-out architecture using SNS, SQS, DLQs, and DynamoDB Global Tables, but marred by invalid direct integrations from DynamoDB Streams to SNS and from an API Gateway HTTP API to DynamoDB."
+    },
+    {
+      "scenario": "order-events-cross-region",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Orders Table connects directly to Order Event Topic (SNS) via DynamoDB Streams, which is not a supported native integration; an AWS Lambda function or Amazon EventBridge Pipe is required between DynamoDB Streams and Amazon SNS.",
+          "evidence": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html"
+        },
+        {
+          "severity": "major",
+          "description": "Orders API is configured as an API Gateway HTTP API (apiType: HTTP) with a direct read edge to DynamoDB (Orders Table), but HTTP APIs do not support direct AWS service integrations with DynamoDB.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services-reference.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Email Lambda has no outbound connection to an email delivery service such as Amazon SES to send the confirmation emails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The dead-letter queue edges point from the DLQs to the source queues (SQS Redrive) rather than depicting the failure path from the source queues to the DLQs, and there is no replication edge shown between Orders Table and Orders Table DR.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-structured serverless event-driven design with independent SQS queues, DLQs, and DynamoDB Global Tables, but it omits required intermediary components between DynamoDB Streams and SNS and between the HTTP API and DynamoDB."
+    },
+    {
+      "scenario": "product-search",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Amazon Aurora invokes Sync Lambda directly without a change-data-capture stream, queue, or Dead-Letter Queue (DLQ), meaning transient Lambda or OpenSearch failures can lose price updates and leave the search index out of sync with the database.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Application Load Balancer is placed only in Public Subnet 2 (AZ 2) while Amazon ECS on Fargate is placed only in Private Subnet 1 (AZ 1), forcing cross-AZ traffic on every request and not reflecting multi-AZ subnet placement.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Caching product pages at Amazon CloudFront without defining short TTLs or invalidation on price updates risks serving stale product page prices even when search results update within one minute.",
+          "evidence": ""
+        }
+      ],
+      "summary": "An appropriate container and search architecture using Aurora, OpenSearch, ECS Fargate, and CloudFront, though the database-to-OpenSearch sync path lacks failure buffering or a DLQ and the ALB/ECS subnet placement forces cross-AZ traffic."
+    },
+    {
+      "scenario": "product-search",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Amazon Aurora invokes Sync Lambda directly without a change-data-capture stream, queue, or Dead-Letter Queue (DLQ), meaning transient Lambda or OpenSearch failures can lose price updates and leave the search index out of sync with the database.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Multi-AZ services (Application Load Balancer, ECS on Fargate, Aurora, OpenSearch) are each placed in a single subnet container rather than spanning both Availability Zones.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Caching product pages at Amazon CloudFront without defining short TTLs or invalidation on price updates risks serving stale product page prices even when search results update within one minute.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-fitted e-commerce search architecture combining Aurora, OpenSearch, ECS Fargate, and CloudFront, weakened mainly by an unbuffered direct Aurora-to-Lambda synchronization trigger without a DLQ."
+    },
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail dead-letter queue and Welcome email dead-letter queue are orphaned nodes with no edges in the graph, and Welcome email sender (triggered by DynamoDB Streams) lacks an OnFailure destination configuration linking it to its DLQ.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "Thumbnail generator writes generated thumbnails back into the same Photo bucket that triggers S3 ObjectCreated events to Thumbnail queue without specifying prefix/suffix filtering, risking an infinite recursive event loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Photo bucket has no origin edge to CloudFront, leaving no read path for blog readers to view uploaded photos and generated thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Global edge container is left empty while AWS WAF is placed inside Primary Region rather than at the global edge with CloudFront.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A cost-effective, low-latency serverless blog architecture with strong security and requirement traceability, but it leaves its DLQ nodes disconnected, omits a CloudFront read path for photos, and writes thumbnails back to the triggering S3 bucket."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Thumbnail dead-letter queue and Welcome email dead-letter queue are orphaned nodes with no edges in the graph, and Welcome email sender (triggered by DynamoDB Streams) lacks an OnFailure destination configuration linking it to its DLQ.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html"
+        },
+        {
+          "severity": "major",
+          "description": "Thumbnail generator writes generated thumbnails back into the same Photo bucket that triggers S3 ObjectCreated events to Thumbnail queue without specifying prefix/suffix filtering, risking an infinite recursive event loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Photo bucket has no origin edge to CloudFront, leaving no read path for blog readers to view uploaded photos and generated thumbnails.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "The Global edge container is left empty while AWS WAF is placed inside Primary Region rather than at the global edge with CloudFront, and requirements R17 and R18 are omitted from most node and edge mappings.",
+          "evidence": ""
+        }
+      ],
+      "summary": "A well-chosen serverless blog stack that keeps latency and cost low, but suffers from disconnected DLQ nodes, a missing CloudFront origin edge for the photo bucket, and an S3 recursive trigger hazard."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "order-events-cross-region",
+      "better": "tie",
+      "why": "Designs A and B are structurally and functionally identical, differing only in minor phrasing on the Cognito User Pool node."
+    },
+    {
+      "scenario": "product-search",
+      "better": "B",
+      "why": "Both designs share the same architecture, but Design B co-locates the ALB and ECS tasks in AZ 1 rather than placing the ALB in AZ 2 and ECS in AZ 1 as Design A does."
+    },
+    {
+      "scenario": "myblog",
+      "better": "A",
+      "why": "Both designs have identical nodes, configurations, and edges, but Design A maintains more complete requirement traceability across nodes and edges for R17 and R18."
+    }
+  ]
+}

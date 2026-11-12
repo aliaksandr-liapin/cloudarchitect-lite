@@ -1,0 +1,263 @@
+{
+  "reviews": [
+    {
+      "scenario": "myblog",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The edge 'Readers and Authors -> API Compute' has the web browser invoke the AWS Lambda function directly to request a presigned upload URL, bypassing the REST API Gateway where the Cognito authorizer is configured.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no read path or origin connection from CloudFront CDN to the Media Uploads Bucket, leaving no way to serve uploaded photos and generated thumbnails to readers with low latency.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Thumbnail Generator Lambda writes generated thumbnails back into the same Media Uploads Bucket that triggers it on object creation without specifying prefix or suffix filtering, which risks an infinite recursive invocation loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "User Pool (Cognito), Thumbnail DLQ (SQS), and CloudWatch Logs are completely disconnected orphan nodes with no edges in the architecture graph.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inferred requirements R7, R8, and R9 are phrased as open questions rather than stating the concrete architectural assumptions decided by the architect.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A selects an appropriate serverless stack for a low-cost global blog, but it routes upload URL requests from the browser directly to Lambda bypassing API Gateway, omits a delivery path for media files, and leaves several supporting services disconnected."
+    },
+    {
+      "scenario": "myblog",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 2,
+        "costAwareness": 3,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "There is no origin connection from CloudFront CDN to the Media Uploads Bucket, leaving no defined path for readers to fetch author photos and thumbnails globally.",
+          "evidence": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html"
+        },
+        {
+          "severity": "major",
+          "description": "The Thumbnail Generator Lambda writes thumbnails back to the same Media Uploads Bucket that triggers the S3 object-created event without specifying key prefix or suffix filters, risking a recursive loop.",
+          "evidence": "https://docs.aws.amazon.com/lambda/latest/dg/with-s3.html"
+        },
+        {
+          "severity": "minor",
+          "description": "Cognito User Pool, Thumbnail DLQ, and CloudWatch Logs have no edges connecting them to the rest of the architecture.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "REST API Gateway omits the explicit Cognito authorizer configuration attribute, though its rationale mentions an authorizer, and Thumbnail DLQ omits the encryption configuration attribute.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Inferred requirements R7, R8, and R9 record the clarifying questions rather than the chosen architectural assumptions.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B uses a well-suited serverless architecture and properly routes upload URL requests through API Gateway, though it still lacks a CloudFront origin for the media bucket and leaves Cognito, the SQS DLQ, and CloudWatch disconnected."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "The design deploys only a single NAT Gateway in Public Subnet 1 (AZ 1) and has no public subnet or NAT Gateway in AZ 2; if AZ 1 fails, containers in AZ 2 lose outbound access to the third-party payments API, violating R4 and R6.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "ElastiCache Redis does not have Multi-AZ with automatic failover enabled, so losing the primary Availability Zone will disrupt the shared session cache.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
+        },
+        {
+          "severity": "major",
+          "description": "API Gateway is connected directly to private Fargate Tasks without a VPC Link integrated with an internal Application Load Balancer, Network Load Balancer, or AWS Cloud Map service discovery.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "Fargate Tasks have no connection to Secrets Manager to retrieve the rotated database credentials, and the rotation edge to RDS PostgreSQL is inaccurately labeled as HTTPS.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "API Gateway is configured with a Cognito authorizer, but no Amazon Cognito node exists in the architecture.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "All compute and stateful nodes are placed only in Private Subnet 1 leaving Private Subnet 2 empty, and CloudWatch has no edges.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A chooses appropriate core managed services (Fargate, RDS, ElastiCache, Secrets Manager), but fails the Multi-AZ survival requirement due to a single-AZ NAT Gateway and non-Multi-AZ ElastiCache, and omits the load balancer or service discovery needed for API Gateway private integration."
+    },
+    {
+      "scenario": "saas-containers",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 2,
+        "serviceFitness": 2,
+        "connectionCorrectness": 1,
+        "securityBaseline": 2,
+        "reliabilityOperability": 1,
+        "costAwareness": 2,
+        "explanationAccuracy": 2
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "major",
+          "description": "Only one NAT Gateway is provisioned in AZ 1 (with no public subnet or NAT Gateway in AZ 2), creating a single point of failure for outbound calls to the third-party payments API if AZ 1 goes down.",
+          "evidence": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+        },
+        {
+          "severity": "major",
+          "description": "ElastiCache Redis is not configured for Multi-AZ automatic failover, risking loss of the shared session cache during an Availability Zone outage.",
+          "evidence": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
+        },
+        {
+          "severity": "major",
+          "description": "API Gateway connects directly to private Fargate Tasks without a required VPC Link target such as an internal Load Balancer or AWS Cloud Map.",
+          "evidence": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html"
+        },
+        {
+          "severity": "major",
+          "description": "There is no edge from Fargate Tasks to Secrets Manager to fetch database credentials, and the rotation connection from Secrets Manager to RDS PostgreSQL is mislabeled as HTTPS.",
+          "evidence": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+        },
+        {
+          "severity": "minor",
+          "description": "All VPC resources are placed in Private Subnet 1 while Private Subnet 2 is unused, and CloudWatch is an unconnected orphan node.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B improves slightly on Design A by including the Cognito User Pool node, but shares the same critical Multi-AZ and networking flaws: a single-AZ NAT Gateway, non-Multi-AZ ElastiCache, and a missing load balancer or Cloud Map between API Gateway and Fargate."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "A",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 2,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "Encryption at rest is not explicitly configured on the Aurora PostgreSQL, Shared session cache (ElastiCache), or Secrets Manager nodes.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "ECS service orchestration is an orphan node with no edge connecting it to the Private API tasks it manages, and B2B API clients lack an edge to Cognito to obtain OAuth 2.0 tokens.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Outbound payment traffic is modeled both as a direct edge from Private API tasks to Payments API and as separate edges to the two NAT Gateways, rather than routing through the NAT Gateways to the Payments API.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Using Aurora PostgreSQL plus RDS Proxy alongside two NAT Gateways and a REST API Gateway is resilient but relatively expensive for an initial modest workload compared to Multi-AZ RDS PostgreSQL without RDS Proxy.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design A delivers a comprehensive, resilient Multi-AZ container architecture with per-AZ NAT Gateways, an internal ALB, Multi-AZ Aurora and ElastiCache, and RDS Proxy integrated with Secrets Manager, lacking only explicit encryption-at-rest configuration on the data stores."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "design": "B",
+      "scores": {
+        "requirementCoverage": 3,
+        "serviceFitness": 3,
+        "connectionCorrectness": 2,
+        "securityBaseline": 3,
+        "reliabilityOperability": 3,
+        "costAwareness": 2,
+        "explanationAccuracy": 3
+      },
+      "criticalDefect": false,
+      "defects": [
+        {
+          "severity": "minor",
+          "description": "ECS service orchestration has no edge connecting it to Private API tasks, and B2B API clients have no edge to Cognito to request OAuth 2.0 client-credentials tokens.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Outbound egress is split into a direct edge from Private API tasks to Payments API plus dead-end edges from Private API tasks to the two NAT Gateways.",
+          "evidence": ""
+        },
+        {
+          "severity": "minor",
+          "description": "Aurora PostgreSQL and RDS Proxy add noticeable baseline cost for a modest initial B2B workload, though they align well with the Multi-AZ resilience and credential rotation priorities.",
+          "evidence": ""
+        }
+      ],
+      "summary": "Design B provides a well-architected Multi-AZ container solution with per-AZ NAT Gateways, an internal ALB across both AZs, Multi-AZ Aurora PostgreSQL with RDS Proxy, Multi-AZ ElastiCache, and explicit encryption at rest on stateful stores."
+    }
+  ],
+  "preference": [
+    {
+      "scenario": "myblog",
+      "better": "B",
+      "why": "Design B properly routes upload URL requests from the browser through the REST API Gateway rather than having the browser invoke the backend Lambda function directly as in Design A."
+    },
+    {
+      "scenario": "saas-containers",
+      "better": "B",
+      "why": "Both designs suffer from the same Multi-AZ and private API integration omissions, but Design B explicitly includes and connects the Amazon Cognito User Pool referenced by the API Gateway authorizer."
+    },
+    {
+      "scenario": "saas-containers-multi-az",
+      "better": "B",
+      "why": "Design B is nearly identical to Design A but explicitly enables encryption at rest on both Aurora PostgreSQL and ElastiCache and more clearly labels the multi-AZ scope of the internal ALB."
+    }
+  ]
+}

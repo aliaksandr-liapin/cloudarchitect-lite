@@ -100,7 +100,7 @@ Which validation rules ([PRD §11](prd.md)) each model's final designs still tri
 | VR-015 `unresolved` node | info | 15/44 | 5/44 | 3/44 | 7/15 | 6/15 | 3/15 |
 
 - No final design has an error-level finding.
-- The economical models get one repair turn and the best-quality models none, so the Sonnet, Sol and Argon columns are first drafts. The repair turn ran when the first draft had a warning or an error: in 34 of 44 Haiku runs, 34 of 44 Luna runs and 38 of 44 Flash-Lite runs. Findings on the first draft were not logged in this run; the live eval records them from 2026-11-07 (`firstDraftFindingsByRule`, `repairTurnsUsed` in `records.json`).
+- The economical models get one repair turn and the best-quality models none, so the Sonnet, Sol and Argon columns are first drafts. The repair turn ran when the first draft had a warning or an error: in 34 of 44 Haiku runs, 34 of 44 Luna runs and 38 of 44 Flash-Lite runs. Findings on the first draft were not logged in this run; the live eval records them from 2026-11-07 (`firstDraftFindingsByRule`, `repairTurnsUsed` in `records.json`). Whether the repair turn should also get info findings was measured separately: [info-repair-experiment.md](info-repair-experiment.md).
 - Patterns: Sonnet often leaves a requirement without a linked node (VR-012), which no other model does; Luna rarely states encryption at rest (VR-008); Flash-Lite most often puts an ALB in one AZ (VR-018) and leaves an API without stated auth (VR-003); Argon leaves the fewest findings.
 - The tiers ran different scenario sets (22 vs 15 scenarios), so compare columns within a tier. One run per design; small counts are noise.
 
