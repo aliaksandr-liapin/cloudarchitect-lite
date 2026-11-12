@@ -110,7 +110,7 @@ export function findLeaks(markdown: string): string[] {
 }
 
 /** Small seeded PRNG (mulberry32). */
-function rng(seed: number): () => number {
+export function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -121,7 +121,7 @@ function rng(seed: number): () => number {
   };
 }
 
-function shuffle<T>(xs: T[], rand: () => number): T[] {
+export function shuffle<T>(xs: T[], rand: () => number): T[] {
   const out = [...xs];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
