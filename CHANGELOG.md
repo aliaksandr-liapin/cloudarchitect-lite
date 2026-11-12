@@ -11,6 +11,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Changed
 
+- GPT-6 Luna's repair turn also sends info findings (encryption at rest, monitoring, RDS Proxy, unlinked components, unexplained cost drivers), so they are fixed instead of left in the design. Other models are unchanged. Based on the [info-repair experiment](docs/product/info-repair-experiment.md).
 - Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
 
 ## [0.3.1] - 2026-11-11

@@ -8,6 +8,8 @@ The question: if the repair turn also gets the info findings, do they go away, a
 
 ## Result
 
+**Adopted for GPT Luna** (unreleased; `repairInfoRules` on the `gpt-luna` model option). Haiku and Flash-Lite are unchanged.
+
 | Model | Info findings per design (W → I) | Unrequested changes | New findings | Blind score (W → I) | Recommendation |
 |---|---|---|---|---|---|
 | GPT-6 Luna | 1.23 → 0.00 | no clear difference | no clear difference | 2.36 → 2.43 | **send info findings** |

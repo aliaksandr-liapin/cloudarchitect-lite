@@ -75,6 +75,23 @@ function userMessage(input: GenerateInput, requirements: Requirement[]): string 
 export const repairMessage = (list: string) =>
   `The deterministic validator reported these findings on your architecture:\n${list}\n\nReturn the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Do not change anything else.`;
 
+/** The repair message when info findings are sent too: one added sentence on how to treat them. */
+export const infoRepairMessage = (list: string) =>
+  `The deterministic validator reported these findings on your architecture:\n${list}\n\nReturn the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Apply each info finding if it fits the requirements; otherwise leave it and say why in assumptions. Do not change anything else.`;
+
+/** Findings the repair turn sends: every error and warning, plus info findings of `infoRules`. */
+export function repairFindings(findings: Finding[], infoRules: readonly string[] = []): Finding[] {
+  return findings.filter(
+    (f) => f.severity !== 'info' || (f.ruleId !== undefined && infoRules.includes(f.ruleId)),
+  );
+}
+
+/** The repair message for `sent`: the info variant only when an info finding is among them. */
+export function repairMessageFor(sent: Finding[]): string {
+  const list = formatFindings(sent);
+  return sent.some((f) => f.severity === 'info') ? infoRepairMessage(list) : repairMessage(list);
+}
+
 type Message = { role: 'user' | 'assistant'; content: string };
 
 /** One architecture the model produced, with the conversation and cost that led to it. */
@@ -185,9 +202,9 @@ export async function generateArchitecture(
   const firstDraftFindings = out.findings;
   let repairTurnsUsed = 0;
   for (let turn = 0; turn < option.repairTurns; turn++) {
-    const issues = out.findings.filter((f) => f.severity !== 'info');
+    const issues = repairFindings(out.findings, option.repairInfoRules);
     if (!issues.length) break;
-    out = await repairDraft(llm, catalog, input, out, repairMessage(formatFindings(issues)));
+    out = await repairDraft(llm, catalog, input, out, repairMessageFor(issues));
     repairTurnsUsed++;
   }
 
