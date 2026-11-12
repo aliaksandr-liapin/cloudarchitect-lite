@@ -1,12 +1,12 @@
 import type { Finding } from '@cloudarchitect/domain';
-import { formatFindings, repairMessage } from '@cloudarchitect/generator';
+import { infoRepairMessage, repairMessageFor } from '@cloudarchitect/generator';
 import { rng, shuffle } from './packets.js';
 
 export type Arm = 'W' | 'I';
 
 export const INFO_RULES_TO_REPAIR = ['VR-005', 'VR-007', 'VR-008', 'VR-013', 'VR-024'] as const;
 
-/** Findings an arm sends back to the model. W is today's app behavior; I adds five info rules. */
+/** Findings an arm sends back to the model. W sends errors and warnings only; I adds five info rules. */
 export function armFindings(findings: Finding[], arm: Arm): Finding[] {
   return findings.filter(
     (f) =>
@@ -19,18 +19,13 @@ export function armFindings(findings: Finding[], arm: Arm): Finding[] {
   );
 }
 
-export function infoRepairMessage(list: string): string {
-  return `The deterministic validator reported these findings on your architecture:\n${list}\n\nReturn the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Apply each info finding if it fits the requirements; otherwise leave it and say why in assumptions. Do not change anything else.`;
-}
+export { infoRepairMessage };
 
 /** The repair message for an arm, or undefined when the arm has nothing to send. */
 export function messageFor(arm: Arm, findings: Finding[]): string | undefined {
   const sent = armFindings(findings, arm);
-  if (sent.length === 0) return undefined;
-  const list = formatFindings(sent);
   // Arm I with no info finding to send makes the same request as arm W.
-  const infoSent = sent.some((f) => f.severity === 'info');
-  return arm === 'I' && infoSent ? infoRepairMessage(list) : repairMessage(list);
+  return sent.length ? repairMessageFor(sent) : undefined;
 }
 
 /** Per model: differing pairs only, info-bearing first, each group shuffled with the seed. */

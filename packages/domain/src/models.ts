@@ -55,6 +55,11 @@ export interface ModelOption {
   summary: string;
   /** Validator-driven repair turns after the first draft. */
   repairTurns: number;
+  /**
+   * Info rules the repair turn also sends (errors and warnings always go). Absent: no info findings.
+   * Set only where the info-repair experiment met its criteria (docs/product/info-repair-experiment.md).
+   */
+  repairInfoRules?: readonly string[];
   /** Absent until a live eval run exists; such a model is not listed (`listedModels`). */
   benchmark?: ModelBenchmark;
 }
@@ -111,6 +116,7 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
     label: 'GPT-6 Luna',
     summary: 'Economical OpenAI model. Not listed: below the listing bar in the 0.3 benchmark.',
     repairTurns: 1,
+    repairInfoRules: ['VR-005', 'VR-007', 'VR-008', 'VR-013', 'VR-024'],
   },
   {
     id: 'gpt-sol',

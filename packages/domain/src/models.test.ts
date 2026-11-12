@@ -22,4 +22,16 @@ describe('model options', () => {
   it('lists only models with a benchmark', () => {
     expect(listedModels().map((o) => o.id)).toEqual(['haiku', 'sonnet', 'gpt-sol', 'gemini-argon']);
   });
+
+  it('sends info findings to repair only for GPT Luna, never VR-015', () => {
+    const withInfo = MODEL_OPTIONS.filter((o) => o.repairInfoRules?.length);
+    expect(withInfo.map((o) => o.id)).toEqual(['gpt-luna']);
+    expect(modelOption('gpt-luna').repairInfoRules).toEqual([
+      'VR-005',
+      'VR-007',
+      'VR-008',
+      'VR-013',
+      'VR-024',
+    ]);
+  });
 });
