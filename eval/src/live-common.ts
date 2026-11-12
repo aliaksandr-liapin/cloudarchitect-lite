@@ -3,7 +3,7 @@
  * environment or the repo-root .env, scenario loading, the cap-checked LLM wrapper and the
  * extraction/answers step. Nothing here prints model text.
  */
-import { ModelChoice, YOU_DECIDE, type Provider } from '@cloudarchitect/domain';
+import { ModelChoice, modelOption, YOU_DECIDE, type Provider } from '@cloudarchitect/domain';
 import {
   anthropicClient,
   costMicroUsd,
@@ -14,7 +14,6 @@ import {
   type GenerateInput,
   type LlmClient,
 } from '@cloudarchitect/generator';
-import { modelOption } from '@cloudarchitect/domain';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KEY_VAR } from './gate.js';

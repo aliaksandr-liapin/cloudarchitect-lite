@@ -57,9 +57,10 @@ export interface InfoRepairRecord {
   infoSent: number;
   /** Both arms sent an identical message (a noise-floor job). */
   sameRequest: boolean;
-  /** The two arms' final designs differ (graphContentHash). */
+  /** The two arms' final designs differ (graphContentHash). False when either arm failed. */
   differ: boolean;
-  /** Structural changes between W's and I's final designs. */
+  /** Structural changes between W's and I's final designs. Undefined when either arm failed;
+   * analyses must filter on arms.W.ok && arms.I.ok. */
   armsDiff?: number;
   arms?: { W: ArmResult; I: ArmResult };
   /** Everything spent on the job, both repairs included. */
@@ -147,7 +148,14 @@ export async function runInfoRepairJob(
       };
     };
 
-    const [w, i] = await Promise.all([runArm('W'), runArm('I')]);
+    // Let both arms finish before deciding, so cost, calls and saves are final when we return.
+    const settled = await Promise.allSettled([runArm('W'), runArm('I')]);
+    const failure = settled.find((r) => r.status === 'rejected');
+    if (failure) throw failure.reason;
+    const [w, i] = settled.map(
+      (r) => (r as PromiseFulfilledResult<Awaited<ReturnType<typeof runArm>>>).value,
+    ) as [Awaited<ReturnType<typeof runArm>>, Awaited<ReturnType<typeof runArm>>];
+    const messageW = messageFor('W', draft.findings);
     const infoSent = armFindings(draft.findings, 'I').filter((f) => f.severity === 'info').length;
     const both = w.final && i.final ? { w: w.final, i: i.final } : null;
     return {
@@ -155,9 +163,7 @@ export async function runInfoRepairJob(
       ok: true,
       firstDraftFindingsByRule: countByRule(draft.findings),
       infoSent,
-      // Both arms send the same findings (no info rule fired); the message wording differs only
-      // by arm I's fixed info sentence.
-      sameRequest: infoSent === 0 && messageFor('W', draft.findings) !== undefined,
+      sameRequest: messageW !== undefined && messageW === messageFor('I', draft.findings),
       differ: both ? graphContentHash(both.w) !== graphContentHash(both.i) : false,
       ...(both ? { armsDiff: diffDesigns(both.w, both.i).length } : {}),
       arms: { W: w.result, I: i.result },

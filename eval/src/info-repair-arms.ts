@@ -28,7 +28,9 @@ export function messageFor(arm: Arm, findings: Finding[]): string | undefined {
   const sent = armFindings(findings, arm);
   if (sent.length === 0) return undefined;
   const list = formatFindings(sent);
-  return arm === 'I' ? infoRepairMessage(list) : repairMessage(list);
+  // Arm I with no info finding to send makes the same request as arm W.
+  const infoSent = sent.some((f) => f.severity === 'info');
+  return arm === 'I' && infoSent ? infoRepairMessage(list) : repairMessage(list);
 }
 
 /** Per model: differing pairs only, info-bearing first, each group shuffled with the seed. */

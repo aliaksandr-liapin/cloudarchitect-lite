@@ -60,6 +60,18 @@ describe('messageFor', () => {
     expect(messageFor('W', only008)).toBeUndefined();
     expect(messageFor('I', only008)).toContain('VR-008');
   });
+
+  it('sends arm I the same message as arm W when no info finding is sent', () => {
+    const warning = [f('VR-004', 'warning'), f('VR-015', 'info')];
+    expect(messageFor('I', warning)).toBe(messageFor('W', warning));
+    expect(messageFor('W', warning)).toBeDefined();
+  });
+
+  it('adds the info sentence to arm I only when an info finding is sent', () => {
+    const mixed = [f('VR-004', 'warning'), f('VR-008', 'info')];
+    expect(messageFor('I', mixed)).toContain('Apply each info finding');
+    expect(messageFor('W', mixed)).not.toContain('Apply each info finding');
+  });
 });
 
 describe('sampleReviewJobs', () => {

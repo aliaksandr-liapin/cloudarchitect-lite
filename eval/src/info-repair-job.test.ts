@@ -89,7 +89,7 @@ function fake(answers: { draft: unknown; W?: unknown; I?: unknown }) {
   const llm: LlmClient = async (req) => {
     requests.push(req);
     const last = req.messages[req.messages.length - 1]!.content;
-    const body =
+    const body: unknown =
       requests.length === 1
         ? extraction
         : requests.length === 2
@@ -97,6 +97,7 @@ function fake(answers: { draft: unknown; W?: unknown; I?: unknown }) {
           : last.includes('Apply each info finding')
             ? answers.I
             : answers.W;
+    if (body instanceof Error) throw body;
     return {
       text: typeof body === 'string' ? body : JSON.stringify(body),
       usage,
@@ -188,6 +189,30 @@ describe('runInfoRepairJob', () => {
     expect(r.arms?.I.score?.schemaValid).toBe(false);
     expect(r.arms?.W.ok).toBe(true);
     expect(r.arms?.I.costUsd).toBeGreaterThan(0);
+  });
+
+  it('settles both arms before failing the job on a non-generation error', async () => {
+    const { llm } = fake({
+      draft: graph(false, false),
+      W: graph(true, false),
+      I: new Error('transport down'),
+    });
+    let returned = false;
+    let savedAfterReturn = false;
+    const record = await runInfoRepairJob(llm, awsCatalog, scenario, 'haiku', 1, () => {
+      if (returned) savedAfterReturn = true;
+    });
+    returned = true;
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(record.ok).toBe(false);
+    expect(record.error).toBe('transport down');
+    expect(record.calls).toHaveLength(3);
+    expect(record.costUsd).toBeCloseTo(
+      record.calls.reduce((a, c) => a + c.costUsd, 0),
+      9,
+    );
+    expect(savedAfterReturn).toBe(false);
   });
 
   it('records a failed draft as ok false without arms', async () => {
