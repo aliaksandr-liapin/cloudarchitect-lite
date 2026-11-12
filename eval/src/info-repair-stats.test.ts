@@ -105,6 +105,12 @@ describe('jobMetrics', () => {
 });
 
 describe('summarizeModel', () => {
+  it('diffs passed over all jobs, counting a failed arm as not passed', () => {
+    const records = [rec(), rec(), rec(), rec({ I: { ok: false } })];
+    const s = summarizeModel(records, 'haiku', 1);
+    expect(s.diff.passed.mean).toBeLessThan(0);
+    expect(s.diff.passed.mean).toBeCloseTo(s.meanI.passed - s.meanW.passed);
+  });
   it('counts failed jobs and failed arms', () => {
     const records = [
       rec(),
@@ -209,6 +215,15 @@ describe('evaluateCriteria', () => {
   it('fails criterion 3 when collateral rises beyond the noise floor', () => {
     const s = summary({ diff: { ...summary().diff, collateral: ci(4, 3, 5) } });
     expect(met(evaluateCriteria(s), 3)).toBe(false);
+  });
+  it('criterion 3 is met when the collateral lower bound equals the noise floor', () => {
+    const s = summary({ diff: { ...summary().diff, collateral: ci(3, 2, 4) } });
+    expect(met(evaluateCriteria(s), 3)).toBe(true);
+  });
+  it('criterion 1 reports missing data when no job has both arms', () => {
+    const c1 = evaluateCriteria(summary({ pairedJobs: 0 })).find((c) => c.id === 1)!;
+    expect(c1.met).toBe(false);
+    expect(c1.detail).toBe('no jobs where both arms succeeded');
   });
   it('without a noise floor, criterion 3 fails on clearly higher collateral', () => {
     const base = summary({ noiseFloor: { value: undefined, pooled: true, jobs: 0 } });

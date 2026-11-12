@@ -58,7 +58,11 @@ export interface JobMetrics {
   costUsd: number;
 }
 
-/** Metrics of one arm. A failed job or failed arm is all zeros and not passed; filter before diffing. */
+/**
+ * Metrics of one arm. A failed job or failed arm has zero findings and changes and is not passed;
+ * its costUsd is what was spent (the arm's, or the whole job's when the job failed). Filter
+ * before diffing.
+ */
 export function jobMetrics(r: InfoRepairRecord, arm: Arm): JobMetrics {
   const a = r.arms?.[arm];
   const zero = { info: 0, vr015: 0, errorsWarnings: 0, collateral: 0, targeted: 0, regressions: 0 };
@@ -119,7 +123,7 @@ export interface ModelArmSummary {
   model: string;
   /** All of the model's jobs, failed ones included. */
   jobs: number;
-  /** Jobs where both arms succeeded; every diff, and every mean except `passed`, uses exactly these. */
+  /** Jobs where both arms succeeded; every mean and diff except `passed` uses exactly these. */
   pairedJobs: number;
   /** Jobs where extraction or the draft failed (no arms ran). */
   failedJobs: number;
@@ -132,7 +136,7 @@ export interface ModelArmSummary {
   meanW: JobMetrics;
   /** Arm I means, over the same sets as `meanW`. */
   meanI: JobMetrics;
-  /** Paired bootstrap of I minus W over the paired jobs (for `passed`, the difference of 0/1 flags). */
+  /** Paired bootstrap of I minus W over the paired jobs (for `passed`: over all `jobs`, the difference of 0/1 flags, failures counting as 0). */
   diff: Record<
     'info' | 'errorsWarnings' | 'passed' | 'collateral' | 'regressions' | 'costUsd',
     Interval
@@ -166,9 +170,11 @@ export function summarizeModel(
     }
     return out as unknown as JobMetrics;
   };
+  // `passed` is diffed over every job (a failed arm or job counts as not passed, matching the
+  // pass-rate means); all other metrics only over jobs where both arms succeeded.
   const diffOf = (k: MetricKey) =>
     pairedBootstrap(
-      paired.map((r) => jobMetrics(r, 'I')[k] - jobMetrics(r, 'W')[k]),
+      (k === 'passed' ? mine : paired).map((r) => jobMetrics(r, 'I')[k] - jobMetrics(r, 'W')[k]),
       seed,
     );
   return {
@@ -210,14 +216,16 @@ export function evaluateCriteria(
   blind?: { W: number; I: number },
 ): CriterionResult[] {
   const noData = s.pairedJobs === 0;
+  let c1: CriterionResult;
   const none = (id: CriterionResult['id']): CriterionResult => ({
     id,
     met: undefined,
     detail: 'no jobs where both arms succeeded',
   });
 
-  let c1: CriterionResult;
-  if (s.meanW.info === 0) {
+  if (noData) {
+    c1 = { id: 1, met: false, detail: 'no jobs where both arms succeeded' };
+  } else if (s.meanW.info === 0) {
     c1 = { id: 1, met: false, detail: 'arm W has no info findings left: nothing to reduce' };
   } else {
     const ratio = s.meanI.info / s.meanW.info;
