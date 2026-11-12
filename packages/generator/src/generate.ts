@@ -72,8 +72,108 @@ function userMessage(input: GenerateInput, requirements: Requirement[]): string 
   ].join('\n');
 }
 
-const repairMessage = (list: string) =>
+export const repairMessage = (list: string) =>
   `The deterministic validator reported these findings on your architecture:\n${list}\n\nReturn the complete corrected architecture. Fix every error. Fix each warning, or keep it only if it is intentional and say why in assumptions. Do not change anything else.`;
+
+type Message = { role: 'user' | 'assistant'; content: string };
+
+/** One architecture the model produced, with the conversation and cost that led to it. */
+export interface Draft {
+  project: Project;
+  text: string;
+  messages: Message[];
+  usage: CallUsage[];
+  findings: Finding[];
+}
+
+/** One list line per finding, with ids (not only labels) so the model can find the element to change. */
+export function formatFindings(findings: Finding[]): string {
+  return findings
+    .map((f) =>
+      [
+        `- [${f.ruleId ?? 'structural'} ${f.severity}] ${f.explanation}`,
+        f.remediation && `Fix: ${f.remediation}`,
+        f.nodeIds?.length && `(nodes: ${f.nodeIds.join(', ')})`,
+        f.edgeIds?.length && `(edges: ${f.edgeIds.join(', ')})`,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    )
+    .join('\n');
+}
+
+/** One model call over `messages`; `priorUsage` is copied, never mutated. */
+async function build(
+  llm: LlmClient,
+  catalog: CatalogSnapshot,
+  input: GenerateInput,
+  messages: Message[],
+  priorUsage: CallUsage[],
+): Promise<Draft> {
+  const option = modelOption(input.model);
+  const contract = contractFor(catalog);
+  const requirements = buildRequirements(input);
+  const usage = [...priorUsage];
+  const res = await llm({
+    model: option.model,
+    system: contract.system,
+    maxTokens: MAX_TOKENS,
+    effort: EFFORT,
+    format: contract.format,
+    messages: [...messages],
+    signal: input.signal,
+  });
+  usage.push(callUsage(option.model, res.usage));
+  const generation = parseOutput(res.text, contract.schema, usage);
+  const draft = toProject(generation, {
+    name: input.name,
+    requirements,
+    catalog,
+    generation: {
+      toggles: input.toggles,
+      model: input.model,
+      generatedAt: (input.now ?? new Date()).toISOString(),
+      contentHash: '',
+    },
+  });
+  const parsed = Project.safeParse(draft);
+  if (!parsed.success) throw new GenerationError('schema_invalid', usage);
+  return {
+    project: parsed.data,
+    text: res.text,
+    messages: [...messages],
+    usage,
+    findings: validateProject(parsed.data, catalog),
+  };
+}
+
+/** The first model call: one user message, no repair. */
+export function draftArchitecture(
+  llm: LlmClient,
+  catalog: CatalogSnapshot,
+  input: GenerateInput,
+): Promise<Draft> {
+  const messages: Message[] = [
+    { role: 'user', content: userMessage(input, buildRequirements(input)) },
+  ];
+  return build(llm, catalog, input, messages, []);
+}
+
+/** One repair call on top of `draft`; `draft` is left untouched. */
+export function repairDraft(
+  llm: LlmClient,
+  catalog: CatalogSnapshot,
+  input: GenerateInput,
+  draft: Draft,
+  message: string,
+): Promise<Draft> {
+  const messages: Message[] = [
+    ...draft.messages,
+    { role: 'assistant', content: draft.text },
+    { role: 'user', content: message },
+  ];
+  return build(llm, catalog, input, messages, draft.usage);
+}
 
 export async function generateArchitecture(
   llm: LlmClient,
@@ -81,70 +181,17 @@ export async function generateArchitecture(
   input: GenerateInput,
 ): Promise<GenerateResult> {
   const option = modelOption(input.model);
-  const contract = contractFor(catalog);
-  const requirements = buildRequirements(input);
-  const messages: { role: 'user' | 'assistant'; content: string }[] = [
-    { role: 'user', content: userMessage(input, requirements) },
-  ];
-  const usage: CallUsage[] = [];
-
-  const build = async () => {
-    const res = await llm({
-      model: option.model,
-      system: contract.system,
-      maxTokens: MAX_TOKENS,
-      effort: EFFORT,
-      format: contract.format,
-      messages: [...messages],
-      signal: input.signal,
-    });
-    usage.push(callUsage(option.model, res.usage));
-    const generation = parseOutput(res.text, contract.schema, usage);
-    const draft = toProject(generation, {
-      name: input.name,
-      requirements,
-      catalog,
-      generation: {
-        toggles: input.toggles,
-        model: input.model,
-        generatedAt: (input.now ?? new Date()).toISOString(),
-        contentHash: '',
-      },
-    });
-    const parsed = Project.safeParse(draft);
-    if (!parsed.success) throw new GenerationError('schema_invalid', usage);
-    return { text: res.text, project: parsed.data };
-  };
-
-  let out = await build();
-  const firstDraftFindings = validateProject(out.project, catalog);
+  let out = await draftArchitecture(llm, catalog, input);
+  const firstDraftFindings = out.findings;
   let repairTurnsUsed = 0;
   for (let turn = 0; turn < option.repairTurns; turn++) {
-    const findings = turn === 0 ? firstDraftFindings : validateProject(out.project, catalog);
-    const issues = findings.filter((f) => f.severity !== 'info');
+    const issues = out.findings.filter((f) => f.severity !== 'info');
     if (!issues.length) break;
-    const list = issues
-      // Ids, not only labels, so the model can find the element to change.
-      .map((f) =>
-        [
-          `- [${f.ruleId ?? 'structural'} ${f.severity}] ${f.explanation}`,
-          f.remediation && `Fix: ${f.remediation}`,
-          f.nodeIds?.length && `(nodes: ${f.nodeIds.join(', ')})`,
-          f.edgeIds?.length && `(edges: ${f.edgeIds.join(', ')})`,
-        ]
-          .filter(Boolean)
-          .join(' '),
-      )
-      .join('\n');
-    messages.push(
-      { role: 'assistant', content: out.text },
-      { role: 'user', content: repairMessage(list) },
-    );
-    out = await build();
+    out = await repairDraft(llm, catalog, input, out, repairMessage(formatFindings(issues)));
     repairTurnsUsed++;
   }
 
   const project = out.project;
   project.generation = { ...project.generation!, contentHash: graphContentHash(project) };
-  return { project, usage, firstDraftFindings, repairTurnsUsed };
+  return { project, usage: out.usage, firstDraftFindings, repairTurnsUsed };
 }
