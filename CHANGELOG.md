@@ -7,11 +7,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Added
 
 - A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls.
-- Experiment report: what happens when the repair turn also gets info findings ([docs/product/info-repair-experiment.md](docs/product/info-repair-experiment.md)), with the eval commands `info-repair`, `review --arms` and `info-repair-report` to reproduce it.
+- Experiment report: what happens when the repair turn also gets info findings ([docs/product/info-repair-experiment.md](docs/product/info-repair-experiment.md)), with the eval commands `info-repair`, `review --arms` and `info-repair-report` to reproduce it, and a follow-up for GPT Luna (`info-repair --info-message prioritized`, `info-repair-followup`). Result: the repair turn keeps sending only errors and warnings.
 
 ### Changed
 
-- GPT-6 Luna's repair turn also sends info findings (encryption at rest, monitoring, RDS Proxy, unlinked components, unexplained cost drivers), so they are fixed instead of left in the design. Other models are unchanged. Based on the [info-repair experiment](docs/product/info-repair-experiment.md).
 - Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
 
 ## [0.3.1] - 2026-11-11

@@ -293,7 +293,7 @@ describe('generateArchitecture', () => {
   });
 });
 
-describe('info findings in the repair turn (GPT Luna only)', () => {
+describe('info findings in the repair turn (no model sends them)', () => {
   const g = graph(true);
   // An unencrypted DynamoDB table: VR-008 (info), no error or warning.
   const infoOnly = { ...g, nodes: [...g.nodes, node('table', 'aws.dynamodb', ['R1'])] };
@@ -309,20 +309,7 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     ],
   };
 
-  it('sends info findings to repair for GPT Luna, with the info sentence', async () => {
-    const { llm, requests } = fake(infoOnly, g);
-    const r = await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
-    expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-008');
-    expect(requests).toHaveLength(2);
-    expect(r.repairTurnsUsed).toBe(1);
-    const repair = requests[1]?.messages[2]?.content ?? '';
-    expect(repair).toContain('VR-008 info');
-    expect(repair).toContain(
-      'Apply each info finding if it fits the requirements; otherwise leave it and say why in assumptions.',
-    );
-  });
-
-  it('never sends VR-015 for GPT Luna', async () => {
+  it('never sends VR-015', async () => {
     const { llm, requests } = fake(unresolvedOnly);
     const r = await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
     expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-015');
@@ -330,7 +317,7 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     expect(r.repairTurnsUsed).toBe(0);
   });
 
-  it('keeps the errors-and-warnings message for GPT Luna when no info finding is sent', async () => {
+  it('keeps the errors-and-warnings message for GPT Luna', async () => {
     const { llm, requests } = fake(graph(false), graph(true));
     await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
     const repair = requests[1]?.messages[2]?.content ?? '';
@@ -338,8 +325,8 @@ describe('info findings in the repair turn (GPT Luna only)', () => {
     expect(repair).not.toContain('info finding');
   });
 
-  it('leaves Haiku and Flash-Lite unchanged: info findings alone trigger no repair', async () => {
-    for (const model of ['haiku', 'gemini-flash-lite'] as const) {
+  it('info findings alone trigger no repair for any economical model', async () => {
+    for (const model of ['haiku', 'gpt-luna', 'gemini-flash-lite'] as const) {
       const { llm, requests } = fake(infoOnly);
       const r = await generateArchitecture(llm, awsCatalog, input({ model }));
       expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-008');

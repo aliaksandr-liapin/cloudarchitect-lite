@@ -104,7 +104,7 @@ Operations (PRD §6): **Generate**, **Edit**, **Review**, **Ask** (P1).
 **Generate**
 1. Prompt → extract structured requirements, assumptions and open questions. Extraction always runs `claude-haiku-5-5`.
 2. If open questions exist (at most 3, topics from the fixed `GapTopic` list) or the user asked to review requirements → return them with an `operationId` and a signed `operationToken`; the operation is not completed until `/continue`. The user answers (or picks "You decide"), may edit the requirements, and calls `/continue` once (max one round).
-3. Generate architecture JSON with structured output (`output_config.format`) against the catalog contract with the selected model; anything outside the catalog must use `unresolved`. The economical models (Haiku, GPT Luna, Flash-Lite) get one repair turn with the deterministic validator's errors and warnings; GPT Luna's repair turn also gets the info findings VR-005, VR-007, VR-008, VR-013 and VR-024 ([experiment](info-repair-experiment.md)).
+3. Generate architecture JSON with structured output (`output_config.format`) against the catalog contract with the selected model; anything outside the catalog must use `unresolved`. The economical models (Haiku, GPT Luna, Flash-Lite) get one repair turn with the deterministic validator's errors and warnings. Info findings are not sent: in the [experiment](info-repair-experiment.md) they cleared, but GPT Luna then left availability warnings unfixed.
 4. Parse and schema-validate; a schema failure fails the operation.
 5. Client: run the rule set (§10), layout with ELK, render findings.
 
