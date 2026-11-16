@@ -824,6 +824,9 @@ export function App() {
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={onNodeDragStop}
+            // No delete yet (US-04): React Flow's default Backspace would hide a node on screen
+            // while the project, its findings and the export still hold it.
+            deleteKeyCode={null}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
             onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}

@@ -13,6 +13,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 - Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
 
+### Fixed
+
+- Editor: Backspace or Delete no longer hides a selected node or container. The editor has no delete yet, so the item stayed in the design, its findings and the export, and came back on the next change.
+
 ## [0.3.1] - 2026-11-11
 
 Fixes a node that could stay invisible after Restore or Import, Gemini retries transient errors, and the benchmark report shows which rules each model breaks.

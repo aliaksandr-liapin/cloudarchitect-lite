@@ -166,3 +166,13 @@ test('reload', async () => {
   await expectNodes(page, dental);
   await expect(versionsHeading(4)).toBeVisible();
 });
+
+// The editor has no delete yet (US-04). Delete keys must not hide a node while the design, its
+// findings and the export still hold it.
+test('delete keys do not hide nodes', async () => {
+  const label = dental.nodes[0]!.label;
+  await canvas(page).getByText(label, { exact: true }).first().click();
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Delete');
+  await expectNodes(page, dental);
+});
