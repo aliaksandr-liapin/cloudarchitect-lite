@@ -17,7 +17,7 @@ four weeks, each with its own hook, a LinkedIn post and a dev.to article
 ([dev.to/aliaksandrliapin](https://dev.to/aliaksandrliapin)). Building-in-public posts (design
 decisions, ADRs, eval numbers, bug stories) fill the weeks between releases.
 
-**Now:** 0.3.1 is out (released 2026-11-11, a fix release on top of 0.3.0). Next: 0.4, Second opinion.
+**Now:** 0.3.1 is out (released 2026-11-11, a fix release on top of 0.3.0). Next: 0.4, Edit by hand (reordered 2026-11-16, see below).
 
 ```mermaid
 gantt
@@ -30,15 +30,16 @@ gantt
     0.2 Public MVP, released 2026-11-04  :done,   r02, 2026-10-27, 2026-11-04
     0.3 Claude vs GPT vs Gemini          :done,   r03, 2026-11-05, 2026-11-10
     section Next
-    0.4 Second opinion                   :active, r04, 2026-11-11, 2027-01-20
-    0.5 Edit with AI                     :        r05, 2027-01-21, 2027-02-17
-    0.6 Cost estimate                    :        r06, 2027-02-18, 2027-03-17
+    0.4 Edit by hand                     :active, r04, 2026-11-17, 2027-01-20
+    0.5 Second opinion                   :        r05, 2027-01-21, 2027-02-17
+    0.6 Edit with AI                     :        r06, 2027-02-18, 2027-03-17
     section Later
-    0.7 Diagram to code                  :        r07, 2027-03-18, 2027-04-14
-    0.8 Fully offline                    :        r08, 2027-04-15, 2027-05-19
-    0.9 Multi-cloud                      :        r09, 2027-05-20, 2027-07-21
-    0.10 Bring your infrastructure       :        r10, 2027-07-22, 2027-08-18
-    0.11 Share                           :        r11, 2027-08-19, 2027-10-13
+    0.7 Cost estimate                    :        r07, 2027-03-18, 2027-04-14
+    0.8 Diagram to code                  :        r08, 2027-04-15, 2027-05-19
+    0.9 Fully offline                    :        r09, 2027-05-20, 2027-06-16
+    0.10 Multi-cloud                     :        r10, 2027-06-17, 2027-07-28
+    0.11 Bring your infrastructure       :        r11, 2027-07-29, 2027-08-25
+    0.12 Share                           :        r12, 2027-08-26, 2027-10-13
     1.0                                  :        r1,  2027-10-14, 2027-11-10
 ```
 
@@ -52,18 +53,21 @@ hosted Privacy Policy and Terms).
 |---|---|---|---|---|
 | 0.2 | ✅ 2026-11-04 | **Public MVP** (released: 0.2.0, 0.2.1) | Repository public; README with demo GIF; clickable editor demo on GitHub Pages; one-command install (tested on macOS and Linux; Windows expected to work, not hand-tested yet); PNG/SVG/JSON export; hosted-only leftovers dropped (free credits, kill switch, Cloudflare deploy) | "Describe your app, get an AWS architecture checked against 25 rules, on your own key" · How the catalog stops an LLM from inventing cloud services |
 | 0.3 | ✅ 2026-11-10 | **Claude vs GPT vs Gemini** (released: 0.3.0, then 0.3.1 on 2026-11-11) | Claude, OpenAI and Gemini, two models each (four listed after the owner's bar); public blind benchmark with a three-provider review panel ([report](phase3-provider-benchmark.md), [design](../superpowers/specs/2026-10-26-multi-provider-ai-design.md)) | "Three AIs designed the same systems: here is who won" · Benchmarking LLMs on architecture design |
-| 0.4 | Jan 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
-| 0.5 | Feb 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"); undo/redo. OpenAI strict-mode schema conversion does not support `z.record` or unions, and the patch schema uses both: the OpenAI adapter needs work first | Diff-based AI editing of a graph |
-| 0.6 | Mar 2027 | **Cost estimate** | Monthly AWS cost estimate per diagram from traffic assumptions | "What will this architecture cost?" |
-| 0.7 | Apr 2027 | **Diagram to code** | CloudFormation / Terraform skeleton export | "From a sentence to deployable infrastructure" |
-| 0.8 | May 2027 | **Fully offline** | Local models via Ollama; benchmark update | "Free, private, no API key" |
-| 0.9 | Jun–Jul 2027 | **Multi-cloud** | Azure and GCP catalogs and generation | "Same app, three clouds, side by side" |
-| 0.10 | Aug 2027 | **Bring your infrastructure** | Import Terraform/CloudFormation into a diagram, then review it | "Understand inherited infrastructure in a minute" |
-| 0.11 | Sep–Oct 2027 | **Share** | Share by link, draw.io export, Ask about the design (FR-022); Hacktoberfest contributor push | Contributing to an open-source AI tool |
+| 0.4 | Jan 2027 | **Edit by hand** | The P0 manual editing the MVP skipped (FR-005, FR-014, US-04): add services and containers from the catalog, connect, re-plug and edit connectors, delete, undo/redo; findings update on every edit | "Draw it yourself and watch the rules react" |
+| 0.5 | Feb 2027 | **Second opinion** | Review (FR-021): AI critique of any diagram; Mermaid export | "Your diagram, reviewed by AI, rendered in your README" · Rule checks vs AI review |
+| 0.6 | Mar 2027 | **Edit with AI** | AI edit of the existing diagram ("add a cache in front of the database"), built on 0.4's edit operations and undo. OpenAI strict-mode schema conversion does not support `z.record` or unions, and the patch schema uses both: the OpenAI adapter needs work first | Diff-based AI editing of a graph |
+| 0.7 | Apr 2027 | **Cost estimate** | Monthly AWS cost estimate per diagram from traffic assumptions | "What will this architecture cost?" |
+| 0.8 | May 2027 | **Diagram to code** | CloudFormation / Terraform skeleton export | "From a sentence to deployable infrastructure" |
+| 0.9 | Jun 2027 | **Fully offline** | Local models via Ollama; benchmark update | "Free, private, no API key" |
+| 0.10 | Jul 2027 | **Multi-cloud** | Azure and GCP catalogs and generation | "Same app, three clouds, side by side" |
+| 0.11 | Aug 2027 | **Bring your infrastructure** | Import Terraform/CloudFormation into a diagram, then review it | "Understand inherited infrastructure in a minute" |
+| 0.12 | Sep–Oct 2027 | **Share** | Share by link, draw.io export, Ask about the design (FR-022); Hacktoberfest contributor push | Contributing to an open-source AI tool |
 | 1.0 | Nov 2027 | **1.0** | Stability, accessibility, documentation site, contribution guide for catalog entries | A year of building in public |
 
 Launch channels for 0.2: LinkedIn, dev.to, Show HN; for 0.3 also r/aws and r/LLMDevs. Each
-release gets its own design, plan and PR; dates are targets, and July and October carry slack.
+release gets its own design, plan and PR; dates are targets, and October carries slack.
+
+**Reordered 2026-11-16:** Edit by hand became 0.4 and every later release moved one number. Checking the public demo showed that the editor cannot add, delete, connect or undo, all P0 in the PRD (FR-005, FR-014). AI editing needs the same operations and undo, so they come first; the extra month comes out of July's slack.
 
 ## 3. Development stages (original plan, 2026-10-13)
 
@@ -80,7 +84,7 @@ The AI spike is moved into Phase 0 because generation quality is the main produc
 
 ## 4. Implementation epics
 
-**E1 — Project/Canvas:** editor, graph schema 1.1, **containers (FR-019)**, manual operations, undo/redo, ELK layout in a Web Worker, local save/load, schema migration. Readability pass done 2026-10-19 after Gate A manual testing: orthogonal routing with label space, fit to view, resizable components and groups (schema 1.4.0), light/dark switch, resizable side panel, generation status. Still open: undo/redo, ELK in a Web Worker.
+**E1 — Project/Canvas:** editor, graph schema 1.1, **containers (FR-019)**, manual operations, undo/redo, ELK layout in a Web Worker, local save/load, schema migration. Readability pass done 2026-10-19 after Gate A manual testing: orthogonal routing with label space, fit to view, resizable components and groups (schema 1.4.0), light/dark switch, resizable side panel, generation status. Still open (planned for 0.4 Edit by hand): adding, connecting and deleting by hand, edge editing, undo/redo; ELK in a Web Worker.
 
 **E2 — Cloud Catalog:** ~40 AWS services + containers + features, CloudFormation-checked IDs, lifecycle, evidence, icon pack import with hashes and terms, manual update checklist, provider-neutral interfaces, sample Azure/GCP schemas.
 
