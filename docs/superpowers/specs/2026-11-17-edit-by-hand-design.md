@@ -1,6 +1,6 @@
 # 0.4 Edit by hand: design
 
-**Status:** draft for owner approval · **Date:** 2026-11-17 · **Release:** 0.4 (target Jan 2027)
+**Status:** approved by owner 2026-11-18 · **Date:** 2026-11-17 · **Release:** 0.4 (target Jan 2027)
 **PRD:** FR-005 (editable canvas, editable edges, undo/redo), FR-014 (manual mode), US-04 (add and
 delete nodes, edges and containers), acceptance case "manually added DAX flagged by VR-006".
 
