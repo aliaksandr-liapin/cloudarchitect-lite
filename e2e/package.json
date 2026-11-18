@@ -14,7 +14,7 @@
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
     "@cloudarchitect/generator": "workspace:*",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
