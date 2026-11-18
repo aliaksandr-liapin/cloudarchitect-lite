@@ -14,11 +14,11 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.6.0",
+    "@anthropic-ai/sdk": "^1.8.0",
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
-    "@google/genai": "^3.0.0",
-    "openai": "^7.53.0",
+    "@google/genai": "^3.3.0",
+    "openai": "^7.57.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
