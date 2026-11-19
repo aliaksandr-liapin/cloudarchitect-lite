@@ -118,8 +118,8 @@ describe('edit helpers', () => {
   });
 
   it('nestRefusal names the allowed parents, or the top level when there are none', () => {
-    expect(nestRefusal('subnet')).toBe('A Subnet can only go inside: VPC, Availability Zone.');
-    expect(nestRefusal('aws-cloud')).toBe('A AWS Cloud can only be placed at the top level.');
+    expect(nestRefusal('subnet')).toBe('Subnet can only go inside: VPC, Availability Zone.');
+    expect(nestRefusal('aws-cloud')).toBe('AWS Cloud can only be placed at the top level.');
   });
 
   it('absolutePosition sums the parent chain', () => {

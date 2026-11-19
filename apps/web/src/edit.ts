@@ -90,8 +90,8 @@ export function nestRefusal(kind: ContainerKind): string {
     (k) => awsCatalog.containers.find((c) => c.kind === k)?.displayName ?? k,
   );
   return parents.length === 0
-    ? `A ${name} can only be placed at the top level.`
-    : `A ${name} can only go inside: ${parents.join(', ')}.`;
+    ? `${name} can only be placed at the top level.`
+    : `${name} can only go inside: ${parents.join(', ')}.`;
 }
 
 /** Absolute origin of a container: its position plus every ancestor's. */
