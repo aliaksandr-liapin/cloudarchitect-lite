@@ -17,9 +17,11 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  applyEdgeChanges,
   applyNodeChanges,
   type Connection,
   type Edge,
+  type EdgeChange,
   type FitViewOptions,
   type Node,
   type NodeChange,
@@ -42,6 +44,7 @@ import {
   fitsChildren,
   needsLayout,
   recoverRoutes,
+  keepEdgeState,
   keepFlowState,
   LEGACY_NODE_SIZE,
   NODE_SIZE,
@@ -221,14 +224,15 @@ export function App() {
       setProject(laid);
       // Keep the selection (and so the resize handles and Details) and measured sizes across a commit.
       setNodes((current) => keepFlowState(current, flow.nodes));
-      setEdges(flow.edges);
+      setEdges((current) => keepEdgeState(current, flow.edges));
       if (opts.recover && !layout) {
         void recoverRoutes(laid).then(
           (recovered) => {
             // A newer commit owns the diagram (and its routes) now.
             if (projectRef.current !== laid) return;
             routesRef.current = recovered;
-            setEdges(toFlow(laid, displayName, recovered).edges);
+            const { edges: next } = toFlow(laid, displayName, recovered);
+            setEdges((current) => keepEdgeState(current, next));
           },
           () => undefined,
         );
@@ -752,6 +756,23 @@ export function App() {
     [],
   );
 
+  // Edges take select changes only: removing or adding one is an edit of the Project.
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) =>
+      setEdges((es) =>
+        applyEdgeChanges(
+          changes.filter((c) => c.type === 'select'),
+          es,
+        ),
+      ),
+    [],
+  );
+
+  /**
+   * A drag commits the new position of every node React Flow moved, so nothing moves on screen
+   * without being in the Project. Only a single service node re-parents: the container under its
+   * dragged centre becomes the parent.
+   */
   const onNodeDragStop = useCallback(
     (_: unknown, dragged: Node) => {
       const p = projectRef.current;
@@ -1096,6 +1117,7 @@ export function App() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
             deleteKeyCode={['Backspace', 'Delete']}
             onBeforeDelete={onBeforeDelete}

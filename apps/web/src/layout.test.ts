@@ -3,6 +3,7 @@ import { migrateProject, type Project } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import {
   keepFlowState,
+  keepEdgeState,
   applyLayout,
   containerMinSize,
   dropRoutes,
@@ -301,5 +302,20 @@ describe('keepFlowState', () => {
       ['a', true, undefined],
       ['b', undefined, undefined],
     ]);
+  });
+});
+
+describe('keepEdgeState', () => {
+  const edge = (id: string, extra: object = {}) => ({ id, source: 'a', target: 'b', ...extra });
+
+  it('keeps the selection of edges that survive and leaves new ones untouched', () => {
+    const current = [edge('e1', { selected: true }), edge('e2'), edge('gone', { selected: true })];
+    const next = keepEdgeState(current, [edge('e1', { label: 'new' }), edge('e2'), edge('e3')]);
+    expect(next.map((e) => [e.id, e.selected])).toEqual([
+      ['e1', true],
+      ['e2', undefined],
+      ['e3', undefined],
+    ]);
+    expect(next[0]).toMatchObject({ label: 'new' });
   });
 });

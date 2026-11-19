@@ -292,6 +292,12 @@ export function keepFlowState(current: Node[], next: Node[]): Node[] {
   });
 }
 
+/** Carries edge selection across a commit, so a connector being edited stays selected (and in Details). */
+export function keepEdgeState(current: Edge[], next: Edge[]): Edge[] {
+  const selected = new Set(current.filter((e) => e.selected).map((e) => e.id));
+  return next.map((e) => (selected.has(e.id) ? { ...e, selected: true } : e));
+}
+
 /** Converts stored project geometry to React Flow nodes. Parents must precede children, so containers go depth-first. */
 export function toFlow(
   project: Project,
