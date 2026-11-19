@@ -5,6 +5,7 @@ import {
   applyPatch,
   migrateProject,
   validateProject,
+  type Container,
   type Finding,
   type GapTopic,
   type GenerateResponse,
@@ -43,6 +44,7 @@ import {
   recoverRoutes,
   keepFlowState,
   LEGACY_NODE_SIZE,
+  NODE_SIZE,
   toFlow,
   type Routes,
 } from './layout';
@@ -59,12 +61,19 @@ import {
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
 import { Details, type Selection } from './Details';
+import { AddPanel, DRAG_MIME, type AddItem } from './AddPanel';
 import {
   absolutePosition,
+  atNodeLimit,
+  canNest,
   connectionError,
   containerAt,
   deletionOps,
+  newContainer,
   newEdge,
+  newExternalNode,
+  newServiceNode,
+  NEW_CONTAINER_SIZE,
   reparentNode,
   selectedIds,
   shouldHandleShortcut,
@@ -522,6 +531,10 @@ export function App() {
       ?.medianLatencySeconds ?? 0,
   );
 
+  /** What to select once the commit that added it has rendered. */
+  const pendingSelect = useRef<Selection | undefined>(undefined);
+  const canvasRef = useRef<HTMLElement>(null);
+
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
   const busy = step !== undefined || replacing || dialog !== undefined;
 
@@ -536,9 +549,16 @@ export function App() {
     ) => {
       const current = projectRef.current;
       if (busy || !current) return;
-      const next = Array.isArray(change)
-        ? applyPatch(current, { baseRevision: current.revision, ops: change })
-        : Project.parse({ ...change(current), revision: current.revision + 1 });
+      let next: Project;
+      try {
+        next = Array.isArray(change)
+          ? applyPatch(current, { baseRevision: current.revision, ops: change })
+          : Project.parse({ ...change(current), revision: current.revision + 1 });
+      } catch (err) {
+        pendingSelect.current = undefined;
+        setError(errorMessage(err));
+        return;
+      }
       setHistory(record(historyRef.current, current));
       if (opts.toast) setToast({ text: opts.toast, undo: true });
       void commit(next, opts.forceLayout ?? false, {
@@ -549,16 +569,17 @@ export function App() {
     [busy, commit, setHistory],
   );
 
-  // The edge to select once the commit that added it has rendered.
-  const pendingEdge = useRef<string | undefined>(undefined);
+  // The item to select once the commit that added it has rendered.
   useEffect(() => {
-    const id = pendingEdge.current;
-    if (!id || !edges.some((e) => e.id === id)) return;
-    pendingEdge.current = undefined;
-    setEdges((es) => es.map((e) => ({ ...e, selected: e.id === id })));
-    setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
-    setSelected({ kind: 'edge', id });
-  }, [edges]);
+    const pending = pendingSelect.current;
+    if (!pending) return;
+    const { kind, id } = pending;
+    if (!(kind === 'edge' ? edges : nodes).some((x) => x.id === id)) return;
+    pendingSelect.current = undefined;
+    setEdges((es) => es.map((e) => ({ ...e, selected: kind === 'edge' && e.id === id })));
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: kind === 'node' && n.id === id })));
+    setSelected({ kind, id });
+  }, [nodes, edges]);
 
   // React Flow never deletes anything itself: the selected items go through edit(), then it is told no.
   const onBeforeDelete = useCallback(
@@ -586,7 +607,7 @@ export function App() {
         return;
       }
       const edge = newEdge(source, target);
-      pendingEdge.current = edge.id;
+      pendingSelect.current = { kind: 'edge', id: edge.id };
       edit([{ op: 'addEdge', edge }]);
     },
     [busy, edit],
@@ -596,6 +617,7 @@ export function App() {
     (old: Edge, { source, target }: Connection) => {
       const current = projectRef.current;
       if (busy || !current) return;
+      if (old.source === source && old.target === target) return;
       const without = { ...current, edges: current.edges.filter((e) => e.id !== old.id) };
       const problem = connectionError(without, source, target);
       if (problem) {
@@ -608,6 +630,92 @@ export function App() {
     },
     [busy, edit],
   );
+
+  /**
+   * Adds a catalog item. `drop` is an absolute flow point (the pointer); without it the item goes
+   * inside the selected container, or at the centre of the canvas.
+   */
+  const addItem = (item: AddItem, drop?: { x: number; y: number }) => {
+    const current = projectRef.current;
+    const flow = flowRef.current;
+    if (busy || !current || !flow) return;
+    if (item.type !== 'container' && atNodeLimit(current)) {
+      setToast({ text: 'This design has the maximum of 150 components.' });
+      return;
+    }
+    const isContainer = item.type === 'container';
+    const size = isContainer ? NEW_CONTAINER_SIZE : NODE_SIZE;
+    let parent: Container | undefined;
+    let at: { x: number; y: number };
+    if (drop) {
+      parent = containerAt(current, drop);
+      const origin = absolutePosition(current, parent?.id);
+      at = { x: drop.x - origin.x, y: drop.y - origin.y };
+      if (!isContainer) {
+        at = { x: at.x - size.width / 2, y: at.y - size.height / 2 };
+      }
+    } else {
+      const sel = selected?.kind === 'node' ? selected.id : undefined;
+      parent = current.containers.find((c) => c.id === sel);
+      if (parent?.size) {
+        at = isContainer
+          ? { x: 16, y: 32 }
+          : {
+              x: Math.max(8, (parent.size.width - size.width) / 2),
+              y: Math.max(32, (parent.size.height - size.height) / 2),
+            };
+      } else {
+        parent = undefined;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const centre = flow.screenToFlowPosition({
+          x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
+          y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
+        });
+        at = { x: centre.x - size.width / 2, y: centre.y - size.height / 2 };
+      }
+    }
+    at = { x: Math.round(at.x), y: Math.round(at.y) };
+    if (item.type === 'container') {
+      if (!canNest(item.kind, parent?.kind)) {
+        const def = awsCatalog.containers.find((c) => c.kind === item.kind);
+        const parents = (def?.allowedParents ?? [])
+          .map((k) => awsCatalog.containers.find((c) => c.kind === k)?.displayName ?? k)
+          .join(', ');
+        setToast({ text: `A ${def?.displayName ?? item.kind} can only go inside: ${parents}.` });
+        return;
+      }
+      const container = newContainer(item.kind, at, parent?.id);
+      pendingSelect.current = { kind: 'node', id: container.id };
+      edit([{ op: 'addContainer', container }]);
+      return;
+    }
+    const node =
+      item.type === 'service'
+        ? newServiceNode(item.serviceId, at, parent?.id)
+        : newExternalNode(item.kind, at, parent?.id);
+    pendingSelect.current = { kind: 'node', id: node.id };
+    edit([{ op: 'addNode', node }]);
+  };
+
+  const onCanvasDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const onCanvasDrop = (e: React.DragEvent) => {
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return;
+    e.preventDefault();
+    let item: AddItem;
+    try {
+      item = JSON.parse(raw) as AddItem;
+    } catch {
+      return;
+    }
+    const flow = flowRef.current;
+    if (!flow) return;
+    addItem(item, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+  };
 
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
@@ -960,7 +1068,13 @@ export function App() {
         className="main"
         style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
       >
-        <section className={step ? 'canvas is-busy' : 'canvas'} aria-label="Architecture canvas">
+        <section
+          ref={canvasRef}
+          className={step ? 'canvas is-busy' : 'canvas'}
+          aria-label="Architecture canvas"
+          onDragOver={onCanvasDragOver}
+          onDrop={onCanvasDrop}
+        >
           {clarify && (
             <div className="overlay">
               <ClarifyCard
@@ -1044,6 +1158,14 @@ export function App() {
               onGenerate={generate}
               onCancel={cancel}
             />
+            {project && (
+              <AddPanel
+                disabled={busy}
+                atLimit={atNodeLimit(project)}
+                iconUrls={iconUrls}
+                onAdd={(item) => addItem(item)}
+              />
+            )}
             {project && selected && (
               <Details
                 project={project}

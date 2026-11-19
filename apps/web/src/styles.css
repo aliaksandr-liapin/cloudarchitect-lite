@@ -777,3 +777,64 @@ dialog.confirm::backdrop {
   margin: 12px 0 4px;
   font-size: 1em;
 }
+
+.add-panel input[type='search'] {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 8px;
+}
+.add-group h3 {
+  font-size: 12px;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.add-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 14px;
+  cursor: grab;
+}
+.add-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--muted);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.add-icon.is-official {
+  border: none;
+  background: #fff;
+  padding: 2px;
+}
+:root[data-theme='dark'] .add-icon.is-official {
+  background: #f3f4f6;
+}
+.add-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.add-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.add-row button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
