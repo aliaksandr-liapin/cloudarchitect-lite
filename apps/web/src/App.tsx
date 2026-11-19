@@ -1023,10 +1023,22 @@ export function App() {
         >
           Auto layout
         </button>
-        <button aria-label="Undo" disabled={busy || !canUndo} onClick={undoEdit}>
+        <button
+          aria-label="Undo"
+          title="Undo (⌘Z / Ctrl+Z)"
+          aria-keyshortcuts="Meta+Z Control+Z"
+          disabled={busy || !canUndo}
+          onClick={undoEdit}
+        >
           Undo
         </button>
-        <button aria-label="Redo" disabled={busy || !canRedo} onClick={redoEdit}>
+        <button
+          aria-label="Redo"
+          title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
+          aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
+          disabled={busy || !canRedo}
+          onClick={redoEdit}
+        >
           Redo
         </button>
         <details className="menu" ref={exportMenu}>
@@ -1203,14 +1215,6 @@ export function App() {
               onGenerate={generate}
               onCancel={cancel}
             />
-            {project && (
-              <AddPanel
-                disabled={busy}
-                atLimit={atNodeLimit(project)}
-                iconUrls={iconUrls}
-                onAdd={(item) => addItem(item)}
-              />
-            )}
             {project && selected && (
               <Details
                 project={project}
@@ -1221,6 +1225,14 @@ export function App() {
                   void edit(ops, removing ? { toast: 'Container deleted' } : {});
                   if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
                 }}
+              />
+            )}
+            {project && (
+              <AddPanel
+                disabled={busy}
+                atLimit={atNodeLimit(project)}
+                iconUrls={iconUrls}
+                onAdd={(item) => addItem(item)}
               />
             )}
             <section>

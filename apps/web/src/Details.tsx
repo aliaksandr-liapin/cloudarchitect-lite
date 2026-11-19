@@ -1,7 +1,17 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import { EdgeKind, type PatchOp, type Project } from '@cloudarchitect/domain';
+import { EdgeKind, type ArchEdge, type PatchOp, type Project } from '@cloudarchitect/domain';
 import { useId } from 'react';
 import { deletionOps, toggleRequirement } from './edit';
+
+/** Readable names for the connector kinds; the stored value stays the enum. */
+export const EDGE_KIND_LABELS: Record<ArchEdge['kind'], string> = {
+  invoke: 'Invoke',
+  read: 'Read',
+  write: 'Write',
+  event: 'Event',
+  origin: 'Origin',
+  other: 'Other',
+};
 
 export type Selection = { kind: 'node' | 'edge'; id: string };
 
@@ -56,10 +66,11 @@ function Field(props: {
 
 function describe({ project, selection, disabled, onEdit }: Props) {
   const { id } = selection;
-  const del = (nodes: string[], edges: string[]) => (
+  const del = (what: 'component' | 'connector' | 'container', nodes: string[], edges: string[]) => (
     <button
       type="button"
       className="btn"
+      aria-label={`Delete ${what}`}
       disabled={disabled}
       onClick={() => onEdit(deletionOps(project, { nodes, edges }))}
     >
@@ -103,7 +114,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
           >
             {EdgeKind.options.map((k) => (
               <option key={k} value={k}>
-                {k}
+                {EDGE_KIND_LABELS[k]}
               </option>
             ))}
           </select>
@@ -129,7 +140,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
             commit={text('authNotes')}
           />
         </dd>
-        <dd>{del([], [id])}</dd>
+        <dd>{del('connector', [], [id])}</dd>
       </dl>
     );
   }
@@ -181,7 +192,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
             </dd>
           </>
         )}
-        <dd>{del([id], [])}</dd>
+        <dd>{del('container', [id], [])}</dd>
       </dl>
     );
   }
@@ -250,7 +261,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
           </div>
         ))}
       </dd>
-      <dd>{del([id], [])}</dd>
+      <dd>{del('component', [id], [])}</dd>
     </dl>
   );
 }

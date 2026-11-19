@@ -63,6 +63,9 @@ describe('Details', () => {
     for (const label of ['Label', 'Kind', 'Protocol', 'Auth notes', 'Delete', 'Alpha', 'Beta'])
       expect(html).toContain(label);
     expect(html).toContain('aria-labelledby');
+    expect(html).toContain('aria-label="Delete connector"');
+    expect(html).toContain('<option value="invoke" selected="">Invoke</option>');
+    expect(html).toContain('<option value="other">Other</option>');
   });
 
   it('node view lists requirements as checkboxes, linked ones checked', () => {
@@ -73,6 +76,7 @@ describe('Details', () => {
     expect(html.match(/checked=""/g)).toHaveLength(1);
     expect(html).toContain('Delete');
     expect(html).toContain('Component name');
+    expect(html).toContain('aria-label="Delete component"');
   });
 
   it('node view says when there are no requirements', () => {
@@ -84,7 +88,7 @@ describe('Details', () => {
     expect(render({ kind: 'node', id: 'sub' })).toContain('Subnet type');
     const vpc = render({ kind: 'node', id: 'vpc' });
     expect(vpc).not.toContain('Subnet type');
-    expect(vpc).toContain('Delete');
+    expect(vpc).toContain('aria-label="Delete container"');
   });
 
   it('unknown id renders nothing', () => {
