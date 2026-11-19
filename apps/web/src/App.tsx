@@ -57,6 +57,7 @@ import {
 } from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
+import { Details, type Selection } from './Details';
 import { absolutePosition, containerAt, reparentNode, shouldHandleShortcut } from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
@@ -124,7 +125,7 @@ export function App() {
   const [project, setProject] = useState<Project>();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<Selection>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
   const modelState = useModelChoice();
@@ -231,7 +232,7 @@ export function App() {
         if (!DEMO) return;
         const id = demoBootSelection(project);
         if (!id) return;
-        setSelected(id);
+        setSelected({ kind: 'node', id });
         setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
       });
     });
@@ -561,14 +562,6 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   });
 
-  /** A hand edit: after this, generating again asks before replacing (replaceDecision). */
-  const rename = (id: string, label: string) => {
-    const node = projectRef.current?.nodes.find((n) => n.id === id);
-    const text = label.trim();
-    if (!node || !text || text === node.label) return;
-    edit((p) => ({ ...p, nodes: p.nodes.map((n) => (n.id === id ? { ...n, label: text } : n)) }));
-  };
-
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
     [project],
@@ -724,7 +717,7 @@ export function App() {
       f.containerIds[0] ??
       project?.edges.find((e) => e.id === f.edgeIds[0])?.target;
     if (!id) return;
-    setSelected(id);
+    setSelected({ kind: 'node', id });
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
   };
 
@@ -923,7 +916,15 @@ export function App() {
             deleteKeyCode={null}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
-            onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}
+            onSelectionChange={({ nodes: ns, edges: es }) =>
+              setSelected(
+                ns[0]
+                  ? { kind: 'node', id: ns[0].id }
+                  : es[0]
+                    ? { kind: 'edge', id: es[0].id }
+                    : undefined,
+              )
+            }
             fitView
             fitViewOptions={FIT}
             minZoom={0.2}
@@ -971,7 +972,16 @@ export function App() {
               onCancel={cancel}
             />
             {project && selected && (
-              <Details project={project} id={selected} onRename={rename} disabled={busy} />
+              <Details
+                project={project}
+                selection={selected}
+                disabled={busy}
+                onEdit={(ops) => {
+                  const removing = ops.some((o) => o.op === 'removeContainer');
+                  edit(ops, removing ? { toast: 'Container deleted' } : {});
+                  if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
+                }}
+              />
             )}
             <section>
               <h2>Findings ({findings.length})</h2>
@@ -1059,81 +1069,5 @@ export function App() {
         )}
       </dialog>
     </div>
-  );
-}
-
-function Details(props: {
-  project: Project;
-  id: string;
-  onRename: (id: string, label: string) => void;
-  disabled: boolean;
-}) {
-  const body = describe(props);
-  return body ? (
-    <section>
-      <h2>Details</h2>
-      {body}
-    </section>
-  ) : null;
-}
-
-function describe({
-  project,
-  id,
-  onRename,
-  disabled,
-}: {
-  project: Project;
-  id: string;
-  onRename: (id: string, label: string) => void;
-  disabled: boolean;
-}) {
-  const node = project.nodes.find((n) => n.id === id);
-  if (!node) {
-    const c = project.containers.find((x) => x.id === id);
-    return c ? <p>{`${c.label} (${c.kind})`}</p> : undefined;
-  }
-  const svc = node.serviceId ? services.get(node.serviceId) : undefined;
-  const reqs = project.requirements.filter((r) => node.requirementIds.includes(r.id));
-  return (
-    <dl className="detail">
-      <dt>Component</dt>
-      <dd>
-        <input
-          key={`${node.id}:${node.label}`}
-          className="input"
-          aria-label="Component name"
-          defaultValue={node.label}
-          maxLength={200}
-          disabled={disabled}
-          onBlur={(e) => onRename(node.id, e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-        />
-      </dd>
-      <dt>Service</dt>
-      <dd>
-        {svc
-          ? svc.displayName
-          : node.external
-            ? `${node.external.name} (external ${node.external.kind}, outside the AWS account)`
-            : `${node.unresolved?.name} (not in verified catalog)`}
-      </dd>
-      {svc && (
-        <>
-          <dt>Verification</dt>
-          <dd>
-            {svc.lifecycle} · {svc.reviewStatus.replace('_', ' ')}
-          </dd>
-          <dt>Docs</dt>
-          <dd>
-            <a href={svc.documentationUrl} target="_blank" rel="noreferrer">
-              {svc.documentationUrl}
-            </a>
-          </dd>
-        </>
-      )}
-      <dt>Requirements</dt>
-      <dd>{reqs.length ? reqs.map((r) => `${r.id}: ${r.text}`).join('; ') : 'None linked'}</dd>
-    </dl>
   );
 }
