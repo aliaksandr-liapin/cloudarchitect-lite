@@ -78,11 +78,24 @@ export function applyPatch(project: Project, patch: GraphPatch): Project {
         break;
       case 'removeContainer': {
         const removed = containers.find((c) => c.id === op.id);
+        // Children's positions are relative to their parent: shift them by the removed container's origin.
+        const origin = removed?.position ?? { x: 0, y: 0 };
+        const shift = (p: { x: number; y: number }) => ({ x: p.x + origin.x, y: p.y + origin.y });
         containers = containers
           .filter((c) => c.id !== op.id)
-          .map((c) => (c.parentId === op.id ? { ...c, parentId: removed?.parentId } : c));
+          .map((c) =>
+            c.parentId === op.id
+              ? {
+                  ...c,
+                  parentId: removed?.parentId,
+                  ...(c.position ? { position: shift(c.position) } : {}),
+                }
+              : c,
+          );
         nodes = nodes.map((n) =>
-          n.containerId === op.id ? { ...n, containerId: removed?.parentId } : n,
+          n.containerId === op.id
+            ? { ...n, containerId: removed?.parentId, position: shift(n.position) }
+            : n,
         );
         break;
       }

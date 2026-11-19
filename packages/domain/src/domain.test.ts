@@ -419,6 +419,41 @@ describe('applyPatch', () => {
     expect(next.nodes[0]).toMatchObject({ label: 'Obs', position: pos });
   });
 
+  it('removing a container keeps its children where they are on screen', () => {
+    // vpc at (100, 50) inside region r; node n at (10, 20) inside vpc; subnet s at (5, 5) inside vpc
+    const p = base({
+      containers: [
+        { id: 'cloud', kind: 'aws-cloud', label: 'AWS' },
+        { id: 'r', kind: 'region', parentId: 'cloud', label: 'us-east-1' },
+        { id: 'vpc', kind: 'vpc', parentId: 'r', label: 'VPC', position: { x: 100, y: 50 } },
+        { id: 's', kind: 'subnet', parentId: 'vpc', label: 'Subnet', position: { x: 5, y: 5 } },
+      ],
+      nodes: [
+        {
+          id: 'n',
+          provider: 'aws',
+          serviceId: 'aws.s3',
+          label: 'S3',
+          requirementIds: [],
+          containerId: 'vpc',
+          position: { x: 10, y: 20 },
+        },
+      ],
+    });
+    const next = applyPatch(p, {
+      baseRevision: p.revision,
+      ops: [{ op: 'removeContainer', id: 'vpc' }],
+    });
+    expect(next.nodes.find((n) => n.id === 'n')).toMatchObject({
+      containerId: 'r',
+      position: { x: 110, y: 70 },
+    });
+    expect(next.containers.find((c) => c.id === 's')).toMatchObject({
+      parentId: 'r',
+      position: { x: 105, y: 55 },
+    });
+  });
+
   it('rejects stale patches', () => {
     expect(() =>
       applyPatch(base({ revision: 3 }), { baseRevision: 2, ops: [{ op: 'removeNode', id: 'cw' }] }),
