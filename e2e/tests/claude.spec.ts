@@ -167,12 +167,35 @@ test('reload', async () => {
   await expect(versionsHeading(4)).toBeVisible();
 });
 
-// The editor has no delete yet (US-04). Delete keys must not hide a node while the design, its
-// findings and the export still hold it.
-test('delete keys do not hide nodes', async () => {
-  const label = dental.nodes[0]!.label;
+test('add a service by hand and see its finding', async () => {
+  await page.getByRole('searchbox', { name: 'Search services' }).fill('dax');
+  await page.getByRole('button', { name: 'Add DynamoDB Accelerator (DAX)' }).click();
+  await expect(canvas(page).getByText('DynamoDB Accelerator (DAX)').first()).toBeVisible({
+    timeout: CANVAS_TIMEOUT_MS,
+  });
+  await expect(page.locator('.findings').getByText('VR-006').first()).toBeVisible();
+});
+
+test('linking a requirement clears it', async () => {
+  // The new node is selected, so Details shows it.
+  const details = page.getByRole('region', { name: 'Details' });
+  await details.getByRole('checkbox').first().check();
+  await expect(page.locator('.findings').getByText('VR-006')).toHaveCount(0);
+});
+
+test('delete keys delete from the design, and undo brings it back', async () => {
+  const first = dental.nodes[0]!;
+  const label = first.label;
   await canvas(page).getByText(label, { exact: true }).first().click();
-  await page.keyboard.press('Backspace');
   await page.keyboard.press('Delete');
-  await expectNodes(page, dental);
+  await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
+  const json = Project.parse(JSON.parse((await download(page, 'JSON project')).toString('utf8')));
+  expect(json.nodes.some((n) => n.label === label)).toBe(false);
+  expect(json.edges.some((e) => e.source === first.id || e.target === first.id)).toBe(false);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(canvas(page).getByText(label, { exact: true }).first()).toBeVisible({
+    timeout: CANVAS_TIMEOUT_MS,
+  });
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
 });
