@@ -178,6 +178,17 @@ export function deletionOps(
   return ops;
 }
 
+/** The ids React Flow offers for deletion that were themselves selected; its extras (children, attached edges) are dropped. */
+export function selectedIds(
+  nodes: { id: string; selected?: boolean }[],
+  edges: { id: string; selected?: boolean }[],
+): { nodes: string[]; edges: string[] } {
+  return {
+    nodes: nodes.filter((n) => n.selected === true).map((n) => n.id),
+    edges: edges.filter((e) => e.selected === true).map((e) => e.id),
+  };
+}
+
 export function connectionError(
   project: Project,
   source: string,

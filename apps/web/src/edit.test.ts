@@ -14,6 +14,7 @@ import {
   newId,
   newServiceNode,
   reparentNode,
+  selectedIds,
   shortcutFor,
   isTextTarget,
   shouldHandleShortcut,
@@ -219,5 +220,16 @@ describe('shortcuts', () => {
     expect(shouldHandleShortcut(event('z', { metaKey: true }, input), false)).toBeUndefined();
     expect(shouldHandleShortcut(event('z', { metaKey: true }, body), true)).toBeUndefined();
     expect(shouldHandleShortcut(event('z', { metaKey: true }, body), false)).toBe('undo');
+  });
+});
+
+describe('selectedIds', () => {
+  it('keeps only the selected items React Flow offered', () => {
+    expect(
+      selectedIds(
+        [{ id: 'a', selected: true }, { id: 'child' }, { id: 'c', selected: false }],
+        [{ id: 'e1' }, { id: 'e2', selected: true }],
+      ),
+    ).toEqual({ nodes: ['a'], edges: ['e2'] });
   });
 });

@@ -17,6 +17,7 @@ import {
   MiniMap,
   ReactFlow,
   applyNodeChanges,
+  type Connection,
   type Edge,
   type FitViewOptions,
   type Node,
@@ -58,7 +59,16 @@ import {
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
 import { Details, type Selection } from './Details';
-import { absolutePosition, containerAt, reparentNode, shouldHandleShortcut } from './edit';
+import {
+  absolutePosition,
+  connectionError,
+  containerAt,
+  deletionOps,
+  newEdge,
+  reparentNode,
+  selectedIds,
+  shouldHandleShortcut,
+} from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
@@ -539,6 +549,66 @@ export function App() {
     [busy, commit, setHistory],
   );
 
+  // The edge to select once the commit that added it has rendered.
+  const pendingEdge = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = pendingEdge.current;
+    if (!id || !edges.some((e) => e.id === id)) return;
+    pendingEdge.current = undefined;
+    setEdges((es) => es.map((e) => ({ ...e, selected: e.id === id })));
+    setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+    setSelected({ kind: 'edge', id });
+  }, [edges]);
+
+  // React Flow never deletes anything itself: the selected items go through edit(), then it is told no.
+  const onBeforeDelete = useCallback(
+    async ({ nodes: ns, edges: es }: { nodes: Node[]; edges: Edge[] }) => {
+      const current = projectRef.current;
+      if (busy || !current) return false;
+      const ids = selectedIds(ns, es);
+      const ops = deletionOps(current, ids);
+      if (ops.length === 0) return false;
+      const container = ops.some((o) => o.op === 'removeContainer');
+      edit(ops, container ? { toast: 'Container deleted' } : {});
+      setSelected(undefined);
+      return false;
+    },
+    [busy, edit],
+  );
+
+  const onConnect = useCallback(
+    ({ source, target }: Connection) => {
+      const current = projectRef.current;
+      if (busy || !current) return;
+      const problem = connectionError(current, source, target);
+      if (problem) {
+        setToast({ text: problem });
+        return;
+      }
+      const edge = newEdge(source, target);
+      pendingEdge.current = edge.id;
+      edit([{ op: 'addEdge', edge }]);
+    },
+    [busy, edit],
+  );
+
+  const onReconnect = useCallback(
+    (old: Edge, { source, target }: Connection) => {
+      const current = projectRef.current;
+      if (busy || !current) return;
+      const without = { ...current, edges: current.edges.filter((e) => e.id !== old.id) };
+      const problem = connectionError(without, source, target);
+      if (problem) {
+        setToast({ text: problem });
+        return;
+      }
+      const routes = new Map(routesRef.current);
+      routes.delete(old.id);
+      edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }], { routes });
+    },
+    [busy, edit],
+  );
+
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
     if (busy || !current) return;
@@ -911,9 +981,12 @@ export function App() {
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onNodeDragStop={onNodeDragStop}
-            // No delete yet (US-04): React Flow's default Backspace would hide a node on screen
-            // while the project, its findings and the export still hold it.
-            deleteKeyCode={null}
+            deleteKeyCode={['Backspace', 'Delete']}
+            onBeforeDelete={onBeforeDelete}
+            onConnect={onConnect}
+            onReconnect={onReconnect}
+            nodesConnectable={!busy}
+            edgesReconnectable={!busy}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
             onSelectionChange={({ nodes: ns, edges: es }) =>
