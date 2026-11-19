@@ -169,6 +169,8 @@ export function App() {
   const [cancellable, setCancellable] = useState(false);
   /** A replace flow (generated result, Restore) is running; see `exclusive`. */
   const [replacing, setReplacing] = useState(false);
+  /** Auto layout's ELK pass is running: the latest project is not committed yet. */
+  const [layingOut, setLayingOut] = useState(false);
   const [iconState, setIconState] = useState<IconState>();
   const [iconUrls, setIconUrls] = useState<IconUrls>({});
   const [iconTick, setIconTick] = useState(0);
@@ -539,20 +541,24 @@ export function App() {
   const pendingSelect = useRef<Selection | undefined>(undefined);
   const canvasRef = useRef<HTMLElement>(null);
 
-  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
-  const busy = step !== undefined || replacing || dialog !== undefined;
+  /**
+   * A generation, a replace flow, a dialog or Auto layout is in progress: hold every other change to
+   * the diagram.
+   */
+  const busy = step !== undefined || replacing || dialog !== undefined || layingOut;
 
   /**
    * Every hand edit goes through here: the current design is remembered for Undo, then the change
-   * is applied (patch ops, or a function of the latest project) and committed.
+   * is applied (patch ops, or a function of the latest project) and committed. Resolves once the
+   * commit has landed (at once when nothing was changed).
    */
   const edit = useCallback(
     (
       change: PatchOp[] | ((p: Project) => Project),
       opts: { routes?: Routes; forceLayout?: boolean; fit?: boolean; toast?: string } = {},
-    ) => {
+    ): Promise<void> => {
       const current = projectRef.current;
-      if (busy || !current) return;
+      if (busy || !current) return Promise.resolve();
       let next: Project;
       try {
         next = Array.isArray(change)
@@ -561,11 +567,12 @@ export function App() {
       } catch (err) {
         pendingSelect.current = undefined;
         setError(errorMessage(err));
-        return;
+        return Promise.resolve();
       }
       setHistory(record(historyRef.current, current));
-      if (opts.toast) setToast({ text: opts.toast, undo: true });
-      void commit(next, opts.forceLayout ?? false, {
+      // A toast's Undo belongs to the edit that raised it: a later edit takes it away.
+      setToast((t) => (opts.toast ? { text: opts.toast, undo: true } : t?.undo ? undefined : t));
+      return commit(next, opts.forceLayout ?? false, {
         ...(opts.routes ? { routes: opts.routes } : {}),
         ...(opts.fit ? { fit: true } : {}),
       });
@@ -594,7 +601,7 @@ export function App() {
       const ops = deletionOps(current, ids);
       if (ops.length === 0) return false;
       const container = ops.some((o) => o.op === 'removeContainer');
-      edit(ops, container ? { toast: 'Container deleted' } : {});
+      void edit(ops, container ? { toast: 'Container deleted' } : {});
       setSelected(undefined);
       return false;
     },
@@ -612,7 +619,7 @@ export function App() {
       }
       const edge = newEdge(source, target);
       pendingSelect.current = { kind: 'edge', id: edge.id };
-      edit([{ op: 'addEdge', edge }]);
+      void edit([{ op: 'addEdge', edge }]);
     },
     [busy, edit],
   );
@@ -630,7 +637,7 @@ export function App() {
       }
       const routes = new Map(routesRef.current);
       routes.delete(old.id);
-      edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }], { routes });
+      void edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }], { routes });
     },
     [busy, edit],
   );
@@ -692,7 +699,7 @@ export function App() {
       }
       const container = newContainer(item.kind, at, parent?.id);
       pendingSelect.current = { kind: 'node', id: container.id };
-      edit([{ op: 'addContainer', container }]);
+      void edit([{ op: 'addContainer', container }]);
       return;
     }
     const node =
@@ -700,7 +707,7 @@ export function App() {
         ? newServiceNode(item.serviceId, at, parent?.id)
         : newExternalNode(item.kind, at, parent?.id);
     pendingSelect.current = { kind: 'node', id: node.id };
-    edit([{ op: 'addNode', node }]);
+    void edit([{ op: 'addNode', node }]);
   };
 
   const onCanvasDragOver = (e: React.DragEvent) => {
@@ -828,7 +835,7 @@ export function App() {
         x: pos.x - (x - old.x),
         y: pos.y - (y - old.y),
       });
-      edit(
+      void edit(
         (q) => ({
           ...q,
           nodes: q.nodes.map((n) =>
@@ -997,7 +1004,10 @@ export function App() {
         <button
           disabled={busy}
           onClick={() => {
-            edit((p) => p, { forceLayout: true, fit: true });
+            setLayingOut(true);
+            void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
+              setLayingOut(false),
+            );
           }}
         >
           Auto layout
@@ -1197,7 +1207,7 @@ export function App() {
                 disabled={busy}
                 onEdit={(ops) => {
                   const removing = ops.some((o) => o.op === 'removeContainer');
-                  edit(ops, removing ? { toast: 'Container deleted' } : {});
+                  void edit(ops, removing ? { toast: 'Container deleted' } : {});
                   if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
                 }}
               />
