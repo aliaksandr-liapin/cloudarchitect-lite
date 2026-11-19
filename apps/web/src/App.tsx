@@ -778,36 +778,50 @@ export function App() {
    * dragged centre becomes the parent.
    */
   const onNodeDragStop = useCallback(
-    (_: unknown, dragged: Node) => {
+    (_: unknown, dragged: Node, draggedNodes: Node[]) => {
       const p = projectRef.current;
       if (!p) return;
-      const position = dragged.position;
-      const node = p.nodes.find((n) => n.id === dragged.id);
-      const box = node ?? p.containers.find((c) => c.id === dragged.id);
-      if (!box) return;
-      // Only service nodes re-parent: the container under the dragged centre becomes the parent.
-      let target = node?.containerId;
-      if (node && dragged.type === 'service') {
+      const all = draggedNodes.length > 0 ? draggedNodes : [dragged];
+      const moved = new Map<string, { x: number; y: number }>();
+      for (const d of all) {
+        const box = p.nodes.find((n) => n.id === d.id) ?? p.containers.find((c) => c.id === d.id);
+        if (!box) continue;
+        const old = box.position ?? { x: 0, y: 0 };
+        if (old.x !== d.position.x || old.y !== d.position.y) moved.set(d.id, d.position);
+      }
+      let reparent: { id: string; target: string | undefined } | undefined;
+      const single = all.length === 1 ? all[0] : undefined;
+      const node = single && p.nodes.find((n) => n.id === single.id);
+      if (single && node && single.type === 'service') {
         const size = node.size ?? LEGACY_NODE_SIZE;
         const origin = absolutePosition(p, node.containerId);
-        target = containerAt(p, {
-          x: origin.x + position.x + size.width / 2,
-          y: origin.y + position.y + size.height / 2,
+        const target = containerAt(p, {
+          x: origin.x + single.position.x + size.width / 2,
+          y: origin.y + single.position.y + size.height / 2,
         })?.id;
+        if (target !== node.containerId) reparent = { id: node.id, target };
       }
-      const reparent = node !== undefined && target !== node.containerId;
-      const old = box.position ?? { x: 0, y: 0 };
-      if (!reparent && old.x === position.x && old.y === position.y) return;
-      edit(
+      if (!reparent && moved.size === 0) return;
+      void edit(
         (q) => {
           const placed = {
             ...q,
-            nodes: q.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-            containers: q.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+            nodes: q.nodes.map((n) => {
+              const position = moved.get(n.id);
+              return position ? { ...n, position } : n;
+            }),
+            containers: q.containers.map((c) => {
+              const position = moved.get(c.id);
+              return position ? { ...c, position } : c;
+            }),
           };
-          return reparent ? reparentNode(placed, dragged.id, target) : placed;
+          return reparent ? reparentNode(placed, reparent.id, reparent.target) : placed;
         },
-        { routes: dropRoutes(routesRef.current, p, [dragged.id]) },
+        {
+          routes: dropRoutes(routesRef.current, p, [
+            ...new Set([...moved.keys(), ...(reparent ? [reparent.id] : [])]),
+          ]),
+        },
       );
     },
     [edit],
