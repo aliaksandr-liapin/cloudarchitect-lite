@@ -299,7 +299,9 @@ export function toFlow(
   routes?: Routes,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
-  const parented = (parentId?: string) => (parentId ? { parentId, extent: 'parent' as const } : {});
+  /** Containers stay inside their parent; service nodes may be dragged out (and re-parented on drop). */
+  const parented = (parentId?: string, bound = false) =>
+    parentId ? { parentId, ...(bound ? { extent: 'parent' as const } : {}) } : {};
 
   const addContainer = (c: Container) => {
     nodes.push({
@@ -308,7 +310,7 @@ export function toFlow(
       position: c.position ?? { x: 0, y: 0 },
       style: { width: c.size?.width, height: c.size?.height },
       data: { container: c } satisfies ContainerNodeData,
-      ...parented(c.parentId),
+      ...parented(c.parentId, true),
     });
     project.containers.filter((child) => child.parentId === c.id).forEach(addContainer);
   };

@@ -41,6 +41,7 @@ import {
   needsLayout,
   recoverRoutes,
   keepFlowState,
+  LEGACY_NODE_SIZE,
   toFlow,
   type Routes,
 } from './layout';
@@ -56,7 +57,7 @@ import {
 } from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
-import { shouldHandleShortcut } from './edit';
+import { absolutePosition, containerAt, reparentNode, shouldHandleShortcut } from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
@@ -517,19 +518,25 @@ export function App() {
    * Every hand edit goes through here: the current design is remembered for Undo, then the change
    * is applied (patch ops, or a function of the latest project) and committed.
    */
-  const edit = (
-    change: PatchOp[] | ((p: Project) => Project),
-    opts: { routes?: Routes; forceLayout?: boolean; toast?: string } = {},
-  ) => {
-    const current = projectRef.current;
-    if (busy || !current) return;
-    const next = Array.isArray(change)
-      ? applyPatch(current, { baseRevision: current.revision, ops: change })
-      : Project.parse({ ...change(current), revision: current.revision + 1 });
-    setHistory(record(historyRef.current, current));
-    if (opts.toast) setToast({ text: opts.toast, undo: true });
-    void commit(next, opts.forceLayout ?? false, opts.routes ? { routes: opts.routes } : {});
-  };
+  const edit = useCallback(
+    (
+      change: PatchOp[] | ((p: Project) => Project),
+      opts: { routes?: Routes; forceLayout?: boolean; fit?: boolean; toast?: string } = {},
+    ) => {
+      const current = projectRef.current;
+      if (busy || !current) return;
+      const next = Array.isArray(change)
+        ? applyPatch(current, { baseRevision: current.revision, ops: change })
+        : Project.parse({ ...change(current), revision: current.revision + 1 });
+      setHistory(record(historyRef.current, current));
+      if (opts.toast) setToast({ text: opts.toast, undo: true });
+      void commit(next, opts.forceLayout ?? false, {
+        ...(opts.routes ? { routes: opts.routes } : {}),
+        ...(opts.fit ? { fit: true } : {}),
+      });
+    },
+    [busy, commit],
+  );
 
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
@@ -572,19 +579,41 @@ export function App() {
     [],
   );
 
-  const onNodeDragStop = (_: unknown, dragged: Node) => {
-    const p = projectRef.current;
-    if (!p) return;
-    const position = dragged.position;
-    edit(
-      (q) => ({
-        ...q,
-        nodes: q.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-        containers: q.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
-      }),
-      { routes: dropRoutes(routesRef.current, p, [dragged.id]) },
-    );
-  };
+  const onNodeDragStop = useCallback(
+    (_: unknown, dragged: Node) => {
+      const p = projectRef.current;
+      if (!p) return;
+      const position = dragged.position;
+      const node = p.nodes.find((n) => n.id === dragged.id);
+      const box = node ?? p.containers.find((c) => c.id === dragged.id);
+      if (!box) return;
+      // Only service nodes re-parent: the container under the dragged centre becomes the parent.
+      let target = node?.containerId;
+      if (node && dragged.type === 'service') {
+        const size = node.size ?? LEGACY_NODE_SIZE;
+        const origin = absolutePosition(p, node.containerId);
+        target = containerAt(p, {
+          x: origin.x + position.x + size.width / 2,
+          y: origin.y + position.y + size.height / 2,
+        })?.id;
+      }
+      const reparent = node !== undefined && target !== node.containerId;
+      const old = box.position ?? { x: 0, y: 0 };
+      if (!reparent && old.x === position.x && old.y === position.y) return;
+      edit(
+        (q) => {
+          const placed = {
+            ...q,
+            nodes: q.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
+            containers: q.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+          };
+          return reparent ? reparentNode(placed, dragged.id, target) : placed;
+        },
+        { routes: dropRoutes(routesRef.current, p, [dragged.id]) },
+      );
+    },
+    [edit],
+  );
 
   /**
    * A resize is a hand edit like a drag. Left and top handles move the box too; React Flow then shifts
@@ -626,8 +655,7 @@ export function App() {
         { routes: dropRoutes(routesRef.current, p, [id]) },
       );
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy],
+    [edit],
   );
 
   /** Loads the official icons, polling every 3 s only while a download is plausibly running (see `nextIconStep`). */
@@ -775,8 +803,7 @@ export function App() {
         <button
           disabled={busy}
           onClick={() => {
-            fitPendingRef.current = true;
-            edit((p) => p, { forceLayout: true });
+            edit((p) => p, { forceLayout: true, fit: true });
           }}
         >
           Auto layout

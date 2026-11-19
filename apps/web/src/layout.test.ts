@@ -61,6 +61,13 @@ describe('layout', () => {
     });
   });
 
+  it('service nodes can leave their container; containers stay inside their parent', () => {
+    const { nodes } = toFlow(project, (id) => id);
+    expect(nodes.find((n) => n.id === 'db')).toMatchObject({ parentId: 'region' });
+    expect(nodes.find((n) => n.id === 'db')?.extent).toBeUndefined();
+    expect(nodes.find((n) => n.id === 'region')?.extent).toBe('parent');
+  });
+
   it('emits parents before children for React Flow', async () => {
     const { nodes } = toFlow((await applyLayout(project)).project, (id) => id);
     const index = new Map(nodes.map((n, i) => [n.id, i]));
