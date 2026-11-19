@@ -196,6 +196,107 @@ test('delete keys delete from the design, and undo brings it back', async () => 
   await expect(canvas(page).getByText(label, { exact: true }).first()).toBeVisible({
     timeout: CANVAS_TIMEOUT_MS,
   });
+  await expectNodes(page, dental);
   await page.keyboard.press('ControlOrMeta+Shift+z');
   await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
+});
+
+/** The JSON export, parsed. */
+const exportJson = async () =>
+  Project.parse(JSON.parse((await download(page, 'JSON project')).toString('utf8')));
+
+/** Centre of an element's bounding box, in page coordinates. */
+const centre = async (selector: string) => {
+  const box = await canvas(page).locator(selector).first().boundingBox();
+  if (!box) throw new Error(`${selector} is not on screen`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+
+/**
+ * Clicks a connector on its own stroke: connectors leaving the same handle share their first
+ * segment, so this picks a point along the path where this connector is the topmost element.
+ */
+async function clickEdge(id: string): Promise<void> {
+  const path = canvas(page).locator(
+    `.react-flow__edge[data-id="${id}"] path.react-flow__edge-path`,
+  );
+  const at = await path.evaluate((el, edgeId) => {
+    // The e2e tsconfig has no DOM lib; this runs in the browser.
+    type Hit = { closest(s: string): { getAttribute(n: string): string | null } | null } | null;
+    const p = el as unknown as {
+      getTotalLength(): number;
+      getPointAtLength(l: number): { x: number; y: number };
+      getScreenCTM(): { a: number; b: number; c: number; d: number; e: number; f: number } | null;
+      ownerDocument: { elementFromPoint(x: number, y: number): Hit };
+    };
+    const m = p.getScreenCTM()!;
+    const total = p.getTotalLength();
+    for (const f of [0.5, 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1]) {
+      const q = p.getPointAtLength(total * f);
+      const x = q.x * m.a + q.y * m.c + m.e;
+      const y = q.x * m.b + q.y * m.d + m.f;
+      const hit = p.ownerDocument.elementFromPoint(x, y)?.closest('.react-flow__edge');
+      if (hit?.getAttribute('data-id') === edgeId) return { x, y };
+    }
+    return undefined;
+  }, id);
+  if (!at) throw new Error(`no clickable point on connector ${id}`);
+  await page.mouse.click(at.x, at.y);
+}
+
+test('connectors: connect, select, edit, delete and undo', async () => {
+  // Two dental components that are still on the canvas and not yet connected that way.
+  const gone = dental.nodes[0]!.id;
+  const present = dental.nodes.filter((n) => n.id !== gone);
+  const pair = present
+    .flatMap((a) => present.map((b) => [a, b] as const))
+    .find(
+      ([a, b]) =>
+        a.id !== b.id && !dental.edges.some((e) => e.source === a.id && e.target === b.id),
+    );
+  expect(pair, 'two dental components to connect').toBeDefined();
+  const [from, to] = pair!;
+
+  const start = await centre(`.react-flow__node[data-id="${from.id}"] .react-flow__handle.source`);
+  const end = await centre(`.react-flow__node[data-id="${to.id}"] .react-flow__handle.target`);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  await page.mouse.up();
+
+  let json = await exportJson();
+  const edge = json.edges.find((e) => e.source === from.id && e.target === to.id);
+  expect(edge, 'the dragged connector is in the design').toBeDefined();
+  const id = edge!.id;
+  const shown = canvas(page).locator(`.react-flow__edge[data-id="${id}"]`);
+  await expect(shown).toHaveCount(1);
+
+  // Clicking empty canvas closes Details; clicking the connector opens its view.
+  const details = page.getByRole('region', { name: 'Details' });
+  await canvas(page)
+    .locator('.react-flow__pane')
+    .click({ position: { x: 5, y: 5 } });
+  await expect(details).toHaveCount(0);
+  await clickEdge(id);
+  const kind = details.getByRole('combobox', { name: 'Kind' });
+  await expect(kind).toBeVisible();
+  await expect(details.getByRole('button', { name: 'Delete connector' })).toBeVisible();
+  await expect(details.getByText(`${from.label} → ${to.label}`)).toBeVisible();
+
+  await kind.selectOption({ label: 'Invoke' });
+  await expect(kind).toHaveValue('invoke');
+  json = await exportJson();
+  expect(json.edges.find((e) => e.id === id)?.kind).toBe('invoke');
+  await expect(kind).toHaveValue('invoke');
+
+  await clickEdge(id);
+  await page.keyboard.press('Delete');
+  await expect(shown).toHaveCount(0);
+  json = await exportJson();
+  expect(json.edges.some((e) => e.id === id)).toBe(false);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(shown).toHaveCount(1, { timeout: CANVAS_TIMEOUT_MS });
+  json = await exportJson();
+  expect(json.edges.find((e) => e.id === id)?.kind).toBe('invoke');
 });
