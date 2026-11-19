@@ -654,6 +654,8 @@ export function App() {
       if (!isContainer) {
         at = { x: at.x - size.width / 2, y: at.y - size.height / 2 };
       }
+      // Keep it below the container's header, like the Add button does.
+      if (parent) at = { x: Math.max(8, at.x), y: Math.max(32, at.y) };
     } else {
       const sel = selected?.kind === 'node' ? selected.id : undefined;
       parent = current.containers.find((c) => c.id === sel);
