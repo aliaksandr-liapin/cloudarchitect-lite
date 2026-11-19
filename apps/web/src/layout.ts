@@ -292,6 +292,12 @@ export function keepFlowState(current: Node[], next: Node[]): Node[] {
   });
 }
 
+/** Carries edge selection across a commit, so a connector being edited stays selected (and in Details). */
+export function keepEdgeState(current: Edge[], next: Edge[]): Edge[] {
+  const selected = new Set(current.filter((e) => e.selected).map((e) => e.id));
+  return next.map((e) => (selected.has(e.id) ? { ...e, selected: true } : e));
+}
+
 /** Converts stored project geometry to React Flow nodes. Parents must precede children, so containers go depth-first. */
 export function toFlow(
   project: Project,
@@ -299,7 +305,9 @@ export function toFlow(
   routes?: Routes,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
-  const parented = (parentId?: string) => (parentId ? { parentId, extent: 'parent' as const } : {});
+  /** Containers stay inside their parent; service nodes may be dragged out (and re-parented on drop). */
+  const parented = (parentId?: string, bound = false) =>
+    parentId ? { parentId, ...(bound ? { extent: 'parent' as const } : {}) } : {};
 
   const addContainer = (c: Container) => {
     nodes.push({
@@ -308,7 +316,7 @@ export function toFlow(
       position: c.position ?? { x: 0, y: 0 },
       style: { width: c.size?.width, height: c.size?.height },
       data: { container: c } satisfies ContainerNodeData,
-      ...parented(c.parentId),
+      ...parented(c.parentId, true),
     });
     project.containers.filter((child) => child.parentId === c.id).forEach(addContainer);
   };

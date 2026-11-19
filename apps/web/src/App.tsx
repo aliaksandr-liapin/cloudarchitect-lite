@@ -1,12 +1,15 @@
 import { awsCatalog, samples } from '@cloudarchitect/catalog';
 import {
   MODEL_OPTIONS,
+  Project,
+  applyPatch,
   migrateProject,
   validateProject,
+  type Container,
   type Finding,
   type GapTopic,
   type GenerateResponse,
-  type Project,
+  type PatchOp,
   type Requirement,
 } from '@cloudarchitect/domain';
 import {
@@ -14,8 +17,11 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  applyEdgeChanges,
   applyNodeChanges,
+  type Connection,
   type Edge,
+  type EdgeChange,
   type FitViewOptions,
   type Node,
   type NodeChange,
@@ -38,7 +44,10 @@ import {
   fitsChildren,
   needsLayout,
   recoverRoutes,
+  keepEdgeState,
   keepFlowState,
+  LEGACY_NODE_SIZE,
+  NODE_SIZE,
   toFlow,
   type Routes,
 } from './layout';
@@ -53,6 +62,26 @@ import {
   type IconUrls,
 } from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
+import { Details, type Selection } from './Details';
+import { AddPanel, DRAG_MIME, type AddItem } from './AddPanel';
+import {
+  absolutePosition,
+  atNodeLimit,
+  canNest,
+  nestRefusal,
+  connectionError,
+  containerAt,
+  deletionOps,
+  newContainer,
+  newEdge,
+  newExternalNode,
+  newServiceNode,
+  NEW_CONTAINER_SIZE,
+  reparentNode,
+  selectedIds,
+  shouldHandleShortcut,
+} from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
@@ -109,7 +138,7 @@ const STORAGE_DIALOG: DialogSpec = {
   ],
 };
 
-type Toast = { text: string; restore?: ProjectVersion };
+type Toast = { text: string; restore?: ProjectVersion; undo?: boolean };
 
 /** Fit the whole diagram with padding, never zooming past 100 %. */
 const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
@@ -119,7 +148,7 @@ export function App() {
   const [project, setProject] = useState<Project>();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<Selection>();
   const [error, setError] = useState<string>();
   const [setupPending, setSetupPending] = useState(false);
   const modelState = useModelChoice();
@@ -141,6 +170,8 @@ export function App() {
   const [cancellable, setCancellable] = useState(false);
   /** A replace flow (generated result, Restore) is running; see `exclusive`. */
   const [replacing, setReplacing] = useState(false);
+  /** Auto layout's ELK pass is running: the latest project is not committed yet. */
+  const [layingOut, setLayingOut] = useState(false);
   const [iconState, setIconState] = useState<IconState>();
   const [iconUrls, setIconUrls] = useState<IconUrls>({});
   const [iconTick, setIconTick] = useState(0);
@@ -156,10 +187,22 @@ export function App() {
   const abortRef = useRef<AbortController>(undefined);
   /** Latest committed project, for async flows that outlive a render. */
   const projectRef = useRef<Project>(undefined);
+  const historyRef = useRef<History>(EMPTY_HISTORY);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
   const preparedRef = useRef<Kept & { project: Project | undefined }>(undefined);
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
+
+  const setHistory = useCallback((h: History) => {
+    historyRef.current = h;
+    setCanUndo(h.past.length > 0);
+    setCanRedo(h.future.length > 0);
+  }, []);
+
+  /** A different design was loaded: nothing before it can be undone. */
+  const clearHistory = useCallback(() => setHistory(EMPTY_HISTORY), [setHistory]);
 
   /**
    * Single entry point for project changes: lay out if needed, persist, re-render. A layout pass
@@ -184,14 +227,15 @@ export function App() {
       setProject(laid);
       // Keep the selection (and so the resize handles and Details) and measured sizes across a commit.
       setNodes((current) => keepFlowState(current, flow.nodes));
-      setEdges(flow.edges);
+      setEdges((current) => keepEdgeState(current, flow.edges));
       if (opts.recover && !layout) {
         void recoverRoutes(laid).then(
           (recovered) => {
             // A newer commit owns the diagram (and its routes) now.
             if (projectRef.current !== laid) return;
             routesRef.current = recovered;
-            setEdges(toFlow(laid, displayName, recovered).edges);
+            const { edges: next } = toFlow(laid, displayName, recovered);
+            setEdges((current) => keepEdgeState(current, next));
           },
           () => undefined,
         );
@@ -209,15 +253,16 @@ export function App() {
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
+      clearHistory();
       return commit(project, false, { recover: true }).then(() => {
         if (!DEMO) return;
         const id = demoBootSelection(project);
         if (!id) return;
-        setSelected(id);
+        setSelected({ kind: 'node', id });
         setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
       });
     });
-  }, [commit]);
+  }, [commit, clearHistory]);
 
   useEffect(() => {
     // Self-hosted installs: point to the wizard, but never block the local-first editor.
@@ -341,6 +386,7 @@ export function App() {
     const saved = preparedRef.current?.saved ?? undefined;
     preparedRef.current = undefined;
     setStep('checking');
+    clearHistory();
     await commit(
       {
         ...migrateProject(generated),
@@ -364,6 +410,7 @@ export function App() {
         await refreshVersions(current.projectId);
         setVersionsAdded((n) => n + 1);
       }
+      clearHistory();
       await commit(
         {
           ...migrateProject(v.project),
@@ -485,25 +532,225 @@ export function App() {
     setToast({ text: CANCELLED });
   };
 
-  /** A hand edit: after this, generating again asks before replacing (replaceDecision). */
-  const rename = (id: string, label: string) => {
-    const node = project?.nodes.find((n) => n.id === id);
-    if (!project || !node || !label.trim() || label.trim() === node.label) return;
-    void commit({
-      ...project,
-      revision: project.revision + 1,
-      nodes: project.nodes.map((n) => (n.id === id ? { ...n, label: label.trim() } : n)),
-    });
-  };
-
   // Typical wait for the chosen model (benchmark median), shown next to the timer.
   const typicalSeconds = Math.round(
     MODEL_OPTIONS.find((m) => m.id === (modelState.choice ?? 'haiku'))?.benchmark
       ?.medianLatencySeconds ?? 0,
   );
 
-  /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
-  const busy = step !== undefined || replacing || dialog !== undefined;
+  /** What to select once the commit that added it has rendered. */
+  const pendingSelect = useRef<Selection | undefined>(undefined);
+  const canvasRef = useRef<HTMLElement>(null);
+
+  /**
+   * A generation, a replace flow, a dialog or Auto layout is in progress: hold every other change to
+   * the diagram.
+   */
+  const busy = step !== undefined || replacing || dialog !== undefined || layingOut;
+
+  /**
+   * Every hand edit goes through here: the current design is remembered for Undo, then the change
+   * is applied (patch ops, or a function of the latest project) and committed. Resolves once the
+   * commit has landed (at once when nothing was changed).
+   */
+  const edit = useCallback(
+    (
+      change: PatchOp[] | ((p: Project) => Project),
+      opts: { routes?: Routes; forceLayout?: boolean; fit?: boolean; toast?: string } = {},
+    ): Promise<void> => {
+      const current = projectRef.current;
+      if (busy || !current) return Promise.resolve();
+      let next: Project;
+      try {
+        next = Array.isArray(change)
+          ? applyPatch(current, { baseRevision: current.revision, ops: change })
+          : Project.parse({ ...change(current), revision: current.revision + 1 });
+      } catch (err) {
+        pendingSelect.current = undefined;
+        setError(errorMessage(err));
+        return Promise.resolve();
+      }
+      setHistory(record(historyRef.current, current));
+      // A toast's Undo belongs to the edit that raised it: a later edit takes it away.
+      setToast((t) => (opts.toast ? { text: opts.toast, undo: true } : t?.undo ? undefined : t));
+      return commit(next, opts.forceLayout ?? false, {
+        ...(opts.routes ? { routes: opts.routes } : {}),
+        ...(opts.fit ? { fit: true } : {}),
+      });
+    },
+    [busy, commit, setHistory],
+  );
+
+  // The item to select once the commit that added it has rendered.
+  useEffect(() => {
+    const pending = pendingSelect.current;
+    if (!pending) return;
+    const { kind, id } = pending;
+    if (!(kind === 'edge' ? edges : nodes).some((x) => x.id === id)) return;
+    pendingSelect.current = undefined;
+    setEdges((es) => es.map((e) => ({ ...e, selected: kind === 'edge' && e.id === id })));
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: kind === 'node' && n.id === id })));
+    setSelected({ kind, id });
+  }, [nodes, edges]);
+
+  // React Flow never deletes anything itself: the selected items go through edit(), then it is told no.
+  const onBeforeDelete = useCallback(
+    async ({ nodes: ns, edges: es }: { nodes: Node[]; edges: Edge[] }) => {
+      const current = projectRef.current;
+      if (busy || !current) return false;
+      const ids = selectedIds(ns, es);
+      const ops = deletionOps(current, ids);
+      if (ops.length === 0) return false;
+      const container = ops.some((o) => o.op === 'removeContainer');
+      void edit(ops, container ? { toast: 'Container deleted' } : {});
+      setSelected(undefined);
+      return false;
+    },
+    [busy, edit],
+  );
+
+  const onConnect = useCallback(
+    ({ source, target }: Connection) => {
+      const current = projectRef.current;
+      if (busy || !current) return;
+      const problem = connectionError(current, source, target);
+      if (problem) {
+        setToast({ text: problem });
+        return;
+      }
+      const edge = newEdge(source, target);
+      pendingSelect.current = { kind: 'edge', id: edge.id };
+      void edit([{ op: 'addEdge', edge }]);
+    },
+    [busy, edit],
+  );
+
+  const onReconnect = useCallback(
+    (old: Edge, { source, target }: Connection) => {
+      const current = projectRef.current;
+      if (busy || !current) return;
+      if (old.source === source && old.target === target) return;
+      const without = { ...current, edges: current.edges.filter((e) => e.id !== old.id) };
+      const problem = connectionError(without, source, target);
+      if (problem) {
+        setToast({ text: problem });
+        return;
+      }
+      const routes = new Map(routesRef.current);
+      routes.delete(old.id);
+      void edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }], { routes });
+    },
+    [busy, edit],
+  );
+
+  /**
+   * Adds a catalog item. `drop` is an absolute flow point (the pointer); without it the item goes
+   * inside the selected container, or at the centre of the canvas.
+   */
+  const addItem = (item: AddItem, drop?: { x: number; y: number }) => {
+    const current = projectRef.current;
+    const flow = flowRef.current;
+    if (busy || !current || !flow) return;
+    if (item.type !== 'container' && atNodeLimit(current)) {
+      setToast({ text: 'This design has the maximum of 150 components.' });
+      return;
+    }
+    const isContainer = item.type === 'container';
+    const size = isContainer ? NEW_CONTAINER_SIZE : NODE_SIZE;
+    let parent: Container | undefined;
+    let at: { x: number; y: number };
+    if (drop) {
+      parent = containerAt(current, drop);
+      const origin = absolutePosition(current, parent?.id);
+      at = { x: drop.x - origin.x, y: drop.y - origin.y };
+      if (!isContainer) {
+        at = { x: at.x - size.width / 2, y: at.y - size.height / 2 };
+      }
+      // Keep it below the container's header, like the Add button does.
+      if (parent) at = { x: Math.max(8, at.x), y: Math.max(32, at.y) };
+    } else {
+      const sel = selected?.kind === 'node' ? selected.id : undefined;
+      parent = current.containers.find((c) => c.id === sel);
+      if (parent?.size) {
+        at = isContainer
+          ? { x: 16, y: 32 }
+          : {
+              x: Math.max(8, (parent.size.width - size.width) / 2),
+              y: Math.max(32, (parent.size.height - size.height) / 2),
+            };
+      } else {
+        parent = undefined;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const centre = flow.screenToFlowPosition({
+          x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
+          y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
+        });
+        at = { x: centre.x - size.width / 2, y: centre.y - size.height / 2 };
+      }
+    }
+    at = { x: Math.round(at.x), y: Math.round(at.y) };
+    if (item.type === 'container') {
+      if (!canNest(item.kind, parent?.kind)) {
+        setToast({ text: nestRefusal(item.kind) });
+        return;
+      }
+      const container = newContainer(item.kind, at, parent?.id);
+      pendingSelect.current = { kind: 'node', id: container.id };
+      void edit([{ op: 'addContainer', container }]);
+      return;
+    }
+    const node =
+      item.type === 'service'
+        ? newServiceNode(item.serviceId, at, parent?.id)
+        : newExternalNode(item.kind, at, parent?.id);
+    pendingSelect.current = { kind: 'node', id: node.id };
+    void edit([{ op: 'addNode', node }]);
+  };
+
+  const onCanvasDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const onCanvasDrop = (e: React.DragEvent) => {
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return;
+    e.preventDefault();
+    let item: AddItem;
+    try {
+      item = JSON.parse(raw) as AddItem;
+    } catch {
+      return;
+    }
+    const flow = flowRef.current;
+    if (!flow) return;
+    addItem(item, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+  };
+
+  const stepHistory = (move: typeof undo) => {
+    const current = projectRef.current;
+    if (busy || !current) return;
+    const moved = move(historyRef.current, current);
+    if (!moved) return;
+    setHistory(moved.history);
+    // A toast's Undo targets the edit it announced; once history moves, it would undo something else.
+    setToast((t) => (t?.undo ? undefined : t));
+    void commit(moved.project, false, { recover: true });
+  };
+  const undoEdit = () => stepHistory(undo);
+  const redoEdit = () => stepHistory(redo);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = shouldHandleShortcut(e, busy);
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'undo') undoEdit();
+      else redoEdit();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
 
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
@@ -515,22 +762,71 @@ export function App() {
     [],
   );
 
+  // Edges take select changes only: removing or adding one is an edit of the Project.
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) =>
+      setEdges((es) =>
+        applyEdgeChanges(
+          changes.filter((c) => c.type === 'select'),
+          es,
+        ),
+      ),
+    [],
+  );
+
+  /**
+   * A drag commits the new position of every node React Flow moved, so nothing moves on screen
+   * without being in the Project. Only a single service node re-parents: the container under its
+   * dragged centre becomes the parent.
+   */
   const onNodeDragStop = useCallback(
-    (_: unknown, dragged: Node) => {
-      if (!project) return;
-      const position = dragged.position;
-      void commit(
-        {
-          ...project,
-          revision: project.revision + 1,
-          nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-          containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+    (_: unknown, dragged: Node, draggedNodes: Node[]) => {
+      const p = projectRef.current;
+      if (!p) return;
+      const all = draggedNodes.length > 0 ? draggedNodes : [dragged];
+      const moved = new Map<string, { x: number; y: number }>();
+      for (const d of all) {
+        const box = p.nodes.find((n) => n.id === d.id) ?? p.containers.find((c) => c.id === d.id);
+        if (!box) continue;
+        const old = box.position ?? { x: 0, y: 0 };
+        if (old.x !== d.position.x || old.y !== d.position.y) moved.set(d.id, d.position);
+      }
+      let reparent: { id: string; target: string | undefined } | undefined;
+      const single = all.length === 1 ? all[0] : undefined;
+      const node = single && p.nodes.find((n) => n.id === single.id);
+      if (single && node && single.type === 'service') {
+        const size = node.size ?? LEGACY_NODE_SIZE;
+        const origin = absolutePosition(p, node.containerId);
+        const target = containerAt(p, {
+          x: origin.x + single.position.x + size.width / 2,
+          y: origin.y + single.position.y + size.height / 2,
+        })?.id;
+        if (target !== node.containerId) reparent = { id: node.id, target };
+      }
+      if (!reparent && moved.size === 0) return;
+      void edit(
+        (q) => {
+          const placed = {
+            ...q,
+            nodes: q.nodes.map((n) => {
+              const position = moved.get(n.id);
+              return position ? { ...n, position } : n;
+            }),
+            containers: q.containers.map((c) => {
+              const position = moved.get(c.id);
+              return position ? { ...c, position } : c;
+            }),
+          };
+          return reparent ? reparentNode(placed, reparent.id, reparent.target) : placed;
         },
-        false,
-        { routes: dropRoutes(routesRef.current, project, [dragged.id]) },
+        {
+          routes: dropRoutes(routesRef.current, p, [
+            ...new Set([...moved.keys(), ...(reparent ? [reparent.id] : [])]),
+          ]),
+        },
       );
     },
-    [project, commit],
+    [edit],
   );
 
   /**
@@ -552,30 +848,28 @@ export function App() {
         x: pos.x - (x - old.x),
         y: pos.y - (y - old.y),
       });
-      void commit(
-        {
-          ...p,
-          revision: p.revision + 1,
-          nodes: p.nodes.map((n) =>
+      void edit(
+        (q) => ({
+          ...q,
+          nodes: q.nodes.map((n) =>
             n.id === id
               ? { ...n, position, size }
               : n.containerId === id
                 ? { ...n, position: shift(n.position) }
                 : n,
           ),
-          containers: p.containers.map((c) =>
+          containers: q.containers.map((c) =>
             c.id === id
               ? { ...c, position, size }
               : c.parentId === id && c.position
                 ? { ...c, position: shift(c.position) }
                 : c,
           ),
-        },
-        false,
+        }),
         { routes: dropRoutes(routesRef.current, p, [id]) },
       );
     },
-    [commit],
+    [edit],
   );
 
   /** Loads the official icons, polling every 3 s only while a download is plausibly running (see `nextIconStep`). */
@@ -644,7 +938,7 @@ export function App() {
       f.containerIds[0] ??
       project?.edges.find((e) => e.id === f.edgeIds[0])?.target;
     if (!id) return;
-    setSelected(id);
+    setSelected({ kind: 'node', id });
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
   };
 
@@ -720,8 +1014,34 @@ export function App() {
         <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
           Dark mode
         </button>
-        <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
+        <button
+          disabled={busy}
+          onClick={() => {
+            setLayingOut(true);
+            void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
+              setLayingOut(false),
+            );
+          }}
+        >
           Auto layout
+        </button>
+        <button
+          aria-label="Undo"
+          title="Undo (⌘Z / Ctrl+Z)"
+          aria-keyshortcuts="Meta+Z Control+Z"
+          disabled={busy || !canUndo}
+          onClick={undoEdit}
+        >
+          Undo
+        </button>
+        <button
+          aria-label="Redo"
+          title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
+          aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
+          disabled={busy || !canRedo}
+          onClick={redoEdit}
+        >
+          Redo
         </button>
         <details className="menu" ref={exportMenu}>
           <summary>Export</summary>
@@ -755,7 +1075,10 @@ export function App() {
             const file = e.target.files?.[0];
             if (file)
               readJsonFile(file).then(
-                (p) => commit(p, false, { recover: true, fit: true }),
+                (p) => {
+                  clearHistory();
+                  return commit(p, false, { recover: true, fit: true });
+                },
                 (err: Error) => setError(err.message),
               );
           }}
@@ -803,7 +1126,13 @@ export function App() {
         className="main"
         style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
       >
-        <section className={step ? 'canvas is-busy' : 'canvas'} aria-label="Architecture canvas">
+        <section
+          ref={canvasRef}
+          className={step ? 'canvas is-busy' : 'canvas'}
+          aria-label="Architecture canvas"
+          onDragOver={onCanvasDragOver}
+          onDrop={onCanvasDrop}
+        >
           {clarify && (
             <div className="overlay">
               <ClarifyCard
@@ -823,13 +1152,25 @@ export function App() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
-            // No delete yet (US-04): React Flow's default Backspace would hide a node on screen
-            // while the project, its findings and the export still hold it.
-            deleteKeyCode={null}
+            deleteKeyCode={['Backspace', 'Delete']}
+            onBeforeDelete={onBeforeDelete}
+            onConnect={onConnect}
+            onReconnect={onReconnect}
+            nodesConnectable={!busy}
+            edgesReconnectable={!busy}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
-            onSelectionChange={({ nodes: sel }) => setSelected(sel[0]?.id)}
+            onSelectionChange={({ nodes: ns, edges: es }) =>
+              setSelected(
+                ns[0]
+                  ? { kind: 'node', id: ns[0].id }
+                  : es[0]
+                    ? { kind: 'edge', id: es[0].id }
+                    : undefined,
+              )
+            }
             fitView
             fitViewOptions={FIT}
             minZoom={0.2}
@@ -877,7 +1218,24 @@ export function App() {
               onCancel={cancel}
             />
             {project && selected && (
-              <Details project={project} id={selected} onRename={rename} disabled={busy} />
+              <Details
+                project={project}
+                selection={selected}
+                disabled={busy}
+                onEdit={(ops) => {
+                  const removing = ops.some((o) => o.op === 'removeContainer');
+                  void edit(ops, removing ? { toast: 'Container deleted' } : {});
+                  if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
+                }}
+              />
+            )}
+            {project && (
+              <AddPanel
+                disabled={busy}
+                atLimit={atNodeLimit(project)}
+                iconUrls={iconUrls}
+                onAdd={(item) => addItem(item)}
+              />
             )}
             <section>
               <h2>Findings ({findings.length})</h2>
@@ -913,6 +1271,14 @@ export function App() {
       {toast && (
         <div className="toast" role="status">
           <span>{toast.text}</span>
+          {toast.undo && (
+            <>
+              {' · '}
+              <button className="link" disabled={busy} onClick={undoEdit}>
+                Undo
+              </button>
+            </>
+          )}
           {toast.restore && (
             <>
               {' · '}
@@ -957,81 +1323,5 @@ export function App() {
         )}
       </dialog>
     </div>
-  );
-}
-
-function Details(props: {
-  project: Project;
-  id: string;
-  onRename: (id: string, label: string) => void;
-  disabled: boolean;
-}) {
-  const body = describe(props);
-  return body ? (
-    <section>
-      <h2>Details</h2>
-      {body}
-    </section>
-  ) : null;
-}
-
-function describe({
-  project,
-  id,
-  onRename,
-  disabled,
-}: {
-  project: Project;
-  id: string;
-  onRename: (id: string, label: string) => void;
-  disabled: boolean;
-}) {
-  const node = project.nodes.find((n) => n.id === id);
-  if (!node) {
-    const c = project.containers.find((x) => x.id === id);
-    return c ? <p>{`${c.label} (${c.kind})`}</p> : undefined;
-  }
-  const svc = node.serviceId ? services.get(node.serviceId) : undefined;
-  const reqs = project.requirements.filter((r) => node.requirementIds.includes(r.id));
-  return (
-    <dl className="detail">
-      <dt>Component</dt>
-      <dd>
-        <input
-          key={`${node.id}:${node.label}`}
-          className="input"
-          aria-label="Component name"
-          defaultValue={node.label}
-          maxLength={200}
-          disabled={disabled}
-          onBlur={(e) => onRename(node.id, e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-        />
-      </dd>
-      <dt>Service</dt>
-      <dd>
-        {svc
-          ? svc.displayName
-          : node.external
-            ? `${node.external.name} (external ${node.external.kind}, outside the AWS account)`
-            : `${node.unresolved?.name} (not in verified catalog)`}
-      </dd>
-      {svc && (
-        <>
-          <dt>Verification</dt>
-          <dd>
-            {svc.lifecycle} · {svc.reviewStatus.replace('_', ' ')}
-          </dd>
-          <dt>Docs</dt>
-          <dd>
-            <a href={svc.documentationUrl} target="_blank" rel="noreferrer">
-              {svc.documentationUrl}
-            </a>
-          </dd>
-        </>
-      )}
-      <dt>Requirements</dt>
-      <dd>{reqs.length ? reqs.map((r) => `${r.id}: ${r.text}`).join('; ') : 'None linked'}</dd>
-    </dl>
   );
 }

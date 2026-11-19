@@ -58,6 +58,7 @@ export const UnresolvedService = z.object({
 
 /** Actors outside the cloud account: people, client apps, third-party and on-premises systems. */
 export const ExternalKind = z.enum(['user', 'client-app', 'third-party', 'on-premises']);
+export type ExternalKind = z.infer<typeof ExternalKind>;
 export const ExternalActor = z.object({
   kind: ExternalKind,
   name: z.string().min(1).max(200),
