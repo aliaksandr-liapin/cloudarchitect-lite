@@ -14,6 +14,9 @@ import {
   newId,
   newServiceNode,
   reparentNode,
+  shortcutFor,
+  isTextTarget,
+  shouldHandleShortcut,
   toggleRequirement,
 } from './edit';
 import { needsLayout } from './layout';
@@ -169,5 +172,52 @@ describe('edit helpers', () => {
     expect(atNodeLimit(p)).toBe(false);
     const full = { ...p, nodes: Array.from({ length: 150 }, () => p.nodes[0]!) };
     expect(atNodeLimit(full)).toBe(true);
+  });
+});
+
+describe('shortcuts', () => {
+  const key = (
+    k: string,
+    o: Partial<Record<'metaKey' | 'ctrlKey' | 'shiftKey', boolean>> = {},
+  ) => ({
+    key: k,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    ...o,
+  });
+  const event = (k: string, o: object, target: unknown) =>
+    ({ ...key(k), ...o, target }) as unknown as KeyboardEvent;
+
+  it('shortcutFor maps the keys', () => {
+    expect(shortcutFor(key('z', { metaKey: true }))).toBe('undo');
+    expect(shortcutFor(key('z', { ctrlKey: true, shiftKey: true }))).toBe('redo');
+    expect(shortcutFor(key('Z', { metaKey: true, shiftKey: true }))).toBe('redo');
+    expect(shortcutFor(key('y', { ctrlKey: true }))).toBe('redo');
+    expect(shortcutFor(key('Backspace'))).toBeUndefined();
+    expect(shortcutFor(key('z'))).toBeUndefined();
+  });
+
+  it('isTextTarget is true only for text entry', () => {
+    expect(isTextTarget(null)).toBe(false);
+    expect(isTextTarget({ tagName: 'TEXTAREA' } as unknown as EventTarget)).toBe(true);
+    expect(isTextTarget({ tagName: 'SELECT' } as unknown as EventTarget)).toBe(true);
+    expect(
+      isTextTarget({ tagName: 'DIV', isContentEditable: true } as unknown as EventTarget),
+    ).toBe(true);
+    expect(isTextTarget({ tagName: 'INPUT', type: 'text' } as unknown as EventTarget)).toBe(true);
+    expect(isTextTarget({ tagName: 'INPUT' } as unknown as EventTarget)).toBe(true);
+    expect(isTextTarget({ tagName: 'INPUT', type: 'checkbox' } as unknown as EventTarget)).toBe(
+      false,
+    );
+    expect(isTextTarget({ tagName: 'BUTTON' } as unknown as EventTarget)).toBe(false);
+  });
+
+  it('shortcuts are ignored in text fields and while busy', () => {
+    const input = { tagName: 'INPUT', type: 'text' };
+    const body = { tagName: 'BODY' };
+    expect(shouldHandleShortcut(event('z', { metaKey: true }, input), false)).toBeUndefined();
+    expect(shouldHandleShortcut(event('z', { metaKey: true }, body), true)).toBeUndefined();
+    expect(shouldHandleShortcut(event('z', { metaKey: true }, body), false)).toBe('undo');
   });
 });

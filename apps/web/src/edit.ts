@@ -200,3 +200,33 @@ export function toggleRequirement(ids: string[], id: string): string[] {
 export function atNodeLimit(project: Project): boolean {
   return project.nodes.length >= LIMITS.maxNodes;
 }
+
+export type Shortcut = 'undo' | 'redo';
+
+export function shortcutFor(
+  e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'shiftKey'>,
+): Shortcut | undefined {
+  if (!(e.metaKey || e.ctrlKey)) return undefined;
+  const key = e.key.toLowerCase();
+  if (key === 'z') return e.shiftKey ? 'redo' : 'undo';
+  if (key === 'y' && !e.shiftKey) return 'redo';
+  return undefined;
+}
+
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number']);
+
+/** True where the browser's own text undo should win: text entry, not checkboxes or buttons. */
+export function isTextTarget(target: EventTarget | null): boolean {
+  const el = target as { tagName?: string; type?: string; isContentEditable?: boolean } | null;
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName?.toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') return !el.type || TEXT_INPUT_TYPES.has(el.type.toLowerCase());
+  return false;
+}
+
+export function shouldHandleShortcut(e: KeyboardEvent, busy: boolean): Shortcut | undefined {
+  if (busy || isTextTarget(e.target)) return undefined;
+  return shortcutFor(e);
+}

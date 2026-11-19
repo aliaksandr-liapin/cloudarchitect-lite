@@ -1,12 +1,14 @@
 import { awsCatalog, samples } from '@cloudarchitect/catalog';
 import {
   MODEL_OPTIONS,
+  Project,
+  applyPatch,
   migrateProject,
   validateProject,
   type Finding,
   type GapTopic,
   type GenerateResponse,
-  type Project,
+  type PatchOp,
   type Requirement,
 } from '@cloudarchitect/domain';
 import {
@@ -53,6 +55,8 @@ import {
   type IconUrls,
 } from './icons';
 import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
+import { shouldHandleShortcut } from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
 import { bootProject, downloadJson, loadProject, readJsonFile, saveProject } from './storage';
 import {
@@ -109,7 +113,7 @@ const STORAGE_DIALOG: DialogSpec = {
   ],
 };
 
-type Toast = { text: string; restore?: ProjectVersion };
+type Toast = { text: string; restore?: ProjectVersion; undo?: boolean };
 
 /** Fit the whole diagram with padding, never zooming past 100 %. */
 const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
@@ -156,10 +160,22 @@ export function App() {
   const abortRef = useRef<AbortController>(undefined);
   /** Latest committed project, for async flows that outlive a render. */
   const projectRef = useRef<Project>(undefined);
+  const historyRef = useRef<History>(EMPTY_HISTORY);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
   const preparedRef = useRef<Kept & { project: Project | undefined }>(undefined);
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
+
+  const setHistory = useCallback((h: History) => {
+    historyRef.current = h;
+    setCanUndo(h.past.length > 0);
+    setCanRedo(h.future.length > 0);
+  }, []);
+
+  /** A different design was loaded: nothing before it can be undone. */
+  const clearHistory = useCallback(() => setHistory(EMPTY_HISTORY), [setHistory]);
 
   /**
    * Single entry point for project changes: lay out if needed, persist, re-render. A layout pass
@@ -209,6 +225,7 @@ export function App() {
     void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
       storageDownRef.current = storage === 'unavailable';
       setStorageDown(storageDownRef.current);
+      clearHistory();
       return commit(project, false, { recover: true }).then(() => {
         if (!DEMO) return;
         const id = demoBootSelection(project);
@@ -217,7 +234,7 @@ export function App() {
         setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
       });
     });
-  }, [commit]);
+  }, [commit, clearHistory]);
 
   useEffect(() => {
     // Self-hosted installs: point to the wizard, but never block the local-first editor.
@@ -341,6 +358,7 @@ export function App() {
     const saved = preparedRef.current?.saved ?? undefined;
     preparedRef.current = undefined;
     setStep('checking');
+    clearHistory();
     await commit(
       {
         ...migrateProject(generated),
@@ -364,6 +382,7 @@ export function App() {
         await refreshVersions(current.projectId);
         setVersionsAdded((n) => n + 1);
       }
+      clearHistory();
       await commit(
         {
           ...migrateProject(v.project),
@@ -485,17 +504,6 @@ export function App() {
     setToast({ text: CANCELLED });
   };
 
-  /** A hand edit: after this, generating again asks before replacing (replaceDecision). */
-  const rename = (id: string, label: string) => {
-    const node = project?.nodes.find((n) => n.id === id);
-    if (!project || !node || !label.trim() || label.trim() === node.label) return;
-    void commit({
-      ...project,
-      revision: project.revision + 1,
-      nodes: project.nodes.map((n) => (n.id === id ? { ...n, label: label.trim() } : n)),
-    });
-  };
-
   // Typical wait for the chosen model (benchmark median), shown next to the timer.
   const typicalSeconds = Math.round(
     MODEL_OPTIONS.find((m) => m.id === (modelState.choice ?? 'haiku'))?.benchmark
@@ -504,6 +512,55 @@ export function App() {
 
   /** A generation, a replace flow or a dialog is in progress: hold every other change to the diagram. */
   const busy = step !== undefined || replacing || dialog !== undefined;
+
+  /**
+   * Every hand edit goes through here: the current design is remembered for Undo, then the change
+   * is applied (patch ops, or a function of the latest project) and committed.
+   */
+  const edit = (
+    change: PatchOp[] | ((p: Project) => Project),
+    opts: { routes?: Routes; forceLayout?: boolean; toast?: string } = {},
+  ) => {
+    const current = projectRef.current;
+    if (busy || !current) return;
+    const next = Array.isArray(change)
+      ? applyPatch(current, { baseRevision: current.revision, ops: change })
+      : Project.parse({ ...change(current), revision: current.revision + 1 });
+    setHistory(record(historyRef.current, current));
+    if (opts.toast) setToast({ text: opts.toast, undo: true });
+    void commit(next, opts.forceLayout ?? false, opts.routes ? { routes: opts.routes } : {});
+  };
+
+  const stepHistory = (move: typeof undo) => {
+    const current = projectRef.current;
+    if (busy || !current) return;
+    const moved = move(historyRef.current, current);
+    if (!moved) return;
+    setHistory(moved.history);
+    void commit(moved.project, false, { recover: true });
+  };
+  const undoEdit = () => stepHistory(undo);
+  const redoEdit = () => stepHistory(redo);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = shouldHandleShortcut(e, busy);
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'undo') undoEdit();
+      else redoEdit();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
+  /** A hand edit: after this, generating again asks before replacing (replaceDecision). */
+  const rename = (id: string, label: string) => {
+    const node = projectRef.current?.nodes.find((n) => n.id === id);
+    const text = label.trim();
+    if (!node || !text || text === node.label) return;
+    edit((p) => ({ ...p, nodes: p.nodes.map((n) => (n.id === id ? { ...n, label: text } : n)) }));
+  };
 
   const findings: Finding[] = useMemo(
     () => (project ? validateProject(project, awsCatalog) : []),
@@ -515,23 +572,19 @@ export function App() {
     [],
   );
 
-  const onNodeDragStop = useCallback(
-    (_: unknown, dragged: Node) => {
-      if (!project) return;
-      const position = dragged.position;
-      void commit(
-        {
-          ...project,
-          revision: project.revision + 1,
-          nodes: project.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
-          containers: project.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
-        },
-        false,
-        { routes: dropRoutes(routesRef.current, project, [dragged.id]) },
-      );
-    },
-    [project, commit],
-  );
+  const onNodeDragStop = (_: unknown, dragged: Node) => {
+    const p = projectRef.current;
+    if (!p) return;
+    const position = dragged.position;
+    edit(
+      (q) => ({
+        ...q,
+        nodes: q.nodes.map((n) => (n.id === dragged.id ? { ...n, position } : n)),
+        containers: q.containers.map((c) => (c.id === dragged.id ? { ...c, position } : c)),
+      }),
+      { routes: dropRoutes(routesRef.current, p, [dragged.id]) },
+    );
+  };
 
   /**
    * A resize is a hand edit like a drag. Left and top handles move the box too; React Flow then shifts
@@ -552,30 +605,29 @@ export function App() {
         x: pos.x - (x - old.x),
         y: pos.y - (y - old.y),
       });
-      void commit(
-        {
-          ...p,
-          revision: p.revision + 1,
-          nodes: p.nodes.map((n) =>
+      edit(
+        (q) => ({
+          ...q,
+          nodes: q.nodes.map((n) =>
             n.id === id
               ? { ...n, position, size }
               : n.containerId === id
                 ? { ...n, position: shift(n.position) }
                 : n,
           ),
-          containers: p.containers.map((c) =>
+          containers: q.containers.map((c) =>
             c.id === id
               ? { ...c, position, size }
               : c.parentId === id && c.position
                 ? { ...c, position: shift(c.position) }
                 : c,
           ),
-        },
-        false,
+        }),
         { routes: dropRoutes(routesRef.current, p, [id]) },
       );
     },
-    [commit],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [busy],
   );
 
   /** Loads the official icons, polling every 3 s only while a download is plausibly running (see `nextIconStep`). */
@@ -720,8 +772,20 @@ export function App() {
         <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
           Dark mode
         </button>
-        <button disabled={busy} onClick={() => project && commit(project, true, { fit: true })}>
+        <button
+          disabled={busy}
+          onClick={() => {
+            fitPendingRef.current = true;
+            edit((p) => p, { forceLayout: true });
+          }}
+        >
           Auto layout
+        </button>
+        <button aria-label="Undo" disabled={busy || !canUndo} onClick={undoEdit}>
+          Undo
+        </button>
+        <button aria-label="Redo" disabled={busy || !canRedo} onClick={redoEdit}>
+          Redo
         </button>
         <details className="menu" ref={exportMenu}>
           <summary>Export</summary>
@@ -755,7 +819,10 @@ export function App() {
             const file = e.target.files?.[0];
             if (file)
               readJsonFile(file).then(
-                (p) => commit(p, false, { recover: true, fit: true }),
+                (p) => {
+                  clearHistory();
+                  return commit(p, false, { recover: true, fit: true });
+                },
                 (err: Error) => setError(err.message),
               );
           }}
@@ -913,6 +980,14 @@ export function App() {
       {toast && (
         <div className="toast" role="status">
           <span>{toast.text}</span>
+          {toast.undo && (
+            <>
+              {' · '}
+              <button className="link" disabled={busy} onClick={undoEdit}>
+                Undo
+              </button>
+            </>
+          )}
           {toast.restore && (
             <>
               {' · '}
