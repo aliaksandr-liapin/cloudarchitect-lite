@@ -55,27 +55,29 @@ component tests), Playwright e2e against the Docker stack.
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `packages/domain/src/patch.ts` (modify) | `removeContainer` keeps children in place on screen |
-| `apps/web/src/history.ts` (create) | Pure snapshot undo/redo reducer |
-| `apps/web/src/edit.ts` (create) | Pure edit helpers: ids, new items, geometry, nesting, deletion, connect checks, shortcut matching |
-| `apps/web/src/Details.tsx` (create) | Details panel moved out of `App.tsx`: node, connector and container views |
-| `apps/web/src/AddPanel.tsx` (create) | Services/actors/containers list with search, drag and Add buttons |
-| `apps/web/src/layout.ts` (modify) | `toFlow`: service nodes no longer locked inside their container (`extent`) |
-| `apps/web/src/App.tsx` (modify) | `edit()`, history state, wiring of every interaction |
-| `e2e/tests/claude.spec.ts` (modify) | End-to-end edit journey |
-| `CHANGELOG.md` (modify) | Unreleased → Added |
+| File                                    | Responsibility                                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `packages/domain/src/patch.ts` (modify) | `removeContainer` keeps children in place on screen                                               |
+| `apps/web/src/history.ts` (create)      | Pure snapshot undo/redo reducer                                                                   |
+| `apps/web/src/edit.ts` (create)         | Pure edit helpers: ids, new items, geometry, nesting, deletion, connect checks, shortcut matching |
+| `apps/web/src/Details.tsx` (create)     | Details panel moved out of `App.tsx`: node, connector and container views                         |
+| `apps/web/src/AddPanel.tsx` (create)    | Services/actors/containers list with search, drag and Add buttons                                 |
+| `apps/web/src/layout.ts` (modify)       | `toFlow`: service nodes no longer locked inside their container (`extent`)                        |
+| `apps/web/src/App.tsx` (modify)         | `edit()`, history state, wiring of every interaction                                              |
+| `e2e/tests/claude.spec.ts` (modify)     | End-to-end edit journey                                                                           |
+| `CHANGELOG.md` (modify)                 | Unreleased → Added                                                                                |
 
 ---
 
 ### Task 1: Removing a container keeps its contents in place
 
 **Files:**
+
 - Modify: `packages/domain/src/patch.ts` (`removeContainer` case)
 - Test: `packages/domain/src/domain.test.ts` (inside `describe('applyPatch')`)
 
 **Interfaces:**
+
 - Produces: `applyPatch` semantics later tasks rely on: after `removeContainer`, each direct child
   node and child container has `position` increased by the removed container's `position`
   (`{x:0,y:0}` when absent) and its parent set to the removed container's parent.
@@ -85,21 +87,30 @@ component tests), Playwright e2e against the Docker stack.
 ```ts
 it('removing a container keeps its children where they are on screen', () => {
   // vpc at (100, 50) inside region r; node n at (10, 20) inside vpc; subnet s at (5, 5) inside vpc
-  const next = applyPatch(p, { baseRevision: p.revision, ops: [{ op: 'removeContainer', id: 'vpc' }] });
-  expect(next.nodes.find((n) => n.id === 'n')).toMatchObject({ containerId: 'r', position: { x: 110, y: 70 } });
-  expect(next.containers.find((c) => c.id === 's')).toMatchObject({ parentId: 'r', position: { x: 105, y: 55 } });
+  const next = applyPatch(p, {
+    baseRevision: p.revision,
+    ops: [{ op: 'removeContainer', id: 'vpc' }],
+  });
+  expect(next.nodes.find((n) => n.id === 'n')).toMatchObject({
+    containerId: 'r',
+    position: { x: 110, y: 70 },
+  });
+  expect(next.containers.find((c) => c.id === 's')).toMatchObject({
+    parentId: 'r',
+    position: { x: 105, y: 55 },
+  });
 });
 ```
 
 - [ ] **Step 2: Run it to make sure it fails**
-Run: `pnpm --filter @cloudarchitect/domain test -- -t "keeps its children"`
-Expected: FAIL (positions unchanged: `{ x: 10, y: 20 }`).
+      Run: `pnpm --filter @cloudarchitect/domain test -- -t "keeps its children"`
+      Expected: FAIL (positions unchanged: `{ x: 10, y: 20 }`).
 
 - [ ] **Step 3: Shift direct children by the removed container's position in the `removeContainer` case.**
 
 - [ ] **Step 4: Run the domain tests**
-Run: `pnpm --filter @cloudarchitect/domain test`
-Expected: all pass.
+      Run: `pnpm --filter @cloudarchitect/domain test`
+      Expected: all pass.
 
 - [ ] **Step 5: Commit** `fix(domain): removing a container keeps its contents in place`
 
@@ -108,10 +119,12 @@ Expected: all pass.
 ### Task 2: Pure edit helpers (`edit.ts`)
 
 **Files:**
+
 - Create: `apps/web/src/edit.ts`
 - Test: `apps/web/src/edit.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Project`, `ArchNode`, `ArchEdge`, `Container`, `ContainerKind`, `PatchOp`, `LIMITS`
   from `@cloudarchitect/domain`; `awsCatalog` from `@cloudarchitect/catalog`; `NODE_SIZE` from
   `./layout`.
@@ -123,7 +136,7 @@ Expected: all pass.
   - `newExternalNode(kind: ExternalKind, at: Point, containerId?: string): ArchNode`: name and
     label from `EXTERNAL_LABELS`
   - `EXTERNAL_LABELS: Record<ExternalKind, string>` = `{ user: 'User', 'client-app': 'Client app',
-    'third-party': 'Third-party service', 'on-premises': 'On-premises system' }`
+'third-party': 'Third-party service', 'on-premises': 'On-premises system' }`
   - `NEW_CONTAINER_SIZE = { width: 320, height: 200 }`
   - `newContainer(kind: ContainerKind, at: Point, parentId?: string): Container`: label = catalog
     `displayName`; subnets get `properties: { subnetType: 'private' }`
@@ -155,39 +168,51 @@ it('containerAt picks the innermost container', () => {
 });
 it('reparentNode keeps the absolute position', () => {
   const next = reparentNode(p, 'n', 'S'); // n at (300, 300) top level
-  expect(next.nodes.find((n) => n.id === 'n')).toMatchObject({ containerId: 'S', position: { x: 230, y: 210 } });
-  expect(reparentNode(next, 'n', undefined).nodes.find((n) => n.id === 'n')?.position).toEqual({ x: 300, y: 300 });
+  expect(next.nodes.find((n) => n.id === 'n')).toMatchObject({
+    containerId: 'S',
+    position: { x: 230, y: 210 },
+  });
+  expect(reparentNode(next, 'n', undefined).nodes.find((n) => n.id === 'n')?.position).toEqual({
+    x: 300,
+    y: 300,
+  });
 });
 it('deletionOps deletes only what was selected', () => {
   expect(deletionOps(p, { nodes: ['V'], edges: [] })).toEqual([{ op: 'removeContainer', id: 'V' }]);
   expect(deletionOps(p, { nodes: ['n', 'nope'], edges: ['e1'] })).toEqual([
-    { op: 'removeNode', id: 'n' }, { op: 'removeEdge', id: 'e1' }]);
+    { op: 'removeNode', id: 'n' },
+    { op: 'removeEdge', id: 'e1' },
+  ]);
 });
 it('canNest follows the catalog', () => {
   expect(canNest('subnet', 'availability-zone')).toBe(true);
   expect(canNest('subnet', 'region')).toBe(false);
   expect(canNest('vpc', undefined)).toBe(true);
 });
-it('connectionError refuses self-loops and duplicates', () => { /* both messages, and undefined for a new pair */ });
+it('connectionError refuses self-loops and duplicates', () => {
+  /* both messages, and undefined for a new pair */
+});
 it('newServiceNode parses as an ArchNode with the catalog name', () => {
   const n = newServiceNode('aws.dax', { x: 0, y: 0 });
   expect(ArchNode.parse(n).label).toBe('DynamoDB Accelerator (DAX)');
   expect(n.requirementIds).toEqual([]);
 });
 it('newContainer has a size, so adding one never triggers auto-layout', () => {
-  expect(needsLayout({ ...p, containers: [...p.containers, newContainer('vpc', { x: 0, y: 0 })] })).toBe(false);
+  expect(
+    needsLayout({ ...p, containers: [...p.containers, newContainer('vpc', { x: 0, y: 0 })] }),
+  ).toBe(false);
 });
 ```
 
 - [ ] **Step 2: Run them to make sure they fail**
-Run: `pnpm --filter @cloudarchitect/web test -- edit.test`
-Expected: FAIL (module not found).
+      Run: `pnpm --filter @cloudarchitect/web test -- edit.test`
+      Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement the helpers** listed under Interfaces.
 
 - [ ] **Step 4: Run the tests**
-Run: `pnpm --filter @cloudarchitect/web test -- edit.test`
-Expected: PASS.
+      Run: `pnpm --filter @cloudarchitect/web test -- edit.test`
+      Expected: PASS.
 
 - [ ] **Step 5: Commit** `feat(web): pure helpers for hand edits`
 
@@ -196,11 +221,13 @@ Expected: PASS.
 ### Task 3: Snapshot history, `edit()`, undo/redo
 
 **Files:**
+
 - Create: `apps/web/src/history.ts`, `apps/web/src/history.test.ts`
 - Modify: `apps/web/src/edit.ts` (+ shortcut helpers), `apps/web/src/edit.test.ts`
 - Modify: `apps/web/src/App.tsx`
 
 **Interfaces:**
+
 - Produces (`history.ts`):
   - `type History = { past: Project[]; future: Project[] }`, `EMPTY_HISTORY`, `HISTORY_LIMIT = 100`
   - `record(h: History, previous: Project): History`: pushes, clears `future`, drops the oldest
@@ -227,16 +254,29 @@ Expected: PASS.
 // history.test.ts
 it('undo returns the previous design and redo the next', () => {
   const h = record(EMPTY_HISTORY, a);
-  const u = undo(h, b)!; expect(u.project.nodes).toEqual(a.nodes); expect(u.project.revision).toBe(b.revision + 1);
-  const r = redo(u.history, u.project)!; expect(r.project.nodes).toEqual(b.nodes);
+  const u = undo(h, b)!;
+  expect(u.project.nodes).toEqual(a.nodes);
+  expect(u.project.revision).toBe(b.revision + 1);
+  const r = redo(u.history, u.project)!;
+  expect(r.project.nodes).toEqual(b.nodes);
 });
-it('a new edit clears redo', () => { const u = undo(record(EMPTY_HISTORY, a), b)!; expect(record(u.history, u.project).future).toEqual([]); });
-it('keeps at most 100 steps', () => { /* record 101 times → past.length 100 and past[0] is the 2nd */ });
+it('a new edit clears redo', () => {
+  const u = undo(record(EMPTY_HISTORY, a), b)!;
+  expect(record(u.history, u.project).future).toEqual([]);
+});
+it('keeps at most 100 steps', () => {
+  /* record 101 times → past.length 100 and past[0] is the 2nd */
+});
 it('undo of a node delete brings back its connectors', () => {
-  const after = applyPatch(a, { baseRevision: a.revision, ops: [{ op: 'removeNode', id: a.nodes[0]!.id }] });
+  const after = applyPatch(a, {
+    baseRevision: a.revision,
+    ops: [{ op: 'removeNode', id: a.nodes[0]!.id }],
+  });
   expect(undo(record(EMPTY_HISTORY, a), after)!.project.edges).toEqual(a.edges);
 });
-it('nothing to undo or redo returns undefined', () => { expect(undo(EMPTY_HISTORY, a)).toBeUndefined(); });
+it('nothing to undo or redo returns undefined', () => {
+  expect(undo(EMPTY_HISTORY, a)).toBeUndefined();
+});
 
 // edit.test.ts
 it('shortcutFor maps the keys', () => {
@@ -244,13 +284,19 @@ it('shortcutFor maps the keys', () => {
   expect(shortcutFor({ key: 'z', metaKey: false, ctrlKey: true, shiftKey: true })).toBe('redo');
   expect(shortcutFor({ key: 'Z', metaKey: true, ctrlKey: false, shiftKey: true })).toBe('redo');
   expect(shortcutFor({ key: 'y', metaKey: false, ctrlKey: true, shiftKey: false })).toBe('redo');
-  expect(shortcutFor({ key: 'Backspace', metaKey: false, ctrlKey: false, shiftKey: false })).toBe('delete');
-  expect(shortcutFor({ key: 'z', metaKey: false, ctrlKey: false, shiftKey: false })).toBeUndefined();
+  expect(shortcutFor({ key: 'Backspace', metaKey: false, ctrlKey: false, shiftKey: false })).toBe(
+    'delete',
+  );
+  expect(
+    shortcutFor({ key: 'z', metaKey: false, ctrlKey: false, shiftKey: false }),
+  ).toBeUndefined();
 });
 it('shortcuts are ignored in text fields and while busy', () => {
   const input = document.createElement('input');
   expect(shouldHandleShortcut(keyEvent('z', { metaKey: true }, input), false)).toBeUndefined();
-  expect(shouldHandleShortcut(keyEvent('z', { metaKey: true }, document.body), true)).toBeUndefined();
+  expect(
+    shouldHandleShortcut(keyEvent('z', { metaKey: true }, document.body), true),
+  ).toBeUndefined();
   expect(shouldHandleShortcut(keyEvent('z', { metaKey: true }, document.body), false)).toBe('undo');
 });
 ```
@@ -259,8 +305,8 @@ If the web Vitest environment has no DOM, test `isTextTarget` with plain objects
 elements (`{ tagName: 'INPUT' }`, `{ isContentEditable: true }`) instead of adding jsdom.
 
 - [ ] **Step 2: Run them to make sure they fail**
-Run: `pnpm --filter @cloudarchitect/web test -- history edit`
-Expected: FAIL.
+      Run: `pnpm --filter @cloudarchitect/web test -- history edit`
+      Expected: FAIL.
 
 - [ ] **Step 3: Implement `history.ts` and the shortcut helpers.**
 
@@ -275,8 +321,8 @@ Expected: FAIL.
     in the header after **Auto layout**.
 
 - [ ] **Step 5: Run checks**
-Run: `pnpm --filter @cloudarchitect/web test && pnpm typecheck && pnpm lint`
-Expected: all pass.
+      Run: `pnpm --filter @cloudarchitect/web test && pnpm typecheck && pnpm lint`
+      Expected: all pass.
 
 - [ ] **Step 6: Commit** `feat(web): undo and redo for every hand edit`
 
@@ -285,10 +331,12 @@ Expected: all pass.
 ### Task 4: Move nodes into and out of containers
 
 **Files:**
+
 - Modify: `apps/web/src/layout.ts` (`toFlow`), `apps/web/src/layout.test.ts`
 - Modify: `apps/web/src/App.tsx` (`onNodeDragStop`)
 
 **Interfaces:**
+
 - Consumes: `containerAt`, `reparentNode`, `absolutePosition` (Task 2); `edit` (Task 3).
 
 - [ ] **Step 1: Write the failing test** in `layout.test.ts`:
@@ -303,16 +351,16 @@ it('service nodes can leave their container; containers stay inside their parent
 ```
 
 - [ ] **Step 2: Run it to make sure it fails**
-Run: `pnpm --filter @cloudarchitect/web test -- layout`
-Expected: FAIL (`extent` is `'parent'`).
+      Run: `pnpm --filter @cloudarchitect/web test -- layout`
+      Expected: FAIL (`extent` is `'parent'`).
 
 - [ ] **Step 3: In `toFlow`, set `extent: 'parent'` only for containers.**
 
 - [ ] **Step 4: In `onNodeDragStop`, for a service node:** compute its centre in flow coordinates
-  (`absolutePosition(project, node.containerId)` + dragged position + half its size). Then call
-  `containerAt(project, centre)`. If that differs from `containerId`, apply one `edit` that sets the
-  dropped position and then `reparentNode`. Otherwise keep the current position-only edit. Drop the
-  routes for the node (`dropRoutes`), as today.
+      (`absolutePosition(project, node.containerId)` + dragged position + half its size). Then call
+      `containerAt(project, centre)`. If that differs from `containerId`, apply one `edit` that sets the
+      dropped position and then `reparentNode`. Otherwise keep the current position-only edit. Drop the
+      routes for the node (`dropRoutes`), as today.
 
 - [ ] **Step 5: Run checks** `pnpm --filter @cloudarchitect/web test && pnpm typecheck`; expected pass.
 
@@ -323,10 +371,12 @@ Expected: FAIL (`extent` is `'parent'`).
 ### Task 5: Details panel: connectors, containers, requirement links, Delete buttons
 
 **Files:**
+
 - Create: `apps/web/src/Details.tsx`, `apps/web/src/details.test.tsx`
 - Modify: `apps/web/src/App.tsx` (remove `Details`/`describe`, select edges, pass callbacks)
 
 **Interfaces:**
+
 - Consumes: `toggleRequirement`, `deletionOps` (Task 2); `edit` (Task 3).
 - Produces:
   ```ts
@@ -355,16 +405,23 @@ Expected: FAIL (`extent` is `'parent'`).
 ```ts
 it('connector view shows its fields', () => {
   const html = render({ kind: 'edge', id: p.edges[0]!.id });
-  for (const label of ['Label', 'Kind', 'Protocol', 'Auth notes', 'Delete']) expect(html).toContain(label);
+  for (const label of ['Label', 'Kind', 'Protocol', 'Auth notes', 'Delete'])
+    expect(html).toContain(label);
 });
-it('node view lists requirements as checkboxes, linked ones checked', () => { /* one checked, one not */ });
-it('subnet shows subnet type; vpc does not', () => { /* ... */ });
-it('unknown id renders nothing', () => { expect(render({ kind: 'edge', id: 'nope' })).toBe(''); });
+it('node view lists requirements as checkboxes, linked ones checked', () => {
+  /* one checked, one not */
+});
+it('subnet shows subnet type; vpc does not', () => {
+  /* ... */
+});
+it('unknown id renders nothing', () => {
+  expect(render({ kind: 'edge', id: 'nope' })).toBe('');
+});
 ```
 
 - [ ] **Step 2: Run them to make sure they fail**
-Run: `pnpm --filter @cloudarchitect/web test -- details`
-Expected: FAIL.
+      Run: `pnpm --filter @cloudarchitect/web test -- details`
+      Expected: FAIL.
 
 - [ ] **Step 3: Implement `Details.tsx` and wire it in `App.tsx`.**
 
@@ -377,25 +434,27 @@ Expected: FAIL.
 ### Task 6: Delete with the keyboard; connect and re-plug
 
 **Files:**
+
 - Modify: `apps/web/src/App.tsx`
 
 **Interfaces:**
+
 - Consumes: `deletionOps`, `connectionError`, `newEdge` (Task 2); `edit` (Task 3).
 
 - [ ] **Step 1: Delete keys.** Remove `deleteKeyCode={null}` and its comment. Add
-  `onBeforeDelete={async ({ nodes, edges }) => { edit(deletionOps(project, { nodes: nodes.filter(n => n.selected).map(n => n.id), edges: edges.filter(e => e.selected).map(e => e.id) })); return false; }}`
-  (pass the toast when a container is among them). React Flow never deletes anything itself, and
-  children it adds to the list stay because they are not selected.
+      `onBeforeDelete={async ({ nodes, edges }) => { edit(deletionOps(project, { nodes: nodes.filter(n => n.selected).map(n => n.id), edges: edges.filter(e => e.selected).map(e => e.id) })); return false; }}`
+      (pass the toast when a container is among them). React Flow never deletes anything itself, and
+      children it adds to the list stay because they are not selected.
 
 - [ ] **Step 2: Connect.** `onConnect={({ source, target }) => ...}`: show `connectionError` as a
-  toast and stop when set; otherwise `edit([{ op: 'addEdge', edge }])` and select the new edge.
+      toast and stop when set; otherwise `edit([{ op: 'addEdge', edge }])` and select the new edge.
 
 - [ ] **Step 3: Re-plug.** Set `edgesReconnectable`. On `onReconnect(old, conn)`, check
-  `connectionError` against the design without `old`, then
-  `edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }])` and drop that edge's route.
+      `connectionError` against the design without `old`, then
+      `edit([{ op: 'updateEdge', id: old.id, changes: { source, target } }])` and drop that edge's route.
 
 - [ ] **Step 4: Run checks** `pnpm --filter @cloudarchitect/web test && pnpm typecheck && pnpm lint`; expected pass.
-  Behaviour is covered end to end in Task 8.
+      Behaviour is covered end to end in Task 8.
 
 - [ ] **Step 5: Commit** `feat(web): delete, connect and re-plug by hand`
 
@@ -404,13 +463,16 @@ Expected: FAIL.
 ### Task 7: Add panel
 
 **Files:**
+
 - Create: `apps/web/src/AddPanel.tsx`, `apps/web/src/addPanel.test.tsx`
 - Modify: `apps/web/src/App.tsx`, `apps/web/src/styles.css`
 
 **Interfaces:**
+
 - Consumes: `newServiceNode`, `newExternalNode`, `newContainer`, `canNest`, `containerAt`,
   `absolutePosition`, `atNodeLimit`, `EXTERNAL_LABELS` (Task 2); `edit` (Task 3).
 - Produces:
+
   ```ts
   export type AddItem =
     | { type: 'service'; serviceId: string }
@@ -419,9 +481,13 @@ Expected: FAIL.
   export const DRAG_MIME = 'application/x-cloudarchitect-add';
   export function filterServices(query: string): { category: string; services: CloudService[] }[];
   export function AddPanel(props: {
-    disabled: boolean; atLimit: boolean; iconUrls: IconUrls; onAdd: (item: AddItem) => void;
+    disabled: boolean;
+    atLimit: boolean;
+    iconUrls: IconUrls;
+    onAdd: (item: AddItem) => void;
   }): JSX.Element;
   ```
+
   `filterServices` matches case-insensitively on display name, id and capabilities, groups by
   `category` (alphabetical), and drops empty groups. The panel is a collapsible "Add" section
   (reuse `Collapsible.tsx`) above Details. It holds a search box, the service groups, "Outside AWS"
@@ -447,12 +513,14 @@ it('filterServices finds DAX by name and groups by category', () => {
 it('an empty query lists all 38 services', () => {
   expect(filterServices('').flatMap((g) => g.services)).toHaveLength(38);
 });
-it('at the limit the Add buttons are disabled and the note shows', () => { /* render atLimit */ });
+it('at the limit the Add buttons are disabled and the note shows', () => {
+  /* render atLimit */
+});
 ```
 
 - [ ] **Step 2: Run them to make sure they fail**
-Run: `pnpm --filter @cloudarchitect/web test -- addPanel`
-Expected: FAIL.
+      Run: `pnpm --filter @cloudarchitect/web test -- addPanel`
+      Expected: FAIL.
 
 - [ ] **Step 3: Implement `AddPanel.tsx`, the drop handling and styles.**
 
@@ -465,6 +533,7 @@ Expected: FAIL.
 ### Task 8: End-to-end journey and changelog
 
 **Files:**
+
 - Modify: `e2e/tests/claude.spec.ts` (replace the test "delete keys do not hide nodes")
 - Modify: `CHANGELOG.md` (Unreleased → `### Added`)
 
@@ -489,7 +558,9 @@ test('delete keys delete from the design, and undo brings it back', async () => 
   await expect(canvas(page).getByText(label, { exact: true })).toHaveCount(0);
   const json = Project.parse(JSON.parse((await download(page, 'JSON project')).toString('utf8')));
   expect(json.nodes.some((n) => n.label === label)).toBe(false);
-  expect(json.edges.some((e) => e.source === dental.nodes[0]!.id || e.target === dental.nodes[0]!.id)).toBe(false);
+  expect(
+    json.edges.some((e) => e.source === dental.nodes[0]!.id || e.target === dental.nodes[0]!.id),
+  ).toBe(false);
   await page.keyboard.press('ControlOrMeta+z');
   await expectNodes(page, dental);
   await page.keyboard.press('ControlOrMeta+Shift+z');
@@ -500,17 +571,17 @@ test('delete keys delete from the design, and undo brings it back', async () => 
 Use whatever accessible names Task 7 actually produced. The assertions are the contract.
 
 - [ ] **Step 2: Run the e2e suite**
-Run: `pnpm e2e -- claude.spec.ts` (local images; first build is slow)
-Expected: all claude tests pass.
+      Run: `pnpm e2e -- claude.spec.ts` (local images; first build is slow)
+      Expected: all claude tests pass.
 
 - [ ] **Step 3: CHANGELOG.** Under Unreleased `### Added`: "Edit by hand: add services, outside
-  actors and containers from the Add panel; connect, re-plug and edit connectors; link components
-  to requirements; move components into and out of containers; delete; undo and redo
-  (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Findings update after every edit." Remove or reword the
-  Unreleased `### Fixed` entry from PR #53 so it no longer says the editor has no delete.
+      actors and containers from the Add panel; connect, re-plug and edit connectors; link components
+      to requirements; move components into and out of containers; delete; undo and redo
+      (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Findings update after every edit." Remove or reword the
+      Unreleased `### Fixed` entry from PR #53 so it no longer says the editor has no delete.
 
 - [ ] **Step 4: Full check**
-Run: `pnpm run ci`
-Expected: lint, format, typecheck, tests and build all pass.
+      Run: `pnpm run ci`
+      Expected: lint, format, typecheck, tests and build all pass.
 
 - [ ] **Step 5: Commit** `test(e2e): edit by hand journey; changelog`

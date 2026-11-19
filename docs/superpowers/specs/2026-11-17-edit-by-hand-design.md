@@ -25,7 +25,7 @@ fire" is the demo moment, and it falls out of the same build.
    `containers.json`). Drag onto the canvas or into a container; a keyboard path (Add button) also
    works.
 2. **Connect:** drag from a node's source handle to another node's target handle.
-2a. **Move into or out of a container:** dropping an existing node inside a container makes that
+   2a. **Move into or out of a container:** dropping an existing node inside a container makes that
    its container (`moveToContainer`); dropping it outside all containers clears it. Fixing "RDS in a
    public subnet" needs this.
 3. **Re-plug:** drag either end of an existing connector to another node.
@@ -77,11 +77,11 @@ fire" is the demo moment, and it falls out of the same build.
 
 **Undo**
 
-| | How | Trade-off |
-|---|---|---|
-| **A. Snapshots (picked)** | Keep a past/future stack of `Project` values; each hand edit pushes the previous one. | Simplest and exact: covers move, resize, rename and every new edit with no per-op logic. Memory is trivial (designs ≤150 nodes; cap 100 steps). |
-| B. Inverse patches | Record each `GraphPatch` and compute its inverse. | Elegant and shareable with 0.6, but `removeNode` cascades to edges and `removeContainer` re-parents children, so inverses need the removed data captured; more code, more ways to be wrong. |
-| C. React Flow as the store | Let React Flow apply changes and sync back. | Rejected: that split is exactly the PR #53 bug. |
+|                            | How                                                                                   | Trade-off                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Snapshots (picked)**  | Keep a past/future stack of `Project` values; each hand edit pushes the previous one. | Simplest and exact: covers move, resize, rename and every new edit with no per-op logic. Memory is trivial (designs ≤150 nodes; cap 100 steps).                                             |
+| B. Inverse patches         | Record each `GraphPatch` and compute its inverse.                                     | Elegant and shareable with 0.6, but `removeNode` cascades to edges and `removeContainer` re-parents children, so inverses need the removed data captured; more code, more ways to be wrong. |
+| C. React Flow as the store | Let React Flow apply changes and sync back.                                           | Rejected: that split is exactly the PR #53 bug.                                                                                                                                             |
 
 **Applying edits:** every structural edit is expressed as `PatchOp`s and applied with `applyPatch`
 (picked), rather than ad-hoc object spreads in App.tsx. One tested path, schema-checked, and 0.6
