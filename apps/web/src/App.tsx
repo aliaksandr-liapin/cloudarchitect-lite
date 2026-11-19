@@ -733,6 +733,8 @@ export function App() {
     const moved = move(historyRef.current, current);
     if (!moved) return;
     setHistory(moved.history);
+    // A toast's Undo targets the edit it announced; once history moves, it would undo something else.
+    setToast((t) => (t?.undo ? undefined : t));
     void commit(moved.project, false, { recover: true });
   };
   const undoEdit = () => stepHistory(undo);
