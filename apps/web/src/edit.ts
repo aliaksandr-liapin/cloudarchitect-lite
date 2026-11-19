@@ -70,13 +70,28 @@ export function newContainer(kind: ContainerKind, at: Point, parentId?: string):
   };
 }
 
-/** Whether a container of `kind` may sit inside `parentKind` (undefined means top level). */
+/**
+ * Whether a container of `kind` may sit inside `parentKind` (undefined means top level). A group is a
+ * free annotation box: it nests anywhere, as the validator allows.
+ */
 export function canNest(kind: ContainerKind, parentKind: ContainerKind | undefined): boolean {
-  if (parentKind === undefined) return true;
+  if (parentKind === undefined || kind === 'group') return true;
   const def = awsCatalog.containers.find((c) => c.kind === kind);
   return (
     (def?.allowedParents as readonly ContainerKind[] | undefined)?.includes(parentKind) ?? false
   );
+}
+
+/** The toast shown when `canNest(kind, parent)` refused a container. */
+export function nestRefusal(kind: ContainerKind): string {
+  const def = awsCatalog.containers.find((c) => c.kind === kind);
+  const name = def?.displayName ?? kind;
+  const parents = ((def?.allowedParents ?? []) as readonly ContainerKind[]).map(
+    (k) => awsCatalog.containers.find((c) => c.kind === k)?.displayName ?? k,
+  );
+  return parents.length === 0
+    ? `A ${name} can only be placed at the top level.`
+    : `A ${name} can only go inside: ${parents.join(', ')}.`;
 }
 
 /** Absolute origin of a container: its position plus every ancestor's. */
@@ -226,13 +241,13 @@ export function shortcutFor(
 
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number']);
 
-/** True where the browser's own text undo should win: text entry, not checkboxes or buttons. */
+/** True where the browser's own text undo should win: text entry, not selects, checkboxes or buttons. */
 export function isTextTarget(target: EventTarget | null): boolean {
   const el = target as { tagName?: string; type?: string; isContentEditable?: boolean } | null;
   if (!el) return false;
   if (el.isContentEditable) return true;
   const tag = el.tagName?.toUpperCase();
-  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'TEXTAREA') return true;
   if (tag === 'INPUT') return !el.type || TEXT_INPUT_TYPES.has(el.type.toLowerCase());
   return false;
 }

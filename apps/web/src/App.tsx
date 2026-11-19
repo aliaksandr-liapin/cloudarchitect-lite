@@ -69,6 +69,7 @@ import {
   absolutePosition,
   atNodeLimit,
   canNest,
+  nestRefusal,
   connectionError,
   containerAt,
   deletionOps,
@@ -690,11 +691,7 @@ export function App() {
     at = { x: Math.round(at.x), y: Math.round(at.y) };
     if (item.type === 'container') {
       if (!canNest(item.kind, parent?.kind)) {
-        const def = awsCatalog.containers.find((c) => c.kind === item.kind);
-        const parents = (def?.allowedParents ?? [])
-          .map((k) => awsCatalog.containers.find((c) => c.kind === k)?.displayName ?? k)
-          .join(', ');
-        setToast({ text: `A ${def?.displayName ?? item.kind} can only go inside: ${parents}.` });
+        setToast({ text: nestRefusal(item.kind) });
         return;
       }
       const container = newContainer(item.kind, at, parent?.id);

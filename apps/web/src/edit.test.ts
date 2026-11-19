@@ -4,6 +4,7 @@ import {
   absolutePosition,
   atNodeLimit,
   canNest,
+  nestRefusal,
   connectionError,
   containerAt,
   deletionOps,
@@ -106,7 +107,19 @@ describe('edit helpers', () => {
     expect(canNest('subnet', 'availability-zone')).toBe(true);
     expect(canNest('subnet', 'region')).toBe(false);
     expect(canNest('vpc', undefined)).toBe(true);
-    expect(canNest('group', 'vpc')).toBe(false);
+    expect(canNest('aws-cloud', 'region')).toBe(false);
+  });
+
+  it('canNest lets a group sit anywhere', () => {
+    expect(canNest('group', 'vpc')).toBe(true);
+    expect(canNest('group', 'subnet')).toBe(true);
+    expect(canNest('group', 'group')).toBe(true);
+    expect(canNest('group', undefined)).toBe(true);
+  });
+
+  it('nestRefusal names the allowed parents, or the top level when there are none', () => {
+    expect(nestRefusal('subnet')).toBe('A Subnet can only go inside: VPC, Availability Zone.');
+    expect(nestRefusal('aws-cloud')).toBe('A AWS Cloud can only be placed at the top level.');
   });
 
   it('absolutePosition sums the parent chain', () => {
@@ -202,7 +215,7 @@ describe('shortcuts', () => {
   it('isTextTarget is true only for text entry', () => {
     expect(isTextTarget(null)).toBe(false);
     expect(isTextTarget({ tagName: 'TEXTAREA' } as unknown as EventTarget)).toBe(true);
-    expect(isTextTarget({ tagName: 'SELECT' } as unknown as EventTarget)).toBe(true);
+    expect(isTextTarget({ tagName: 'SELECT' } as unknown as EventTarget)).toBe(false);
     expect(
       isTextTarget({ tagName: 'DIV', isContentEditable: true } as unknown as EventTarget),
     ).toBe(true);
