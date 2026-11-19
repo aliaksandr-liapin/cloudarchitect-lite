@@ -535,7 +535,7 @@ export function App() {
         ...(opts.fit ? { fit: true } : {}),
       });
     },
-    [busy, commit],
+    [busy, commit, setHistory],
   );
 
   const stepHistory = (move: typeof undo) => {
