@@ -85,7 +85,8 @@ turns, cost and latency.
 **S replaces today's repair for Luna if all of these hold.** The comparison is S vs arm 0, paired,
 with 90% bootstrap intervals as before.
 
-1. Repairable info findings per design drop by at least a third, clearly (the interval excludes
+1. Info findings per design (every info finding except VR-015, the same measure as the earlier
+   runs) drop by at least a third, clearly (the interval excludes
    zero).
 2. Errors + warnings per design are not higher: point estimate ≤ 0.
 3. On VR-018 drafts, S fixes VR-018 at least as often as arm 0.
