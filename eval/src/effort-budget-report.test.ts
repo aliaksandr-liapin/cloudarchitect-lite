@@ -101,7 +101,19 @@ describe('separateTurnCriteria', () => {
     delete (rs[1] as { arms?: unknown }).arms;
     const cs = separateTurnCriteria(rs, 'gpt-luna', 1);
     expect(cs.map((c) => c.id)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(crit(cs, 3).detail).toContain('1 drafts');
+    // The VR-018 draft where S failed stays in criterion 3's pool and counts as not fixed.
+    expect(crit(cs, 3).detail).toContain('2 drafts');
+    expect(crit(cs, 3).detail).toContain('S failed 1');
+  });
+
+  it('criterion 3 counts a failed S arm as not fixed', () => {
+    const rs = [
+      mk({ arms: { '0': { vr018Fixed: true }, S: { vr018Fixed: true } } }),
+      mk({ arms: { '0': { vr018Fixed: true }, S: { ok: false, vr018Fixed: undefined } } }),
+    ];
+    const c = crit(separateTurnCriteria(rs, 'gpt-luna', 1), 3);
+    expect(c.met).toBe(false);
+    expect(c.detail).toContain('arm 0 2, S 1');
   });
 
   it('separateTurnPasses ignores criterion 6', () => {

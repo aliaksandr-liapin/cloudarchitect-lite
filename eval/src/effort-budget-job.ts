@@ -252,7 +252,8 @@ export function toPairRecord(r: EffortBudgetRecord, arm: Exclude<EbArm, '0'>): I
     ...(r.error !== undefined ? { error: r.error } : {}),
     ...(r.firstDraftFindingsByRule ? { firstDraftFindingsByRule: r.firstDraftFindingsByRule } : {}),
     infoSent: i?.infoSent ?? 0,
-    sameRequest: r.sameRequestAs?.[arm] === '0',
+    // Identical *repairs* only: a job where neither arm made a call is not noise (as in the earlier runs).
+    sameRequest: r.sameRequestAs?.[arm] === '0' && (w?.request.length ?? 0) > 0,
     differ: Boolean(w?.finalHash && i?.finalHash && w.finalHash !== i.finalHash),
     ...(w && i ? { arms: { W: w, I: i } } : {}),
     costUsd: r.costUsd,

@@ -234,6 +234,8 @@ describe('runEffortBudgetJob', () => {
       expect(r.arms![a].request).toEqual([]);
     }
     expect(r.sameRequestAs).toEqual({ '0': '0', '1': '0', '2': '0', S: '0' });
+    // No call is not an identical repair: it must not feed the noise floor (as in the earlier runs).
+    expect(toPairRecord(r, 'S').sameRequest).toBe(false);
   });
 
   it('sameRequestAs maps arms 1, 2 and S to 0 when the draft has no eligible info and no VR-018', async () => {

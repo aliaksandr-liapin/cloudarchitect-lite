@@ -41,9 +41,12 @@ export function separateTurnCriteria(
   const paired = mine.filter((r) => pairOk(r, '0', 'S'));
   const ew = s.diff.errorsWarnings;
 
-  const vrPool = paired.filter((r) => r.hasVr018);
-  const fixed0 = vrPool.filter((r) => r.arms!['0'].vr018Fixed).length;
-  const fixedS = vrPool.filter((r) => r.arms!.S.vr018Fixed).length;
+  // Every VR-018 draft counts; an arm that failed counts as not fixed (the user would get the draft back).
+  const vrPool = mine.filter((r) => r.ok && !!r.arms && r.hasVr018);
+  const fixed0 = vrPool.filter((r) => r.arms!['0'].vr018Fixed === true).length;
+  const fixedS = vrPool.filter((r) => r.arms!.S.vr018Fixed === true).length;
+  const failed0 = vrPool.filter((r) => !r.arms!['0'].ok).length;
+  const failedS = vrPool.filter((r) => !r.arms!.S.ok).length;
 
   const unfixedDiffs = paired.map((r) => (r.arms!.S.unfixed ?? 0) - (r.arms!['0'].unfixed ?? 0));
   const unfixed = unfixedDiffs.length ? pairedBootstrap(unfixedDiffs, seed) : undefined;
@@ -61,7 +64,7 @@ export function separateTurnCriteria(
     {
       id: 3,
       met: vrPool.length > 0 && fixedS >= fixed0,
-      detail: `VR-018 fixed on ${vrPool.length} drafts with VR-018: arm 0 ${fixed0}, S ${fixedS}`,
+      detail: `VR-018 fixed on ${vrPool.length} drafts with VR-018: arm 0 ${fixed0}, S ${fixedS} (failed arms count as not fixed: arm 0 failed ${failed0}, S failed ${failedS})`,
     },
     {
       id: 4,
