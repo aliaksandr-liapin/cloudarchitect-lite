@@ -1,6 +1,6 @@
 # Info findings in the repair turn — experiment
 
-**Date:** 2026-11-12 · **Design:** [spec](../superpowers/specs/2026-11-11-info-repair-experiment-design.md), [follow-up spec](../superpowers/specs/2026-11-12-info-repair-followup-design.md) · **Generation run:** `eval/results/live/2026-11-12T04-56-18-173Z` (local, git-ignored) · **Reviews and full report:** `eval/reviews/info-repair-2026-11-12/`
+**Date:** 2026-11-12 · **Design:** [spec](../superpowers/specs/2026-11-11-info-repair-experiment-design.md), [follow-up spec](../superpowers/specs/2026-11-12-info-repair-followup-design.md), [follow-up 2 spec](../superpowers/specs/2026-11-20-effort-budget-experiment-design.md) · **Generation run:** `eval/results/live/2026-11-12T04-56-18-173Z` (local, git-ignored) · **Reviews and full report:** `eval/reviews/info-repair-2026-11-12/`
 
 The generator runs one repair turn for the economical models: it sends the validator's findings back to the model and asks for a corrected design. Today it sends only errors and warnings. Info findings — no encryption at rest (VR-008), no monitoring (VR-007), Lambda to RDS without RDS Proxy (VR-005), components not linked to a requirement (VR-013), cost drivers without a requirement (VR-024) — are never shown to the model, so they stay in the final design.
 
@@ -8,7 +8,7 @@ The question: if the repair turn also gets the info findings, do they go away, a
 
 ## Result
 
-**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed.
+**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed. A second follow-up tried the reader's own fix, the single-AZ warning in a repair turn of its own ([Follow-up 2](#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)); it missed the bar by one finding in 110 designs, so nothing changed.
 
 | Model | Info findings per design (W → I) | Unrequested changes | New findings | Blind score (W → I) | Recommendation |
 |---|---|---|---|---|---|
@@ -112,6 +112,45 @@ Encryption at rest was missing from 51 of 66 final designs with today's message 
 
 **Decision** (fixed before the run): P fails criteria 2 and 3, so GPT Luna returns to today's repair turn. Putting the warnings first did not help; with info findings in the same turn, Luna fixes encryption and drops the harder multi-AZ change. For a single repair turn, sending only errors and warnings is the better trade: the product ranks warnings above info findings.
 
+## Follow-up 2: effort budget and a separate turn (GPT Luna)
+
+**Questions** (from the same reader): does Luna drop the single-AZ fix (VR-018) more often as more info findings join the repair message? And does sending VR-018 **alone in its own repair turn** keep that fix while still clearing the info findings?
+
+**Run** (`eval/results/live/2026-11-20T16-14-28-965Z`, local): Luna only, 22 scenarios × 5 repeats = 110 jobs, all 110 complete, no failed arm. Every arm repaired from the same first draft:
+
+- **0:** today's message (errors and warnings).
+- **1, 2:** the same plus 1 or 2 info findings, picked by a seeded shuffle per job (arm 2 always includes arm 1's pick).
+- **S:** VR-018 alone first, then what the validator finds on that result (errors, warnings and the five info rules) in a second turn. Drafts without VR-018 get one turn with that set.
+
+A dose of 4 info findings was planned and dropped before the run: no Luna draft with VR-018 in the earlier runs had 4 to send. The bar was committed before the run ([spec](../superpowers/specs/2026-11-20-effort-budget-experiment-design.md)).
+
+**Dose (descriptive, prediction written first).** On the 24 drafts with VR-018 and at least 2 info findings to send, VR-018 was fixed in 15 with no info finding in the message, 11 with one and 7 with two. The prediction (the fix rate falls at each step, by at least 3 drafts overall) is **supported**. Across all 43 VR-018 drafts: 26, 23 and 14.
+
+| 110 designs per arm | Arm 0 | Arm 1 | Arm 2 | Arm S |
+|---|---|---|---|---|
+| Errors + warnings per design | 0.34 | 0.39 | 0.48 | 0.35 |
+| Info findings per design (VR-015 excluded) | 1.39 | 0.61 | 0.09 | 0.01 |
+| Designs missing encryption at rest (VR-008) | 82 | 57 | 9 | 0 |
+| Designs with VR-018 at the end | 17 | 20 | 29 | 12 |
+| VR-018 fixed (of 43 drafts) | 26 | 23 | 14 | 31 |
+| Errors and warnings left unfixed per design | 0.33 | 0.35 | 0.44 | 0.27 |
+| Cost per design | $0.0037 | $0.0040 | $0.0039 | $0.0046 |
+
+| Criterion (S vs arm 0) | Result |
+|---|---|
+| 1. Info findings drop by a third, clearly | met: 1.39 → 0.01, diff −1.38 [−1.53, −1.24] |
+| 2. Errors + warnings not higher (mean ≤ 0) | **not met**: 0.34 → 0.35, diff 0.01 [−0.10, 0.12] |
+| 3. VR-018 fixed at least as often | met: 31 vs 26 of 43 drafts (no failed arm) |
+| 4. Errors and warnings left unfixed not higher | met: 0.33 → 0.27, diff −0.05 [−0.17, 0.06] |
+| 5. Collateral within noise, regressions not clearly up | met: collateral −1.63 [−3.13, −0.29] vs noise floor 0.22 (pooled, 9 jobs); regressions 0.01 [−0.08, 0.09] |
+| 6. Extra cost | +$0.0009 per design; S took a second turn in 43 of 110 jobs |
+
+**Decision** (fixed before the run): S fails criterion 2, so Luna keeps errors and warnings only. The miss is one finding in 110 designs, but the bar said "not higher", and it is higher.
+
+**Where the extra finding came from.** S ended with 5 fewer VR-018 (17 → 12) and 5 more VR-003, public API without stated authentication (2 → 7), plus one more missing dead-letter queue (VR-004, 7 → 8). S's 7 VR-003 findings sit in 6 designs; in all 6 the finding was already in the first draft and survived S's second turn, which carried the info findings. Arm 0 fixed it in all 6. The single-AZ fix was protected by its own turn, and the next warning in the queue took its place.
+
+**What this says.** The dose result and the VR-003 trade point the same way: in one turn, Luna does a limited amount of work, and cheap info fixes (encryption is one setting) crowd out harder warning fixes. It is not specific to VR-018. Isolating one warning moves the problem to the next one. The candidate that follows is two turns split by severity, all errors and warnings first and info findings only after, which this run did not test.
+
 ## Limits
 
 - **Small samples.** 44 designs per model and 10 reviewed pairs. One reviewed design moves a blind median by one step (1/14 of a point). Haiku's blind-score miss is that size, and its head-to-head preferences point the other way; criterion 5 was set to use the blind score, so the result stands as recorded.
@@ -130,7 +169,8 @@ Encryption at rest was missing from 51 of 66 final designs with today's message 
 | Blind review, first pass | $4.28 |
 | Blind review, retry of 8 calls | $0.99 |
 | Follow-up run (66 Luna jobs, no review) | $0.37 |
-| **Total** | **$7.25** |
+| Follow-up 2 run (110 Luna jobs, four arms, no review) | $1.01 |
+| **Total** | **$8.26** |
 
 The product owner approved the run and the retry; each command was capped with `--max-usd`.
 
@@ -143,6 +183,9 @@ pnpm --filter @cloudarchitect/eval info-repair-report <runId> --review <absolute
 # Follow-up
 pnpm --filter @cloudarchitect/eval info-repair --models gpt-luna --repeats 3 --info-message prioritized --max-usd 1.20
 pnpm --filter @cloudarchitect/eval info-repair-followup <absolute path to eval/results/live/<runId>>
+# Follow-up 2
+pnpm --filter @cloudarchitect/eval effort-budget --max-usd 1.50
+pnpm --filter @cloudarchitect/eval effort-budget-report <absolute path to eval/results/live/<runId>>
 ```
 
 The full generated report is `eval/reviews/info-repair-2026-11-12/report.md`.
