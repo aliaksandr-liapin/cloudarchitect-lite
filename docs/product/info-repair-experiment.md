@@ -8,7 +8,7 @@ The question: if the repair turn also gets the info findings, do they go away, a
 
 ## Result
 
-**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed. A second follow-up tried the reader's own fix, the single-AZ warning in a repair turn of its own ([Follow-up 2](#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)); it missed the bar by one finding in 110 designs, so nothing changed. A third follow-up separated the two things that turn had changed, the work per turn and the context it carried ([Follow-up 3](#follow-up-3-continued-vs-clean-second-turn-gpt-luna)): the same two turns with a **fresh** second turn passed every criterion and halved errors and warnings per design (0.33 → 0.17). It is now a proposal for Luna, to be made in its own pull request.
+**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed. A second follow-up tried the reader's own fix, the single-AZ warning in a repair turn of its own ([Follow-up 2](#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)); it missed the bar by one finding in 110 designs, so nothing changed. A third follow-up separated the two things that turn had changed, the work per turn and the context it carried ([Follow-up 3](#follow-up-3-continued-vs-clean-second-turn-gpt-luna)): the same two turns with a **fresh** second turn passed every criterion and halved errors and warnings per design (0.33 → 0.17). A confirmation run on new drafts passed again (0.41 → 0.25). Switching Luna's repair to it is the next pull request.
 
 | Model | Info findings per design (W → I) | Unrequested changes | New findings | Blind score (W → I) | Recommendation |
 |---|---|---|---|---|---|
@@ -191,7 +191,23 @@ The candidates were KC, KF and SF; SC (follow-up 2's arm S on new drafts) was th
 
 - **The second turn's history cost fixes.** With identical work and an identical starting design, the fresh turn fixed more: SF ended with VR-018 in 5 designs against SC's 10, and left 4 fewer findings unfixed on the drafts where the two differed. Follow-up 2's "budget" was partly context.
 - **The severity split adds info fixes without hurting warnings, and without helping them.** KF matched arm 0 on errors and warnings exactly and cleared encryption at rest from 85 designs to 0. KC lost a little (0.35), in the same direction as SC vs SF.
-- **SC did better here than arm S did in follow-up 2** (errors + warnings 0.21 vs arm 0's 0.33, where S had 0.35 vs 0.34). Same arm, new drafts: its gap to arm 0 moved by about 0.13 between two runs of 110 jobs, nearly the size of SF's lead (−0.15). So SF's pass rests on one run, and it should be re-run on new drafts before Luna's repair changes. The fresh-vs-continued comparison is paired within this run and does not depend on that swing.
+- **SC did better here than arm S did in follow-up 2** (errors + warnings 0.21 vs arm 0's 0.33, where S had 0.35 vs 0.34). Same arm, new drafts: its gap to arm 0 moved by about 0.13 between two runs of 110 jobs, nearly the size of SF's lead (−0.15). So a confirmation run was set up before changing anything (below). The fresh-vs-continued comparison is paired within this run and does not depend on that swing.
+
+### Confirmation run
+
+**Run** (`eval/results/live/2026-11-23T19-29-46-728Z`, local): arms 0 and SF only, new drafts, 110 jobs, all complete, no failed arm. The bar (criteria 1–5 unchanged, the noise floor taken from the first run because arm R was skipped) was committed before the run ([spec, "Confirmation run"](../superpowers/specs/2026-11-23-clean-turn-experiment-design.md#confirmation-run-added-2026-11-23-after-the-first-run-before-the-second)).
+
+| 110 designs per arm | First run: 0 | First run: SF | Confirmation: 0 | Confirmation: SF |
+|---|---|---|---|---|
+| Errors + warnings per design | 0.33 | 0.17 | 0.41 | **0.25** |
+| Errors and warnings left unfixed per design | 0.31 | 0.16 | 0.47 | **0.25** |
+| VR-018 fixed (of VR-018 drafts) | 28 of 44 | 39 of 44 | 17 of 42 | **38 of 42** |
+| Designs missing encryption at rest (VR-008) | 85 | 1 | 93 | **1** |
+| Cost per design | $0.0038 | $0.0047 | $0.0038 | $0.0046 |
+
+**Confirmed.** SF meets criteria 1–5 again: errors + warnings diff −0.16 [−0.28, −0.05], VR-018 fixed 38 vs 17 of 42, left unfixed −0.23 [−0.41, −0.05], collateral −1.53 [−3.47, 0.23] against the 3.78 floor, regressions −0.05. Extra cost $0.0008 per design; 40 of 110 jobs took a second turn.
+
+Arm 0 moved more between the two runs than SF did (VR-018 fixed 28 of 44, then 17 of 42), and SF fixed VR-018 in 39 of 44 and 38 of 42. With a fresh second turn, the single-AZ fix stops depending on what else is in the queue.
 
 ## Limits
 
@@ -200,7 +216,7 @@ The candidates were KC, KF and SF; SC (follow-up 2's arm S on new drafts) was th
 - **The noise floor is lenient.** Criterion 3 compares the lower end of the collateral interval with the per-job noise floor, which is generous; for Luna the floor rests on 10 jobs.
 - **What is counted as a change.** Configuration edits (encryption settings, the VR-008 fix itself) are not counted; a renamed element counts as removed plus added; an added node attached to another added node counts as collateral, which errs against arm I.
 - **Reviewer retries.** In the first pass the Claude reviewer returned incomplete answers for 5 packets on near-identical design pairs (one design reviewed twice, the others skipped), and 3 calls lost their connection. One retry of those 8 calls succeeded, and every design has three reviewers. One Claude answer listed a design twice; the first entry was kept. Raw answers are in `review-*.raw.json`.
-- **Follow-up 3 is one run.** The control arm moved between follow-up 2 and follow-up 3 by more than the one-finding margin that decided follow-up 2. The collateral noise floor from arm R (3.78) is wide, so criterion 5 is lenient.
+- **Run-to-run swings in follow-ups 2 and 3.** The same arms moved between runs by more than the one-finding margin that decided follow-up 2, which is why SF got a confirmation run. The collateral noise floor from arm R (3.78) is wide, so criterion 5 is lenient.
 - **Reviewers are models**, as in the [0.3 benchmark](phase3-provider-benchmark.md).
 
 ## Cost
@@ -214,7 +230,8 @@ The candidates were KC, KF and SF; SC (follow-up 2's arm S on new drafts) was th
 | Follow-up run (66 Luna jobs, no review) | $0.37 |
 | Follow-up 2 run (110 Luna jobs, four arms, no review) | $1.01 |
 | Follow-up 3 run (110 Luna jobs, six arms, no review) | $1.14 |
-| **Total** | **$9.40** |
+| Follow-up 3 confirmation (110 Luna jobs, arms 0 and SF) | $0.67 |
+| **Total** | **$10.07** |
 
 The product owner approved the run and the retry; each command was capped with `--max-usd`.
 
@@ -232,6 +249,7 @@ pnpm --filter @cloudarchitect/eval effort-budget --max-usd 1.50
 pnpm --filter @cloudarchitect/eval effort-budget-report <absolute path to eval/results/live/<runId>>
 # Follow-up 3
 pnpm --filter @cloudarchitect/eval clean-turn --max-usd 1.50
+pnpm --filter @cloudarchitect/eval clean-turn --arms 0,SF --max-usd 1.00
 pnpm --filter @cloudarchitect/eval clean-turn-report <absolute path to eval/results/live/<runId>>
 ```
 
