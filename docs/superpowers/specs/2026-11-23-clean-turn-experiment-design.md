@@ -1,6 +1,6 @@
 # Continued vs clean second repair turn for GPT Luna: design
 
-**Date:** 2026-11-23 · **Status:** draft, waiting for the product owner (arms, bar, $1.50 cap) ·
+**Date:** 2026-11-23 · **Status:** approved by the product owner 2026-11-23 (arms, bar, $1.50 cap); run done the same day ·
 **Follows:** [effort-budget design](2026-11-20-effort-budget-experiment-design.md),
 [report, follow-up 2](../../product/info-repair-experiment.md#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)
 

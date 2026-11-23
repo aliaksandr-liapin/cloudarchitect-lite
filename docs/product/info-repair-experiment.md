@@ -1,6 +1,6 @@
 # Info findings in the repair turn — experiment
 
-**Date:** 2026-11-12 · **Design:** [spec](../superpowers/specs/2026-11-11-info-repair-experiment-design.md), [follow-up spec](../superpowers/specs/2026-11-12-info-repair-followup-design.md), [follow-up 2 spec](../superpowers/specs/2026-11-20-effort-budget-experiment-design.md) · **Generation run:** `eval/results/live/2026-11-12T04-56-18-173Z` (local, git-ignored) · **Reviews and full report:** `eval/reviews/info-repair-2026-11-12/`
+**Date:** 2026-11-12 · **Design:** [spec](../superpowers/specs/2026-11-11-info-repair-experiment-design.md), [follow-up spec](../superpowers/specs/2026-11-12-info-repair-followup-design.md), [follow-up 2 spec](../superpowers/specs/2026-11-20-effort-budget-experiment-design.md), [follow-up 3 spec](../superpowers/specs/2026-11-23-clean-turn-experiment-design.md) · **Generation run:** `eval/results/live/2026-11-12T04-56-18-173Z` (local, git-ignored) · **Reviews and full report:** `eval/reviews/info-repair-2026-11-12/`
 
 The generator runs one repair turn for the economical models: it sends the validator's findings back to the model and asks for a corrected design. Today it sends only errors and warnings. Info findings — no encryption at rest (VR-008), no monitoring (VR-007), Lambda to RDS without RDS Proxy (VR-005), components not linked to a requirement (VR-013), cost drivers without a requirement (VR-024) — are never shown to the model, so they stay in the final design.
 
@@ -8,7 +8,7 @@ The question: if the repair turn also gets the info findings, do they go away, a
 
 ## Result
 
-**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed. A second follow-up tried the reader's own fix, the single-AZ warning in a repair turn of its own ([Follow-up 2](#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)); it missed the bar by one finding in 110 designs, so nothing changed.
+**Not adopted for any model.** GPT Luna met the six criteria below and was adopted on main, but a reader asked where its extra single-AZ warnings came from: its repair turn left availability warnings unfixed when info findings were in the message. A pre-registered follow-up with a warnings-first message did not fix that ([Follow-up](#follow-up-warnings-left-unfixed-gpt-luna)), so the change was withdrawn before any release. No model sends info findings; Haiku and Flash-Lite were never changed. A second follow-up tried the reader's own fix, the single-AZ warning in a repair turn of its own ([Follow-up 2](#follow-up-2-effort-budget-and-a-separate-turn-gpt-luna)); it missed the bar by one finding in 110 designs, so nothing changed. A third follow-up separated the two things that turn had changed, the work per turn and the context it carried ([Follow-up 3](#follow-up-3-continued-vs-clean-second-turn-gpt-luna)): the same two turns with a **fresh** second turn passed every criterion and halved errors and warnings per design (0.33 → 0.17). It is now a proposal for Luna, to be made in its own pull request.
 
 | Model | Info findings per design (W → I) | Unrequested changes | New findings | Blind score (W → I) | Recommendation |
 |---|---|---|---|---|---|
@@ -151,6 +151,48 @@ A dose of 4 info findings was planned and dropped before the run: no Luna draft 
 
 **What this says.** The dose result and the VR-003 trade point the same way: in one turn, Luna does a limited amount of work, and cheap info fixes (encryption is one setting) crowd out harder warning fixes. It is not specific to VR-018. Isolating one warning moves the problem to the next one. The candidate that follows is two turns split by severity, all errors and warnings first and info findings only after, which this run did not test.
 
+## Follow-up 3: continued vs clean second turn (GPT Luna)
+
+**Question** (from the same reader): in follow-up 2, arm S's second turn continued the whole conversation (request, first draft, VR-018 message, fixed design), so it changed two things at once: how much work each turn had and how much context the second turn carried. With the same design and the same findings, does a **fresh** second turn do better than a continued one? And does any two-turn repair beat today's single turn?
+
+**Run** (`eval/results/live/2026-11-23T17-42-38-611Z`, local): Luna only, 22 scenarios × 5 repeats = 110 jobs, all 110 complete, no failed arm. Turn 1 runs once per branch and is shared; only turn 2's context differs. A fresh turn is three messages: the original request with the requirements, turn 1's design as the model's answer, and the new message.
+
+- **0:** today's repair (errors and warnings). **R:** the same request again as an independent call, used only for the collateral noise floor.
+- **KC / KF:** arm 0's turn, then the five repairable info findings left on its result, continued / fresh.
+- **SC / SF:** VR-018 alone, then what the validator finds on that result (errors, warnings, five info rules), continued / fresh. Drafts without VR-018 get one turn with that set, so SC and SF differ only on VR-018 drafts.
+
+The candidates were KC, KF and SF; SC (follow-up 2's arm S on new drafts) was the control. The bar and the tie-break were committed before the run ([spec](../superpowers/specs/2026-11-23-clean-turn-experiment-design.md)).
+
+| 110 designs per arm | 0 | R | KC | KF | SC | SF |
+|---|---|---|---|---|---|---|
+| Errors + warnings per design | 0.33 | 0.30 | 0.35 | 0.33 | 0.21 | **0.17** |
+| Info findings per design (VR-015 excluded) | 1.54 | 1.54 | 0.03 | 0.01 | 0.01 | 0.02 |
+| Designs missing encryption at rest (VR-008) | 85 | 85 | 0 | 0 | 1 | 1 |
+| Designs with VR-018 at the end | 17 | 15 | 17 | 17 | 10 | **5** |
+| VR-018 fixed (of 44 drafts) | 28 | 30 | 28 | 28 | 34 | **39** |
+| Designs with VR-003 at the end | 2 | 4 | 2 | 2 | 3 | 3 |
+| Errors and warnings left unfixed per design | 0.31 | 0.23 | 0.33 | 0.31 | 0.20 | **0.16** |
+| Cost per design | $0.0038 | $0.0037 | $0.0050 | $0.0050 | $0.0047 | $0.0047 |
+
+**Context (descriptive, prediction written first).** On the 42 VR-018 drafts where S took two turns, the continued second turn left 14 first-draft errors and warnings unfixed and the fresh one 10. The prediction (fresh leaves at least 3 fewer) is **supported**. For the severity split (71 jobs with two turns) the counts were 30 and 28, with no verdict set in advance.
+
+| Criterion (vs arm 0) | KC | KF | SF |
+|---|---|---|---|
+| 1. Info findings drop by a third, clearly | met (1.54 → 0.03) | met (→ 0.01) | met (→ 0.02) |
+| 2. Errors + warnings not higher (mean ≤ 0) | **not met**: +0.02 [0.00, 0.05] | met: 0.00 | met: −0.15 [−0.25, −0.07] |
+| 3. VR-018 fixed at least as often (28 of 44) | met: 28 | met: 28 | met: **39** |
+| 4. Errors and warnings left unfixed not higher | **not met**: +0.02 | met: 0.00 | met: −0.15 [−0.24, −0.06] |
+| 5. Collateral within noise, regressions not clearly up | met | met | met: collateral −0.66 [−1.79, 0.33] vs noise floor 3.78 (89 jobs); regressions −0.03 |
+| 6. Extra cost | +$0.0012, two turns in 71 of 110 | +$0.0012, 71 of 110 | +$0.0010, two turns in 42 of 110 |
+
+**Decision** (fixed before the run): KF and SF pass, KC fails. Of the two, SF has fewer errors and warnings per design (0.17 vs 0.33), so **SF becomes the proposal for Luna**: on a draft with VR-018, send VR-018 alone, then send the remaining errors, warnings and the five info rules in a fresh turn. Drafts without VR-018 get one turn with that set. Switching the app is its own pull request with its own review.
+
+**What this says.**
+
+- **The second turn's history cost fixes.** With identical work and an identical starting design, the fresh turn fixed more: SF ended with VR-018 in 5 designs against SC's 10, and left 4 fewer findings unfixed on the drafts where the two differed. Follow-up 2's "budget" was partly context.
+- **The severity split adds info fixes without hurting warnings, and without helping them.** KF matched arm 0 on errors and warnings exactly and cleared encryption at rest from 85 designs to 0. KC lost a little (0.35), in the same direction as SC vs SF.
+- **SC did better here than arm S did in follow-up 2** (errors + warnings 0.21 vs arm 0's 0.33, where S had 0.35 vs 0.34). Same arm, new drafts: single runs of 110 jobs move this much. SF's lead over arm 0 (−0.15, interval excluding zero) is the result to rely on; SC's swing is a reason to re-check SF in the next benchmark before calling it settled.
+
 ## Limits
 
 - **Small samples.** 44 designs per model and 10 reviewed pairs. One reviewed design moves a blind median by one step (1/14 of a point). Haiku's blind-score miss is that size, and its head-to-head preferences point the other way; criterion 5 was set to use the blind score, so the result stands as recorded.
@@ -158,6 +200,7 @@ A dose of 4 info findings was planned and dropped before the run: no Luna draft 
 - **The noise floor is lenient.** Criterion 3 compares the lower end of the collateral interval with the per-job noise floor, which is generous; for Luna the floor rests on 10 jobs.
 - **What is counted as a change.** Configuration edits (encryption settings, the VR-008 fix itself) are not counted; a renamed element counts as removed plus added; an added node attached to another added node counts as collateral, which errs against arm I.
 - **Reviewer retries.** In the first pass the Claude reviewer returned incomplete answers for 5 packets on near-identical design pairs (one design reviewed twice, the others skipped), and 3 calls lost their connection. One retry of those 8 calls succeeded, and every design has three reviewers. One Claude answer listed a design twice; the first entry was kept. Raw answers are in `review-*.raw.json`.
+- **Follow-up 3 is one run.** The control arm moved between follow-up 2 and follow-up 3 by more than the one-finding margin that decided follow-up 2. The collateral noise floor from arm R (3.78) is wide, so criterion 5 is lenient.
 - **Reviewers are models**, as in the [0.3 benchmark](phase3-provider-benchmark.md).
 
 ## Cost
@@ -170,7 +213,8 @@ A dose of 4 info findings was planned and dropped before the run: no Luna draft 
 | Blind review, retry of 8 calls | $0.99 |
 | Follow-up run (66 Luna jobs, no review) | $0.37 |
 | Follow-up 2 run (110 Luna jobs, four arms, no review) | $1.01 |
-| **Total** | **$8.26** |
+| Follow-up 3 run (110 Luna jobs, six arms, no review) | $1.14 |
+| **Total** | **$9.40** |
 
 The product owner approved the run and the retry; each command was capped with `--max-usd`.
 
@@ -186,6 +230,9 @@ pnpm --filter @cloudarchitect/eval info-repair-followup <absolute path to eval/r
 # Follow-up 2
 pnpm --filter @cloudarchitect/eval effort-budget --max-usd 1.50
 pnpm --filter @cloudarchitect/eval effort-budget-report <absolute path to eval/results/live/<runId>>
+# Follow-up 3
+pnpm --filter @cloudarchitect/eval clean-turn --max-usd 1.50
+pnpm --filter @cloudarchitect/eval clean-turn-report <absolute path to eval/results/live/<runId>>
 ```
 
 The full generated report is `eval/reviews/info-repair-2026-11-12/report.md`.
