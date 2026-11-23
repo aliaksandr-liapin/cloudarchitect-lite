@@ -14,6 +14,8 @@
     "info-repair-followup": "tsx src/info-repair-followup.ts",
     "effort-budget": "tsx src/effort-budget.ts",
     "effort-budget-report": "tsx src/effort-budget-report.ts",
+    "clean-turn": "tsx src/clean-turn.ts",
+    "clean-turn-report": "tsx src/clean-turn-report.ts",
     "review": "tsx src/review.ts",
     "rules": "tsx src/rule-report.ts",
     "typecheck": "tsc --noEmit",

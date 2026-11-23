@@ -13,6 +13,7 @@ import {
   generateArchitecture,
   prioritizedRepairMessage,
   repairDraft,
+  repairDraftFresh,
   repairFindings,
   repairMessageFor,
   type GenerateInput,
@@ -407,5 +408,26 @@ describe('draftArchitecture and repairDraft', () => {
     expect(draft.usage).toHaveLength(1);
     expect(a.usage).toHaveLength(2);
     expect(b.usage).toHaveLength(2);
+  });
+
+  it('repairDraftFresh keeps the request and the current design, and drops the turns between', async () => {
+    const { llm, requests } = fake(graph(false), graph(false), graph(true), graph(true));
+    const draft = await draftArchitecture(llm, awsCatalog, input());
+    const turn1 = await repairDraft(llm, awsCatalog, input(), draft, 'turn 1');
+    const continued = await repairDraft(llm, awsCatalog, input(), turn1, 'turn 2');
+    const fresh = await repairDraftFresh(llm, awsCatalog, input(), turn1, 'turn 2');
+
+    expect(requests[2]?.messages).toHaveLength(5);
+    const sent = requests[3]!.messages;
+    expect(sent).toEqual([
+      draft.messages[0],
+      { role: 'assistant', content: turn1.text },
+      { role: 'user', content: 'turn 2' },
+    ]);
+    expect(requests[3]?.system).toBe(requests[2]?.system);
+    expect(turn1.messages).toHaveLength(3);
+    expect(continued.usage).toHaveLength(3);
+    expect(fresh.usage).toHaveLength(3);
+    expect(fresh.messages).toEqual(sent);
   });
 });
