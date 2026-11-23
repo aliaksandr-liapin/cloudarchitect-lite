@@ -4,7 +4,9 @@ import {
   chooseCandidate,
   contextCounts,
   contextVerdict,
+  armsIn,
   evaluateCandidates,
+  PRIOR_NOISE,
   replicaNoise,
   type CandidateResult,
 } from './clean-turn-report.js';
@@ -136,5 +138,31 @@ describe('chooseCandidate', () => {
     expect(chooseCandidate([c('KC', true, 0.3, 0.004), c('KF', true, 0.2, 0.005)])).toBe('KF');
     expect(chooseCandidate([c('KC', true, 0.3, 0.004), c('SF', true, 0.3, 0.003)])).toBe('SF');
     expect(chooseCandidate([c('KC', false, 0.1, 0.001), c('KF', true, 0.3, 0.005)])).toBe('KF');
+  });
+});
+
+describe('a confirmation run with arms 0 and SF only', () => {
+  const only = (over: Parameters<typeof mk>[0] = {}) => {
+    const r = mk(over);
+    const { '0': zero, SF } = r.arms!;
+    return { ...r, arms: { '0': zero, SF }, sameRequestAs: { '0': '0', SF: 'SF' } } as never;
+  };
+
+  it('finds the arms present and checks SF alone, with the prior noise floor', () => {
+    const rs: CleanTurnRecord[] = Array.from({ length: 6 }, () =>
+      only({
+        arms: {
+          '0': { findingsByRule: { 'VR-008:info': 1 }, collateral: 0 },
+          SF: { findingsByRule: {}, collateral: 3 },
+        },
+      }),
+    );
+    expect(armsIn(rs)).toEqual(['0', 'SF']);
+    const out = evaluateCandidates(rs, 'gpt-luna', 1);
+    expect(out.map((c) => c.arm)).toEqual(['SF']);
+    const c5 = out[0]!.criteria.find((c) => c.id === 5)!;
+    expect(c5.detail).toContain(`noise floor ${PRIOR_NOISE.value!.toFixed(2)}`);
+    // A collateral rise of 3 stays under the prior floor of 3.78.
+    expect(out[0]!.passes).toBe(true);
   });
 });

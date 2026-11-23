@@ -152,3 +152,20 @@ drafts), so 110 jobs ≈ $1.10–1.25, with continued turns a little longer than
 4. Three candidates, with a tie-break fixed in advance.
 5. 5 repeats (110 jobs), as before.
 6. Arm R, an extra call per job (about $0.13), so criterion 5 has a real noise floor.
+
+## Confirmation run (added 2026-11-23, after the first run, before the second)
+
+**Why.** SF passed in run `2026-11-23T17-42-38-611Z` (errors + warnings per design 0.33 → 0.17).
+But the control SC moved by about 0.13 against arm 0 between the 20 Nov and 23 Nov runs, nearly the
+size of SF's lead. One run is not enough to change the app. The owner approved a confirmation run
+the same day.
+
+**Method.** `pnpm --filter @cloudarchitect/eval clean-turn --arms 0,SF --max-usd 1.00`: arms 0 and
+SF only, GPT Luna, the same 22 scenarios, 5 repeats, new drafts. Arm R is skipped; criterion 5 uses
+the noise floor of the first run (3.78 from 89 jobs, `PRIOR_NOISE` in `clean-turn-report.ts`).
+About 4–5 calls per job, so about $0.65–0.75.
+
+**Bar, fixed before the run.** SF is confirmed if it meets criteria 1–5 against arm 0, unchanged
+from above. If confirmed, switching Luna's repair to SF is the next pull request, with its own review.
+If not, nothing changes, and the report shows both runs side by side, with the first run's pass
+recorded as not confirmed.

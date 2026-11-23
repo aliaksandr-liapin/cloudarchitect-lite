@@ -5,7 +5,7 @@
  * branch, turn 2 continued or fresh). Makes PAID API calls.
  *
  * Usage: pnpm --filter @cloudarchitect/eval clean-turn --max-usd <n>
- *        [--models gpt-luna] [--repeats 5] [--scenarios id,id] [--concurrency 4]
+ *        [--arms 0,SF] [--models gpt-luna] [--repeats 5] [--scenarios id,id] [--concurrency 4]
  * --max-usd is required: one shared cap, so a run can never start uncapped. A requested model whose
  * provider key is missing fails the run before any call. Results go to
  * eval/results/live/<runId>/. Console output carries ids, counts, cost and latency only.
@@ -15,7 +15,7 @@ import { modelOption } from '@cloudarchitect/domain';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CT_ARMS, runCleanTurnJob, type CleanTurnRecord } from './clean-turn-job.js';
+import { CT_ARMS, runCleanTurnJob, type CleanTurnRecord, type CtArm } from './clean-turn-job.js';
 import { modelsWithKeys } from './gate.js';
 import {
   Budget,
@@ -34,6 +34,7 @@ const { values: args } = parseArgs({
     scenarios: { type: 'string' },
     concurrency: { type: 'string', default: '4' },
     'max-usd': { type: 'string' },
+    arms: { type: 'string' },
   },
 });
 
@@ -42,6 +43,12 @@ if (args['max-usd'] === undefined) throw new Error('--max-usd is required');
 const maxUsd = Number(args['max-usd']);
 if (!Number.isFinite(maxUsd) || maxUsd <= 0) throw new Error('--max-usd must be a positive number');
 const repeats = positiveInt('repeats', args.repeats);
+// A subset of arms (a confirmation run); arm 0 is always the baseline.
+const only: CtArm[] = args.arms
+  ? (args.arms.split(',').map((a) => a.trim()) as CtArm[])
+  : [...CT_ARMS];
+for (const a of only) if (!CT_ARMS.includes(a)) throw new Error(`unknown arm ${a}`);
+if (!only.includes('0')) throw new Error('--arms must include 0');
 const concurrency = positiveInt('concurrency', args.concurrency);
 
 const clients = loadClients();
@@ -89,12 +96,13 @@ async function worker() {
         writeFileSync(file(`${name}.project.json`), JSON.stringify(project, null, 2)),
       // The rejected answer stays in the local, git-ignored results folder for diagnosis.
       (text) => writeFileSync(file('rejected.txt'), text),
+      only,
     );
     records.push(r);
     console.log(
       `${r.model.padEnd(17)} ${r.scenarioId.padEnd(28)} #${r.repeat} ` +
         (r.ok && r.arms
-          ? `${CT_ARMS.map((a) => `${a} ${pass(r.arms![a])}`).join(' ')} split K ${r.kSplit ? 'y' : 'n'} S ${r.sSplit ? 'y' : 'n'} ` +
+          ? `${only.map((a) => `${a} ${pass(r.arms![a])}`).join(' ')} split K ${r.kSplit ? 'y' : 'n'} S ${r.sSplit ? 'y' : 'n'} ` +
             `VR-018 ${r.hasVr018 ? 'yes' : 'no'}`
           : `ERROR ${r.error}`) +
         ` $${r.costUsd.toFixed(4)} ${(r.latencyMs / 1000).toFixed(1)}s`,
@@ -113,6 +121,7 @@ writeFileSync(
       repeats,
       scenarios: scenarios.length,
       models,
+      arms: only,
       maxUsd,
       spentUsd: budget.spentMicro / 1e6,
       cutShort: budget.cutShort,

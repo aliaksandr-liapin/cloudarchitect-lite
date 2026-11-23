@@ -34,6 +34,16 @@ export const replicaNoise = (records: CleanTurnRecord[], model: string): NoiseFl
     model,
   );
 
+/**
+ * The noise floor of run 2026-11-23T17-42-38-611Z (arm 0 vs R, 89 jobs), used by a confirmation
+ * run that skips R (fixed before that run; see the spec's "Confirmation run").
+ */
+export const PRIOR_NOISE: NoiseFloor = { value: 3.7752808988764044, pooled: false, jobs: 89 };
+
+/** The arms present in a run's records (a confirmation run has only some). */
+export const armsIn = (records: CleanTurnRecord[]): CtArm[] =>
+  CT_ARMS.filter((a) => records.some((r) => r.arms && a in r.arms));
+
 export interface ContextCounts {
   /** Jobs where both modes made their own turn 2 and both succeeded. */
   jobs: number;
@@ -84,9 +94,10 @@ export function evaluateCandidates(
   model: string,
   seed: number,
 ): CandidateResult[] {
-  const noise = replicaNoise(records, model);
+  const present = armsIn(records);
+  const noise = present.includes('R') ? replicaNoise(records, model) : PRIOR_NOISE;
   const mine = records.filter((r) => r.model === model && r.ok && r.arms);
-  return CT_CANDIDATES.map((arm) => {
+  return CT_CANDIDATES.filter((a) => present.includes(a)).map((arm) => {
     const criteria = candidateCriteria<CtArm>(records, model, seed, arm, noise);
     const ok = mine.filter((r) => r.arms![arm].ok);
     return {
@@ -123,12 +134,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const model = values.model;
   const mine = records.filter((r) => r.model === model);
   const ok = mine.filter((r) => r.ok && r.arms);
+  const present = armsIn(records);
   console.log(
     `${model}: ${mine.length} jobs, ${ok.length} ok, ${mine.length - ok.length} failed; ` +
-      `failed arms: ${CT_ARMS.map((a) => `${a} ${ok.filter((r) => !r.arms![a].ok).length}`).join(', ')}; ` +
+      `failed arms: ${present.map((a) => `${a} ${ok.filter((r) => !r.arms![a].ok).length}`).join(', ')}; ` +
       `turn 2 split: K ${ok.filter((r) => r.kSplit).length}, S ${ok.filter((r) => r.sSplit).length}`,
   );
-  for (const a of CT_ARMS) {
+  for (const a of present) {
     const rs = ok.filter((r) => r.arms![a].ok);
     const m = (pick: (r: CleanTurnRecord) => number) => f(mean(rs.map(pick)));
     const vr = ok.filter((r) => r.hasVr018 && r.arms![a].ok);
@@ -143,18 +155,22 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
         `$${f(mean(rs.map((r) => r.arms![a].costUsd)), 4)} per design`,
     );
   }
-  const noise = replicaNoise(records, model);
+  const noise = present.includes('R') ? replicaNoise(records, model) : PRIOR_NOISE;
   console.log(
-    `noise floor (arm 0 vs replica R): ${noise.value === undefined ? 'none' : f(noise.value)} from ${noise.jobs} jobs`,
+    `noise floor${present.includes('R') ? ' (arm 0 vs replica R)' : ' (prior run, fixed in advance)'}: ${noise.value === undefined ? 'none' : f(noise.value)} from ${noise.jobs} jobs`,
   );
-  const s = contextCounts(records, model, 'S');
-  console.log(
-    `context, S pair (VR-018 drafts, turn 2 split): ${s.jobs} jobs; left unfixed continued ${s.continued}, fresh ${s.fresh} -> ${contextVerdict(s)}`,
-  );
-  const k = contextCounts(records, model, 'K');
-  console.log(
-    `context, K pair (turn 2 split, no verdict): ${k.jobs} jobs; left unfixed continued ${k.continued}, fresh ${k.fresh}`,
-  );
+  if (present.includes('SC') && present.includes('SF')) {
+    const s = contextCounts(records, model, 'S');
+    console.log(
+      `context, S pair (VR-018 drafts, turn 2 split): ${s.jobs} jobs; left unfixed continued ${s.continued}, fresh ${s.fresh} -> ${contextVerdict(s)}`,
+    );
+  }
+  if (present.includes('KC') && present.includes('KF')) {
+    const k = contextCounts(records, model, 'K');
+    console.log(
+      `context, K pair (turn 2 split, no verdict): ${k.jobs} jobs; left unfixed continued ${k.continued}, fresh ${k.fresh}`,
+    );
+  }
   const results = evaluateCandidates(records, model, Number(values.seed));
   for (const r of results) {
     console.log(`candidate ${r.arm}: ${r.passes ? 'PASSES' : 'fails'}`);

@@ -296,4 +296,30 @@ describe('runCleanTurnJob', () => {
     expect(r.arms!.SF.costUsd).toBeCloseTo(perCall * 4, 9);
     expect(r.costUsd).toBeCloseTo(perCall * 9, 9);
   });
+
+  it('runs only the requested arms and skips the calls they do not need', async () => {
+    const { llm, requests } = fake(full);
+    const saved: Record<string, Project> = {};
+    const r = await runCleanTurnJob(
+      llm,
+      awsCatalog,
+      scenario,
+      'gpt-luna',
+      1,
+      (name, p) => {
+        saved[name] = p;
+      },
+      () => {},
+      ['0', 'SF'],
+    );
+
+    expect(Object.keys(r.arms!)).toEqual(['0', 'SF']);
+    // extraction, draft, arm 0, S turn 1, SF's fresh turn 2
+    expect(requests).toHaveLength(5);
+    expect(requests.some((q) => q.messages.length === 5)).toBe(false);
+    expect(r.arms!.SF.turns).toBe(2);
+    expect(r.sSplit).toBe(false);
+    expect(r.sameRequestAs).toEqual({ '0': '0', SF: 'SF' });
+    expect(Object.keys(saved).sort()).toEqual(['0', 'S1', 'SF', 'draft']);
+  });
 });

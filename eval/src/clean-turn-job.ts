@@ -50,7 +50,7 @@ export const CT_ARMS: readonly CtArm[] = ['0', 'R', 'KC', 'KF', 'SC', 'SF'];
 /** The arms the bar can pick (SC is the control for SF; R only measures noise). */
 export const CT_CANDIDATES = ['KC', 'KF', 'SF'] as const satisfies readonly CtArm[];
 
-export interface CleanTurnRecord extends ArmJobRecord<CtArm> {
+export interface CleanTurnRecord<A extends CtArm = CtArm> extends ArmJobRecord<A> {
   /** Repairable info findings in the draft (the five rules). */
   eligibleInfo: number;
   /** KC and KF made separate turn-2 calls (continued vs fresh); false when they share a design. */
@@ -91,7 +91,7 @@ async function all<T>(ps: Promise<T>[]): Promise<T[]> {
   return settled.map((r) => (r as PromiseFulfilledResult<T>).value);
 }
 
-export async function runCleanTurnJob(
+export async function runCleanTurnJob<A extends CtArm = CtArm>(
   llm: LlmClient,
   catalog: CatalogSnapshot,
   scenario: Scenario,
@@ -100,7 +100,10 @@ export async function runCleanTurnJob(
   save: (name: CtSaveName, project: Project) => void,
   /** Receives the model's rejected text when the first draft fails schema validation. */
   saveRejectedDraft: (text: string) => void = () => {},
-): Promise<CleanTurnRecord> {
+  /** The arms to run (default all); calls only the unrequested arms need are skipped. */
+  only: readonly A[] = CT_ARMS as readonly A[],
+): Promise<CleanTurnRecord<A>> {
+  const want = (a: CtArm) => (only as readonly CtArm[]).includes(a);
   const started = Date.now();
   // Local meter only: the caller's client enforces any spend cap.
   const { llm: metered, meter } = meteredClient(llm, new Budget(Infinity));
@@ -143,23 +146,40 @@ export async function runCleanTurnJob(
         return { ...next, current: c.current, error: err };
       }
     };
-    /** Turn 2 in both modes from one shared chain; one call when the two contexts are identical. */
-    const branch = async (c: Chain, list: Finding[]): Promise<[Chain, Chain, boolean]> => {
-      if (c.error || !list.length) return [c, c, false];
+    /**
+     * Turn 2 from one shared chain in the requested modes (`c` for a mode not requested); one call
+     * when the two contexts are identical. The flag is true when both modes made their own call.
+     */
+    const branch = async (
+      c: Chain,
+      list: Finding[],
+      cont: boolean,
+      fresh: boolean,
+    ): Promise<[Chain, Chain, boolean]> => {
+      if (c.error || !list.length || (!cont && !fresh)) return [c, c, false];
       if (c.turns === 0) {
         const one = await send(c, list);
         return [one, one, false];
       }
-      const [cont, fresh] = await all([send(c, list), send(c, list, 'fresh')]);
-      return [cont!, fresh!, true];
+      const [a, b] = await all([
+        cont ? send(c, list) : Promise.resolve(c),
+        fresh ? send(c, list, 'fresh') : Promise.resolve(c),
+      ]);
+      return [a!, b!, cont && fresh];
     };
 
     const kBranch = async (): Promise<[Chain, Chain, Chain, boolean]> => {
       const t1 = await send(start, armFindings(draft.findings, 'W'));
-      const [kc, kf, split] = await branch(t1, infoOnly(t1.current.findings));
+      const [kc, kf, split] = await branch(
+        t1,
+        infoOnly(t1.current.findings),
+        want('KC'),
+        want('KF'),
+      );
       return [t1, kc, kf, split];
     };
     const sBranch = async (): Promise<[Chain, Chain, boolean]> => {
+      if (!want('SC') && !want('SF')) return [start, start, false];
       if (!draftHasVr018) {
         const one = await send(start, armFindings(draft.findings, 'I'));
         return [one, one, false];
@@ -167,11 +187,11 @@ export async function runCleanTurnJob(
       const t1 = await send(start, vr018Only(draft.findings));
       const next = t1.error ? [] : armFindings(t1.current.findings, 'I');
       if (next.length) save('S1', t1.current.project);
-      return branch(t1, next);
+      return branch(t1, next, want('SC'), want('SF'));
     };
-    const replica = () => send(start, armFindings(draft.findings, 'W'));
+    const replica = () => (want('R') ? send(start, armFindings(draft.findings, 'W')) : start);
 
-    const [k, s, r] = await all<unknown>([kBranch(), sBranch(), replica()]);
+    const [k, s, r] = await all<unknown>([kBranch(), sBranch(), Promise.resolve(replica())]);
     const [zero, kc, kf, kSplit] = k as Awaited<ReturnType<typeof kBranch>>;
     const [sc, sf, sSplit] = s as Awaited<ReturnType<typeof sBranch>>;
     const chains: Record<CtArm, Chain> = {
@@ -230,13 +250,11 @@ export async function runCleanTurnJob(
         request: c.request,
       };
     };
-    const arms = Object.fromEntries(CT_ARMS.map((a) => [a, result(a)])) as Record<
-      CtArm,
-      EbArmResult
-    >;
+    const arms = Object.fromEntries(only.map((a) => [a, result(a)])) as Record<A, EbArmResult>;
     // Only R repeats another arm's request as a separate call; shared designs are not noise.
-    const sameRequestAs = Object.fromEntries(CT_ARMS.map((a) => [a, a])) as Record<CtArm, CtArm>;
-    if (zero.turns > 0) sameRequestAs.R = '0';
+    const sameRequestAs = Object.fromEntries(only.map((a) => [a, a])) as Record<A, A>;
+    if (want('R') && want('0') && zero.turns > 0)
+      (sameRequestAs as Partial<Record<CtArm, CtArm>>).R = '0';
 
     return {
       ...base,
