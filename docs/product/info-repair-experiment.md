@@ -191,7 +191,7 @@ The candidates were KC, KF and SF; SC (follow-up 2's arm S on new drafts) was th
 
 - **The second turn's history cost fixes.** With identical work and an identical starting design, the fresh turn fixed more: SF ended with VR-018 in 5 designs against SC's 10, and left 4 fewer findings unfixed on the drafts where the two differed. Follow-up 2's "budget" was partly context.
 - **The severity split adds info fixes without hurting warnings, and without helping them.** KF matched arm 0 on errors and warnings exactly and cleared encryption at rest from 85 designs to 0. KC lost a little (0.35), in the same direction as SC vs SF.
-- **SC did better here than arm S did in follow-up 2** (errors + warnings 0.21 vs arm 0's 0.33, where S had 0.35 vs 0.34). Same arm, new drafts: single runs of 110 jobs move this much. SF's lead over arm 0 (−0.15, interval excluding zero) is the result to rely on; SC's swing is a reason to re-check SF in the next benchmark before calling it settled.
+- **SC did better here than arm S did in follow-up 2** (errors + warnings 0.21 vs arm 0's 0.33, where S had 0.35 vs 0.34). Same arm, new drafts: its gap to arm 0 moved by about 0.13 between two runs of 110 jobs, nearly the size of SF's lead (−0.15). So SF's pass rests on one run, and it should be re-run on new drafts before Luna's repair changes. The fresh-vs-continued comparison is paired within this run and does not depend on that swing.
 
 ## Limits
 
