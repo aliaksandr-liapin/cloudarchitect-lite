@@ -3,15 +3,16 @@ import type { ArchEdge, ArchNode, Project } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import { setSettingOps, settingsView } from './settings';
 
-const node = (id: string, extra: Partial<ArchNode>): ArchNode => ({
-  id,
-  provider: 'aws',
-  label: id,
-  requirementIds: [],
-  position: { x: 0, y: 0 },
-  size: { width: 100, height: 60 },
-  ...extra,
-});
+const node = (id: string, extra: Partial<ArchNode>): ArchNode =>
+  ({
+    id,
+    provider: 'aws',
+    label: id,
+    requirementIds: [],
+    position: { x: 0, y: 0 },
+    size: { width: 100, height: 60 },
+    ...extra,
+  }) as ArchNode;
 
 const project = (nodes: ArchNode[], edges: ArchEdge[] = []): Project =>
   ({
