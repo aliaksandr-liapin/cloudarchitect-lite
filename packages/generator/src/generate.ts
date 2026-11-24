@@ -86,6 +86,15 @@ export function repairFindings(findings: Finding[], infoRules: readonly string[]
   );
 }
 
+/** Findings of the model's lead rules (sent alone first); none when the model has no repair turn. */
+export function leadFindings(
+  findings: Finding[],
+  option: { repairTurns: number; repairLeadRules?: readonly string[] },
+): Finding[] {
+  const rules = option.repairTurns > 0 ? (option.repairLeadRules ?? []) : [];
+  return findings.filter((f) => f.ruleId !== undefined && rules.includes(f.ruleId));
+}
+
 /** The repair message for `sent`: the info variant only when an info finding is among them. */
 export function repairMessageFor(sent: Finding[]): string {
   const list = formatFindings(sent);
@@ -213,8 +222,8 @@ export function repairDraft(
 }
 
 /**
- * Experimental (eval only, the app does not use it): a repair call on top of `current` in a fresh
- * conversation. It keeps the original request and requirements (the first user message) and
+ * A repair call on top of `current` in a fresh
+ * conversation (the app uses it after a lead turn, see `repairLeadRules`). It keeps the original request and requirements (the first user message) and
  * `current`'s design as the assistant's answer, and drops everything in between (earlier drafts
  * and repair messages). Usage still accumulates, so cost covers every turn.
  */
@@ -242,10 +251,17 @@ export async function generateArchitecture(
   let out = await draftArchitecture(llm, catalog, input);
   const firstDraftFindings = out.findings;
   let repairTurnsUsed = 0;
+  // Lead turn: these rules alone, in the running conversation; the turns after it start fresh.
+  const lead = leadFindings(out.findings, option);
+  if (lead.length) {
+    out = await repairDraft(llm, catalog, input, out, repairMessageFor(lead));
+    repairTurnsUsed++;
+  }
+  const repair = lead.length ? repairDraftFresh : repairDraft;
   for (let turn = 0; turn < option.repairTurns; turn++) {
     const issues = repairFindings(out.findings, option.repairInfoRules);
     if (!issues.length) break;
-    out = await repairDraft(llm, catalog, input, out, repairMessageFor(issues));
+    out = await repair(llm, catalog, input, out, repairMessageFor(issues));
     repairTurnsUsed++;
   }
 

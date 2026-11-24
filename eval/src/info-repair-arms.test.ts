@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Finding } from '@cloudarchitect/domain';
+import { modelOption, type Finding } from '@cloudarchitect/domain';
 import {
   armFindings,
+  INFO_RULES_TO_REPAIR,
   infoRepairMessage,
   messageFor,
   sampleReviewJobs,
@@ -116,5 +117,12 @@ describe('messageFor with the prioritized info message', () => {
     const mixed = [f('VR-008', 'info'), f('VR-018', 'warning')];
     expect(messageFor('I', mixed)).toBe(messageFor('I', mixed, 'plain'));
     expect(messageFor('I', mixed)).toContain('Apply each info finding');
+  });
+});
+
+describe('the app matches the experiment', () => {
+  it("GPT Luna's repair sends the five info rules and leads with VR-018 (follow-up 3, arm SF)", () => {
+    expect(modelOption('gpt-luna').repairInfoRules).toEqual([...INFO_RULES_TO_REPAIR]);
+    expect(modelOption('gpt-luna').repairLeadRules).toEqual(['VR-018']);
   });
 });
