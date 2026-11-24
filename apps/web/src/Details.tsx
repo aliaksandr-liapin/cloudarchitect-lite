@@ -1,7 +1,8 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
 import { EdgeKind, type ArchEdge, type PatchOp, type Project } from '@cloudarchitect/domain';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { deletionOps, toggleRequirement } from './edit';
+import { setSettingOps, settingsView } from './settings';
 
 /** Readable names for the connector kinds; the stored value stays the enum. */
 export const EDGE_KIND_LABELS: Record<ArchEdge['kind'], string> = {
@@ -33,6 +34,99 @@ export function Details(props: Props) {
       {body}
     </section>
   ) : null;
+}
+
+/** Catalog settings of the selected component or connector (settings editor, 0.4). */
+function Settings({ project, selection, disabled, onEdit }: Props) {
+  const [adding, setAdding] = useState<string | null>(null);
+  const view = settingsView(project, selection, awsCatalog);
+  if (!view) return null;
+  const set = (key: string, value: string) => {
+    const ops = setSettingOps(project, selection, key, value);
+    if (ops.length) onEdit(ops);
+  };
+  const remove = (key: string, name: string) => (
+    <button
+      type="button"
+      className="btn"
+      aria-label={`Remove ${name}`}
+      disabled={disabled}
+      onClick={() => set(key, '')}
+    >
+      ✕
+    </button>
+  );
+  return (
+    <>
+      <dt>Settings</dt>
+      <dd>
+        {view.rows.length === 0 && view.other.length === 0 && (
+          <div>No settings for this {selection.kind === 'node' ? 'component' : 'connector'}</div>
+        )}
+        {view.rows.map(({ key, feature, value }) => {
+          const name = feature.displayName;
+          const editing = value !== undefined || adding === key;
+          return (
+            <div key={key} className="setting">
+              <span title={feature.summary}>{name}</span>{' '}
+              <a href={feature.documentationUrl} target="_blank" rel="noreferrer">
+                docs
+              </a>
+              {!editing && (
+                <button
+                  type="button"
+                  className="btn"
+                  aria-label={`Add ${name}`}
+                  disabled={disabled}
+                  onClick={() => (feature.values ? set(key, feature.values[0]!) : setAdding(key))}
+                >
+                  Add
+                </button>
+              )}
+              {editing && feature.values && (
+                <select
+                  className="input"
+                  aria-label={name}
+                  value={value ?? ''}
+                  disabled={disabled}
+                  onChange={(e) => set(key, e.target.value)}
+                >
+                  {feature.values.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {editing && !feature.values && (
+                <Field
+                  label={name}
+                  value={value ?? ''}
+                  max={200}
+                  disabled={disabled}
+                  commit={(v) => {
+                    if (adding === key) setAdding(null);
+                    set(key, v);
+                  }}
+                />
+              )}
+              {value !== undefined && remove(key, name)}
+            </div>
+          );
+        })}
+        {view.other.length > 0 && (
+          <>
+            <div className="small">Not in catalog</div>
+            {view.other.map(({ key, value }) => (
+              <div key={`other:${key}`} className="setting">
+                <code>{`${key} = ${value}`}</code> {remove(key, key)}
+              </div>
+            ))}
+          </>
+        )}
+      </dd>
+    </>
+  );
 }
 
 /** A text field that commits on blur or Enter; `commit` gets the raw text. */
@@ -140,6 +234,13 @@ function describe({ project, selection, disabled, onEdit }: Props) {
             commit={text('authNotes')}
           />
         </dd>
+        <Settings
+          key={`${selection.kind}:${id}`}
+          project={project}
+          selection={selection}
+          disabled={disabled}
+          onEdit={onEdit}
+        />
         <dd>{del('connector', [], [id])}</dd>
       </dl>
     );
@@ -261,6 +362,13 @@ function describe({ project, selection, disabled, onEdit }: Props) {
           </div>
         ))}
       </dd>
+      <Settings
+        key={`${selection.kind}:${id}`}
+        project={project}
+        selection={selection}
+        disabled={disabled}
+        onEdit={onEdit}
+      />
       <dd>{del('component', [id], [])}</dd>
     </dl>
   );

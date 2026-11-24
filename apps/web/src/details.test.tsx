@@ -52,10 +52,36 @@ const base: Project = {
   edges: [{ id: 'e1', source: 'a', target: 'b', kind: 'invoke', requirementIds: [] }],
 };
 
-const render = (selection: Selection, p: Project = base) =>
+const render = (selection: Selection, p: Project = base, disabled = false) =>
   renderToStaticMarkup(
-    <Details project={p} selection={selection} disabled={false} onEdit={vi.fn()} />,
+    <Details project={p} selection={selection} disabled={disabled} onEdit={vi.fn()} />,
   );
+
+const svcNode = (id: string, serviceId: string, configuration?: Record<string, string | boolean>) =>
+  ({
+    id,
+    serviceId,
+    provider: 'aws',
+    label: id,
+    requirementIds: [],
+    position: { x: 0, y: 0 },
+    size: { width: 100, height: 60 },
+    ...(configuration ? { configuration } : {}),
+  }) as Project['nodes'][number];
+
+const withSettings: Project = {
+  ...base,
+  nodes: [
+    ...base.nodes,
+    svcNode('t', 'aws.dynamodb', { encryption: 'KMS' }),
+    svcNode('q', 'aws.sqs'),
+    svcNode('fn', 'aws.lambda', { legacyFlag: true }),
+  ],
+  edges: [
+    ...base.edges,
+    { id: 'e2', source: 'q', target: 'fn', kind: 'event', requirementIds: [] },
+  ],
+};
 
 describe('Details', () => {
   it('connector view shows its fields', () => {
@@ -94,5 +120,44 @@ describe('Details', () => {
   it('unknown id renders nothing', () => {
     expect(render({ kind: 'edge', id: 'nope' })).toBe('');
     expect(render({ kind: 'node', id: 'nope' })).toBe('');
+  });
+
+  it('component shows its catalog settings', () => {
+    const html = render({ kind: 'node', id: 't' }, withSettings);
+    expect(html).toContain('Settings');
+    expect(html).toMatch(/<select[^>]*aria-label="DynamoDB encryption at rest"/);
+    expect(html).toContain('<option value="KMS" selected="">KMS</option>');
+    expect(html).toContain('<option value="AWS-managed">AWS-managed</option>');
+    expect(html).toContain('aria-label="Remove DynamoDB encryption at rest"');
+    expect(html).toContain('aria-label="Add DynamoDB global tables"');
+    expect(html).toContain(
+      'href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"',
+    );
+  });
+
+  it('connector shows settings from both ends', () => {
+    const html = render({ kind: 'edge', id: 'e2' }, withSettings);
+    expect(html).toContain('aria-label="Add SQS dead-letter queue"');
+    expect(html).toContain('aria-label="Add Lambda on-failure destination"');
+  });
+
+  it('unknown keys are listed and removable', () => {
+    const html = render({ kind: 'node', id: 'fn' }, withSettings);
+    expect(html).toContain('Not in catalog');
+    expect(html).toContain('legacyFlag = true');
+    expect(html).toContain('aria-label="Remove legacyFlag"');
+  });
+
+  it('disabled editor disables settings', () => {
+    const html = render({ kind: 'node', id: 't' }, withSettings, true);
+    expect(html).toMatch(/<select[^>]*aria-label="DynamoDB encryption at rest"[^>]*disabled=""/);
+    expect(html).toMatch(/<button[^>]*aria-label="Add DynamoDB global tables"[^>]*disabled=""/);
+    expect(html).toMatch(
+      /<button[^>]*aria-label="Remove DynamoDB encryption at rest"[^>]*disabled=""/,
+    );
+  });
+
+  it('container shows no settings', () => {
+    expect(render({ kind: 'node', id: 'sub' })).not.toContain('Settings');
   });
 });
