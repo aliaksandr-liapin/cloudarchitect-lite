@@ -144,6 +144,13 @@ type Toast = { text: string; restore?: ProjectVersion; undo?: boolean };
 const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
 const NO_ROUTES: Routes = new Map();
 
+/**
+ * Keep this identity stable. A new array on every render made React Flow re-attach its key
+ * listeners mid-event, so after Ctrl+Z on Windows/Linux it missed the "z" key-up and ignored
+ * Delete until the page was reloaded.
+ */
+const DELETE_KEYS = ['Backspace', 'Delete'];
+
 export function App() {
   const [project, setProject] = useState<Project>();
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -1154,7 +1161,7 @@ export function App() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
-            deleteKeyCode={['Backspace', 'Delete']}
+            deleteKeyCode={DELETE_KEYS}
             onBeforeDelete={onBeforeDelete}
             onConnect={onConnect}
             onReconnect={onReconnect}

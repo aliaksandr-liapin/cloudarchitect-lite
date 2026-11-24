@@ -209,6 +209,7 @@ test('a setting clears its finding, and undo brings it back', async () => {
   await expect(vr008).toHaveCount(before);
 });
 
+// Runs right after a Ctrl+Z: guards the stuck-key bug where Delete stopped working after undo.
 test('delete keys delete from the design, and undo brings it back', async () => {
   const first = dental.nodes[0]!;
   const label = first.label;

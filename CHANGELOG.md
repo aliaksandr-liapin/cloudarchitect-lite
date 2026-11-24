@@ -18,6 +18,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: on Windows and Linux, Delete and Backspace stopped deleting after Ctrl+Z until the page was reloaded.
 - Editor: Backspace or Delete no longer hides a node or container while the design keeps it. Deletes now go through the design, its findings and the export.
 
 ## [0.3.1] - 2026-11-11
