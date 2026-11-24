@@ -36,6 +36,8 @@ export const ServiceFeature = z.object({
   displayName: z.string(),
   summary: z.string(),
   documentationUrl: z.url(),
+  /** Allowed values, when the feature has a fixed set (the settings editor shows a select). */
+  values: z.array(z.string().min(1)).min(1).optional(),
 });
 export type ServiceFeature = z.infer<typeof ServiceFeature>;
 
