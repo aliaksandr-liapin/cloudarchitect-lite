@@ -11,6 +11,7 @@ import {
   buildRequirements,
   draftArchitecture,
   generateArchitecture,
+  leadFindings,
   prioritizedRepairMessage,
   repairDraft,
   repairDraftFresh,
@@ -65,6 +66,29 @@ function graph(dlq: boolean) {
         requirementIds: ['I1'],
         configuration: [],
       },
+    ],
+  };
+}
+
+/**
+ * `graph(dlq)` plus a VPC with two zones, an ALB (in one zone, or a second one in the other zone)
+ * and a table without encryption at rest (VR-008, info).
+ */
+function albGraph(dlq: boolean, twoZones: boolean) {
+  const g = graph(dlq);
+  return {
+    ...g,
+    containers: [
+      ...g.containers,
+      { id: 'vpc', kind: 'vpc', parentId: 'region', label: 'VPC' },
+      { id: 'az1', kind: 'availability-zone', parentId: 'vpc', label: 'AZ a' },
+      { id: 'az2', kind: 'availability-zone', parentId: 'vpc', label: 'AZ b' },
+    ],
+    nodes: [
+      ...g.nodes,
+      { ...node('alb', 'aws.alb', ['R1']), containerId: 'az1' },
+      ...(twoZones ? [{ ...node('alb2', 'aws.alb', ['R1']), containerId: 'az2' }] : []),
+      node('table', 'aws.dynamodb', ['R1']),
     ],
   };
 }
@@ -294,7 +318,7 @@ describe('generateArchitecture', () => {
   });
 });
 
-describe('info findings in the repair turn (no model sends them)', () => {
+describe('info findings in the repair turn (GPT Luna only)', () => {
   const g = graph(true);
   // An unencrypted DynamoDB table: VR-008 (info), no error or warning.
   const infoOnly = { ...g, nodes: [...g.nodes, node('table', 'aws.dynamodb', ['R1'])] };
@@ -318,21 +342,31 @@ describe('info findings in the repair turn (no model sends them)', () => {
     expect(r.repairTurnsUsed).toBe(0);
   });
 
-  it('keeps the errors-and-warnings message for GPT Luna', async () => {
-    const { llm, requests } = fake(graph(false), graph(true));
-    await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
-    const repair = requests[1]?.messages[2]?.content ?? '';
-    expect(repair).toContain('VR-004');
-    expect(repair).not.toContain('info finding');
+  it('keeps the errors-and-warnings message for Haiku and Flash-Lite', async () => {
+    for (const model of ['haiku', 'gemini-flash-lite'] as const) {
+      const { llm, requests } = fake(graph(false), graph(true));
+      await generateArchitecture(llm, awsCatalog, input({ model }));
+      const repair = requests[1]?.messages[2]?.content ?? '';
+      expect(repair).toContain('VR-004');
+      expect(repair).not.toContain('info finding');
+    }
   });
 
-  it('info findings alone trigger no repair for any economical model', async () => {
-    for (const model of ['haiku', 'gpt-luna', 'gemini-flash-lite'] as const) {
+  it('info findings alone trigger no repair for Haiku and Flash-Lite', async () => {
+    for (const model of ['haiku', 'gemini-flash-lite'] as const) {
       const { llm, requests } = fake(infoOnly);
       const r = await generateArchitecture(llm, awsCatalog, input({ model }));
       expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-008');
       expect(requests).toHaveLength(1);
     }
+  });
+
+  it('info findings alone get one repair turn for GPT Luna', async () => {
+    const { llm, requests } = fake(infoOnly, graph(true));
+    const r = await generateArchitecture(llm, awsCatalog, input({ model: 'gpt-luna' }));
+    expect(requests).toHaveLength(2);
+    expect(r.repairTurnsUsed).toBe(1);
+    expect(requests[1]?.messages[2]?.content).toContain('VR-008');
   });
 });
 
@@ -429,5 +463,67 @@ describe('draftArchitecture and repairDraft', () => {
     expect(continued.usage).toHaveLength(3);
     expect(fresh.usage).toHaveLength(3);
     expect(fresh.messages).toEqual(sent);
+  });
+});
+
+describe('generateArchitecture: lead turn (GPT Luna)', () => {
+  const luna = () => input({ model: 'gpt-luna' });
+  const user = (r: LlmRequest | undefined) => String(r?.messages.at(-1)?.content);
+
+  it('sends VR-018 alone first, then the rest with info findings in a fresh turn', async () => {
+    const { llm, requests } = fake(
+      albGraph(false, false),
+      albGraph(false, true),
+      albGraph(true, true),
+    );
+    const r = await generateArchitecture(llm, awsCatalog, luna());
+    expect(requests).toHaveLength(3);
+    expect(r.repairTurnsUsed).toBe(2);
+    expect(r.usage).toHaveLength(3);
+
+    expect(requests[1]?.messages).toHaveLength(3);
+    expect(user(requests[1])).toContain('VR-018');
+    expect(user(requests[1])).not.toContain('VR-004');
+    expect(user(requests[1])).not.toContain('VR-008');
+
+    const fresh = requests[2]!.messages;
+    expect(fresh).toHaveLength(3);
+    expect(fresh[0]).toEqual(requests[0]!.messages[0]);
+    expect(fresh[1]).toEqual({ role: 'assistant', content: JSON.stringify(albGraph(false, true)) });
+    expect(user(requests[2])).toContain('VR-004');
+    expect(user(requests[2])).toContain('VR-008');
+    expect(user(requests[2])).not.toContain('VR-018');
+    expect(r.firstDraftFindings.map((f) => f.ruleId)).toContain('VR-018');
+  });
+
+  it('runs one continued turn with info findings when the draft has no VR-018', async () => {
+    const { llm, requests } = fake(albGraph(false, true), albGraph(true, true));
+    const r = await generateArchitecture(llm, awsCatalog, luna());
+    expect(requests).toHaveLength(2);
+    expect(r.repairTurnsUsed).toBe(1);
+    expect(requests[1]?.messages).toHaveLength(3);
+    expect(user(requests[1])).toContain('VR-004');
+    expect(user(requests[1])).toContain('VR-008');
+  });
+
+  it('keeps Haiku on one turn with errors and warnings only', async () => {
+    const { llm, requests } = fake(albGraph(false, false), albGraph(true, true));
+    const r = await generateArchitecture(llm, awsCatalog, input());
+    expect(requests).toHaveLength(2);
+    expect(r.repairTurnsUsed).toBe(1);
+    expect(user(requests[1])).toContain('VR-018');
+    expect(user(requests[1])).toContain('VR-004');
+    expect(user(requests[1])).not.toContain('VR-008');
+  });
+
+  it('leadFindings: none without lead rules or repair turns', async () => {
+    const { findings } = await draftArchitecture(
+      fake(albGraph(false, false)).llm,
+      awsCatalog,
+      input(),
+    );
+    expect(leadFindings(findings, { repairTurns: 1, repairLeadRules: ['VR-018'] })).toHaveLength(1);
+    expect(leadFindings(findings, { repairTurns: 0, repairLeadRules: ['VR-018'] })).toEqual([]);
+    expect(leadFindings(findings, { repairTurns: 1 })).toEqual([]);
   });
 });

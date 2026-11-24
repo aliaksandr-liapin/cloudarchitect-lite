@@ -23,7 +23,13 @@ describe('model options', () => {
     expect(listedModels().map((o) => o.id)).toEqual(['haiku', 'sonnet', 'gpt-sol', 'gemini-argon']);
   });
 
-  it('sends no info findings to repair for any model (the Luna follow-up failed its bar)', () => {
-    expect(MODEL_OPTIONS.filter((o) => o.repairInfoRules?.length)).toEqual([]);
+  it('sends info findings and a lead turn only for GPT Luna (follow-up 3 passed twice)', () => {
+    expect(MODEL_OPTIONS.filter((o) => o.repairInfoRules?.length).map((o) => o.id)).toEqual([
+      'gpt-luna',
+    ]);
+    expect(MODEL_OPTIONS.filter((o) => o.repairLeadRules?.length).map((o) => o.id)).toEqual([
+      'gpt-luna',
+    ]);
+    expect(modelOption('gpt-luna').repairLeadRules).toEqual(['VR-018']);
   });
 });
