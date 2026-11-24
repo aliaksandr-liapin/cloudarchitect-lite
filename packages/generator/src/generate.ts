@@ -212,6 +212,27 @@ export function repairDraft(
   return build(llm, catalog, input, messages, draft.usage);
 }
 
+/**
+ * Experimental (eval only, the app does not use it): a repair call on top of `current` in a fresh
+ * conversation. It keeps the original request and requirements (the first user message) and
+ * `current`'s design as the assistant's answer, and drops everything in between (earlier drafts
+ * and repair messages). Usage still accumulates, so cost covers every turn.
+ */
+export function repairDraftFresh(
+  llm: LlmClient,
+  catalog: CatalogSnapshot,
+  input: GenerateInput,
+  current: Draft,
+  message: string,
+): Promise<Draft> {
+  const messages: Message[] = [
+    current.messages[0]!,
+    { role: 'assistant', content: current.text },
+    { role: 'user', content: message },
+  ];
+  return build(llm, catalog, input, messages, current.usage);
+}
+
 export async function generateArchitecture(
   llm: LlmClient,
   catalog: CatalogSnapshot,

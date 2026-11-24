@@ -10,77 +10,94 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { EB_ARMS, type EbArm } from './effort-budget-arms.js';
-import { toPairRecord, type EffortBudgetRecord } from './effort-budget-job.js';
+import { toPairRecord, type ArmJobRecord, type EffortBudgetRecord } from './effort-budget-job.js';
 import {
   evaluateCriteria,
   pairedBootstrap,
   summarizeModel,
   type CriterionResult,
+  type NoiseFloor,
 } from './info-repair-stats.js';
 
 const f = (n: number, d = 2) => n.toFixed(d);
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-const pairOk = (r: EffortBudgetRecord, a: EbArm, b: EbArm) =>
+const pairOk = <A extends string>(r: ArmJobRecord<A>, a: A, b: A) =>
   r.ok && !!r.arms && r.arms[a].ok && r.arms[b].ok;
 
-/** The six criteria; S replaces today's repair for Luna only if 1-5 are all met. */
-export function separateTurnCriteria(
-  records: EffortBudgetRecord[],
+/**
+ * The six criteria for candidate `arm` against arm 0; the candidate replaces today's repair only
+ * if 1-5 are all met. `noise` replaces the noise floor computed from same-request pairs.
+ */
+export function candidateCriteria<A extends string>(
+  records: ArmJobRecord<A>[],
   model: string,
   seed: number,
+  arm: A,
+  noise?: NoiseFloor,
 ): CriterionResult[] {
+  const zero = '0' as A;
   const mine = records.filter((r) => r.model === model);
-  const s = summarizeModel(
-    mine.map((r) => toPairRecord(r, 'S')),
+  const summary = summarizeModel(
+    mine.map((r) => toPairRecord(r as ArmJobRecord<string>, arm, zero)),
     model,
     seed,
   );
+  const s = noise ? { ...summary, noiseFloor: noise } : summary;
   const base = evaluateCriteria(s);
   const pick = (id: CriterionResult['id']) => base.find((c) => c.id === id)!;
-  const paired = mine.filter((r) => pairOk(r, '0', 'S'));
+  const paired = mine.filter((r) => pairOk(r, zero, arm));
   const ew = s.diff.errorsWarnings;
 
   // Every VR-018 draft counts; an arm that failed counts as not fixed (the user would get the draft back).
   const vrPool = mine.filter((r) => r.ok && !!r.arms && r.hasVr018);
-  const fixed0 = vrPool.filter((r) => r.arms!['0'].vr018Fixed === true).length;
-  const fixedS = vrPool.filter((r) => r.arms!.S.vr018Fixed === true).length;
-  const failed0 = vrPool.filter((r) => !r.arms!['0'].ok).length;
-  const failedS = vrPool.filter((r) => !r.arms!.S.ok).length;
+  const fixed0 = vrPool.filter((r) => r.arms![zero].vr018Fixed === true).length;
+  const fixedArm = vrPool.filter((r) => r.arms![arm].vr018Fixed === true).length;
+  const failed0 = vrPool.filter((r) => !r.arms![zero].ok).length;
+  const failedArm = vrPool.filter((r) => !r.arms![arm].ok).length;
 
-  const unfixedDiffs = paired.map((r) => (r.arms!.S.unfixed ?? 0) - (r.arms!['0'].unfixed ?? 0));
+  const unfixedDiffs = paired.map(
+    (r) => (r.arms![arm].unfixed ?? 0) - (r.arms![zero].unfixed ?? 0),
+  );
   const unfixed = unfixedDiffs.length ? pairedBootstrap(unfixedDiffs, seed) : undefined;
 
   const c3 = pick(3);
   const c4 = pick(4);
-  const twoTurns = paired.filter((r) => r.arms!.S.turns === 2).length;
+  const twoTurns = paired.filter((r) => r.arms![arm].turns === 2).length;
   return [
     pick(1),
     {
       id: 2,
       met: s.pairedJobs > 0 && ew.mean <= 0,
-      detail: `errors+warnings per design 0 ${f(s.meanW.errorsWarnings)} -> S ${f(s.meanI.errorsWarnings)}; diff ${f(ew.mean)} [${f(ew.lo)}, ${f(ew.hi)}] (need mean <= 0)`,
+      detail: `errors+warnings per design 0 ${f(s.meanW.errorsWarnings)} -> ${arm} ${f(s.meanI.errorsWarnings)}; diff ${f(ew.mean)} [${f(ew.lo)}, ${f(ew.hi)}] (need mean <= 0)`,
     },
     {
       id: 3,
-      met: vrPool.length > 0 && fixedS >= fixed0,
-      detail: `VR-018 fixed on ${vrPool.length} drafts with VR-018: arm 0 ${fixed0}, S ${fixedS} (failed arms count as not fixed: arm 0 failed ${failed0}, S failed ${failedS})`,
+      met: vrPool.length > 0 && fixedArm >= fixed0,
+      detail: `VR-018 fixed on ${vrPool.length} drafts with VR-018: arm 0 ${fixed0}, ${arm} ${fixedArm} (failed arms count as not fixed: arm 0 failed ${failed0}, ${arm} failed ${failedArm})`,
     },
     {
       id: 4,
       met: unfixed !== undefined && unfixed.mean <= 0,
       detail: unfixed
-        ? `left unfixed per design 0 ${f(mean(paired.map((r) => r.arms!['0'].unfixed ?? 0)))} -> S ${f(mean(paired.map((r) => r.arms!.S.unfixed ?? 0)))}; diff ${f(unfixed.mean)} [${f(unfixed.lo)}, ${f(unfixed.hi)}] (need mean <= 0)`
+        ? `left unfixed per design 0 ${f(mean(paired.map((r) => r.arms![zero].unfixed ?? 0)))} -> ${arm} ${f(mean(paired.map((r) => r.arms![arm].unfixed ?? 0)))}; diff ${f(unfixed.mean)} [${f(unfixed.lo)}, ${f(unfixed.hi)}] (need mean <= 0)`
         : 'no jobs where both arms succeeded',
     },
     { id: 5, met: c3.met === true && c4.met === true, detail: `${c3.detail}; ${c4.detail}` },
     {
       id: 6,
       met: true,
-      detail: `extra cost per design: ${f(s.diff.costUsd.mean, 4)} USD; S took two turns in ${twoTurns} of ${paired.length} jobs`,
+      detail: `extra cost per design: ${f(s.diff.costUsd.mean, 4)} USD; ${arm} took two turns in ${twoTurns} of ${paired.length} jobs`,
     },
   ];
 }
+
+/** The six criteria for arm S of the effort-budget run. */
+export const separateTurnCriteria = (
+  records: EffortBudgetRecord[],
+  model: string,
+  seed: number,
+): CriterionResult[] => candidateCriteria<EbArm>(records, model, seed, 'S');
 
 export const separateTurnPasses = (criteria: CriterionResult[]): boolean =>
   [1, 2, 3, 4, 5].every((id) => criteria.find((c) => c.id === id)?.met === true);

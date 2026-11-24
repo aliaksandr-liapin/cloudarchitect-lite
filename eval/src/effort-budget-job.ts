@@ -57,7 +57,8 @@ export interface EbArmResult extends ArmResult {
   request: string[];
 }
 
-export interface EffortBudgetRecord {
+/** One job with named repair arms, each repaired from the same first draft. */
+export interface ArmJobRecord<A extends string> {
   scenarioId: string;
   model: ModelChoice;
   repeat: number;
@@ -65,16 +66,25 @@ export interface EffortBudgetRecord {
   ok: boolean;
   error?: string;
   firstDraftFindingsByRule?: FindingsByRule;
-  /** Repairable info findings in the draft (the five rules). */
-  eligibleInfo: number;
   hasVr018: boolean;
-  /** For each arm, the first arm (in EB_ARMS order) that sent the identical messages. */
-  sameRequestAs?: Record<EbArm, EbArm>;
-  arms?: Record<EbArm, EbArmResult>;
+  /**
+   * For each arm, the first arm (in the experiment's arm order) that made the identical,
+   * separate calls; an arm maps to itself when it shares no request with an earlier arm.
+   */
+  sameRequestAs?: Record<A, A>;
+  arms?: Record<A, EbArmResult>;
   /** Everything spent on the job, every arm included. */
   costUsd: number;
   latencyMs: number;
   calls: CallRecord[];
+}
+
+/** The arm names of a record type. */
+export type ArmOf<R> = R extends ArmJobRecord<infer A> ? A : never;
+
+export interface EffortBudgetRecord extends ArmJobRecord<EbArm> {
+  /** Repairable info findings in the draft (the five rules). */
+  eligibleInfo: number;
 }
 
 export type EbSaveName = 'draft' | EbArm | 'S1';
@@ -238,11 +248,15 @@ export async function runEffortBudgetJob(
 }
 
 /**
- * "Arm 0 vs `arm`" in the two-arm shape of the info-repair experiment (W = arm 0, I = `arm`), so
+ * "`base` (arm 0) vs `arm`" in the two-arm shape of the info-repair experiment (W = arm 0, I = `arm`), so
  * `summarizeModel`, `evaluateCriteria` and `noiseFloor` apply unchanged.
  */
-export function toPairRecord(r: EffortBudgetRecord, arm: Exclude<EbArm, '0'>): InfoRepairRecord {
-  const w = r.arms?.['0'];
+export function toPairRecord<R extends ArmJobRecord<string>>(
+  r: R,
+  arm: ArmOf<R>,
+  base = '0' as ArmOf<R>,
+): InfoRepairRecord {
+  const w = r.arms?.[base];
   const i = r.arms?.[arm];
   return {
     scenarioId: r.scenarioId,
@@ -253,7 +267,7 @@ export function toPairRecord(r: EffortBudgetRecord, arm: Exclude<EbArm, '0'>): I
     ...(r.firstDraftFindingsByRule ? { firstDraftFindingsByRule: r.firstDraftFindingsByRule } : {}),
     infoSent: i?.infoSent ?? 0,
     // Identical *repairs* only: a job where neither arm made a call is not noise (as in the earlier runs).
-    sameRequest: r.sameRequestAs?.[arm] === '0' && (w?.request.length ?? 0) > 0,
+    sameRequest: r.sameRequestAs?.[arm] === base && (w?.request.length ?? 0) > 0,
     differ: Boolean(w?.finalHash && i?.finalHash && w.finalHash !== i.finalHash),
     ...(w && i ? { arms: { W: w, I: i } } : {}),
     costUsd: r.costUsd,
