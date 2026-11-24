@@ -212,6 +212,16 @@ button.link {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.detail .setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+}
+.detail .setting .input {
+  flex: 1 1 140px;
+}
 .svc {
   display: flex;
   gap: 8px;

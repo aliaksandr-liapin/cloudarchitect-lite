@@ -63,3 +63,49 @@ describe('MyBlog sample', () => {
     expect(validateProject(p, awsCatalog).map((f) => f.ruleId)).toContain('VR-006');
   });
 });
+
+describe('feature values (settings editor)', () => {
+  it('fixed choices: encryption and API type', () => {
+    const enc = awsCatalog.features.filter((f) => f.configKey === 'encryption');
+    expect(enc).toHaveLength(8);
+    for (const f of enc) expect(f.values, f.id).toEqual(['KMS', 'AWS-managed']);
+    expect(awsCatalog.features.find((f) => f.id === 'aws.apigateway.api-type')?.values).toEqual([
+      'REST',
+      'HTTP',
+      'WEBSOCKET',
+    ]);
+    // VR-001 needs exactly "OAC".
+    expect(awsCatalog.features.find((f) => f.id === 'aws.cloudfront.oac')?.values).toEqual(['OAC']);
+    expect(awsCatalog.features.filter((f) => f.values).length).toBe(10);
+  });
+
+  it('KMS clears VR-025 and VR-008; AWS-managed clears VR-008', () => {
+    const base = migrateProject(samples.myblog);
+    const withTable = (encryption: string) => ({
+      ...base,
+      // VR-025 only applies with security hardening on.
+      generation: { ...base.generation!, toggles: { securityHardening: true } },
+      nodes: [
+        ...base.nodes,
+        {
+          id: 'table',
+          serviceId: 'aws.dynamodb',
+          provider: 'aws' as const,
+          label: 'Table',
+          requirementIds: [],
+          position: { x: 0, y: 0 },
+          size: { width: 100, height: 60 },
+          configuration: { encryption },
+        },
+      ],
+    });
+    const rules = (encryption: string) =>
+      validateProject(withTable(encryption), awsCatalog)
+        .filter((f) => f.nodeIds?.includes('table'))
+        .map((f) => f.ruleId);
+    expect(rules('KMS')).not.toContain('VR-008');
+    expect(rules('KMS')).not.toContain('VR-025');
+    expect(rules('AWS-managed')).not.toContain('VR-008');
+    expect(rules('AWS-managed')).toContain('VR-025');
+  });
+});

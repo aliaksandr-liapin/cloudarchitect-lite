@@ -7,6 +7,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Added
 
 - Edit by hand: add services, outside actors and containers from the Add panel; connect, re-plug and edit connectors; link components to requirements; move components into and out of containers; delete; undo and redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Findings update after every edit.
+- Edit by hand: a Settings section in Details sets, changes and removes catalog settings (encryption, authorizer, dead-letter queue, Multi-AZ, backup and more) on the selected component or connector, with fixed choices where the catalog has them (encryption: KMS or AWS-managed). Findings update as you edit, and undo works.
 - A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls.
 - Experiment report: what happens when the repair turn also gets info findings ([docs/product/info-repair-experiment.md](docs/product/info-repair-experiment.md)), with the eval commands `info-repair`, `review --arms` and `info-repair-report` to reproduce it, and a follow-up for GPT Luna (`info-repair --info-message prioritized`, `info-repair-followup`). Result: the repair turn keeps sending only errors and warnings.
 
@@ -17,6 +18,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: on Windows and Linux, Delete and Backspace stopped deleting after Ctrl+Z until the page was reloaded.
 - Editor: Backspace or Delete no longer hides a node or container while the design keeps it. Deletes now go through the design, its findings and the export.
 
 ## [0.3.1] - 2026-11-11

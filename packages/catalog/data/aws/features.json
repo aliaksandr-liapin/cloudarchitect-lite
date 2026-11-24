@@ -6,7 +6,8 @@
     "configKey": "originAccess",
     "displayName": "Origin Access Control (OAC)",
     "summary": "Lets CloudFront read a private S3 bucket; the bucket stays non-public.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
+    "values": ["OAC"]
   },
   {
     "id": "aws.s3.transfer-acceleration",
@@ -69,7 +70,8 @@
     "configKey": "apiType",
     "displayName": "API Gateway API type",
     "summary": "REST, HTTP or WEBSOCKET. REST APIs support AWS WAF, API keys, usage plans and request validation; HTTP APIs are cheaper and simpler.",
-    "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html"
+    "documentationUrl": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html",
+    "values": ["REST", "HTTP", "WEBSOCKET"]
   },
   {
     "id": "aws.dynamodb.pitr",
@@ -195,7 +197,8 @@
     "configKey": "encryption",
     "displayName": "S3 encryption at rest",
     "summary": "Encrypts S3 data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.dynamodb.encryption",
@@ -204,7 +207,8 @@
     "configKey": "encryption",
     "displayName": "DynamoDB encryption at rest",
     "summary": "Encrypts DynamoDB data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    "documentationUrl": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.rds.encryption",
@@ -213,7 +217,8 @@
     "configKey": "encryption",
     "displayName": "RDS encryption at rest",
     "summary": "Encrypts RDS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.aurora.encryption",
@@ -222,7 +227,8 @@
     "configKey": "encryption",
     "displayName": "Aurora encryption at rest",
     "summary": "Encrypts Aurora data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.efs.encryption",
@@ -231,7 +237,8 @@
     "configKey": "encryption",
     "displayName": "EFS encryption at rest",
     "summary": "Encrypts EFS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html"
+    "documentationUrl": "https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.elasticache.encryption",
@@ -240,7 +247,8 @@
     "configKey": "encryption",
     "displayName": "ElastiCache encryption at rest",
     "summary": "Encrypts ElastiCache data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.sqs.encryption",
@@ -249,7 +257,8 @@
     "configKey": "encryption",
     "displayName": "SQS encryption at rest",
     "summary": "Encrypts SQS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html",
+    "values": ["KMS", "AWS-managed"]
   },
   {
     "id": "aws.sns.encryption",
@@ -258,6 +267,7 @@
     "configKey": "encryption",
     "displayName": "SNS encryption at rest",
     "summary": "Encrypts SNS data at rest. Value: exactly \"KMS\" or \"AWS-managed\"; KMS means a customer managed key.",
-    "documentationUrl": "https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html"
+    "documentationUrl": "https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html",
+    "values": ["KMS", "AWS-managed"]
   }
 ]

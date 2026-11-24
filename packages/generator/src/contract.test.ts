@@ -1,4 +1,5 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { contractFor, toProject } from './contract.js';
 
@@ -73,5 +74,12 @@ describe('containerId', () => {
       generation: { toggles: {}, model: 'haiku', generatedAt: '', contentHash: '' },
     });
     expect(p.nodes[0]).not.toHaveProperty('containerId');
+  });
+});
+
+describe('system prompt', () => {
+  it('is unchanged by feature values (settings editor, 2026-11-24)', () => {
+    const hash = createHash('sha256').update(contract.system).digest('hex');
+    expect(hash).toBe('2159a412c77ba7a80d74c7beb1bd6642ec4a9178dd332d9b8626f8dac66c5d49');
   });
 });
