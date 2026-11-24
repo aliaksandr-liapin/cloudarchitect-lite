@@ -41,6 +41,12 @@ export const ServiceFeature = z.object({
 });
 export type ServiceFeature = z.infer<typeof ServiceFeature>;
 
+/**
+ * Feature values that mean "not used". The generator drops them and the settings editor treats
+ * them as blank, so rules that read any value as "set" stay honest.
+ */
+export const UNSET_FEATURE_VALUE = /^(|none|disabled|false|no|off|n\/a)$/i;
+
 export const ContainerDefinition = z.object({
   kind: ContainerKind,
   displayName: z.string(),

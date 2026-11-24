@@ -160,4 +160,23 @@ describe('Details', () => {
   it('container shows no settings', () => {
     expect(render({ kind: 'node', id: 'sub' })).not.toContain('Settings');
   });
+
+  it('a value outside the fixed choices is shown as it is, not as the first choice', () => {
+    const p: Project = {
+      ...withSettings,
+      nodes: [svcNode('k', 'aws.dynamodb', { encryption: 'aws:kms' })],
+    };
+    const html = render({ kind: 'node', id: 'k' }, p);
+    expect(html).toContain(
+      '<option value="aws:kms" selected="">aws:kms (not a catalog value)</option>',
+    );
+    expect(html).toContain('<option value="KMS">KMS</option>');
+  });
+
+  it('free-text settings show the catalog example as placeholder', () => {
+    const p: Project = { ...withSettings, nodes: [svcNode('k', 'aws.dynamodb', { backup: 'x' })] };
+    expect(render({ kind: 'node', id: 'k' }, p)).toMatch(
+      /<input[^>]*aria-label="DynamoDB point-in-time recovery \(PITR\)"[^>]*placeholder="PITR"/,
+    );
+  });
 });

@@ -5,6 +5,7 @@
  */
 import {
   PROJECT_SCHEMA_VERSION,
+  UNSET_FEATURE_VALUE,
   type CatalogSnapshot,
   type Project,
   type Requirement,
@@ -157,12 +158,9 @@ export function contractFor(catalog: CatalogSnapshot): Contract {
   return c;
 }
 
-/** Values that mean "feature not used"; dropping them keeps truthy-config rules honest. */
-const UNSET = /^(|none|disabled|false|no|off|n\/a)$/i;
-
 /** Feature values arrive as strings; booleans are restored and "not used" values dropped. */
 const toConfig = (items: Generation['nodes'][number]['configuration']) => {
-  const kept = items.filter(({ value }) => !UNSET.test(value.trim()));
+  const kept = items.filter(({ value }) => !UNSET_FEATURE_VALUE.test(value.trim()));
   return kept.length
     ? Object.fromEntries(kept.map(({ key, value }) => [key, value === 'true' ? true : value]))
     : undefined;

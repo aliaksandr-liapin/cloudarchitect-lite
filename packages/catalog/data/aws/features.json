@@ -6,7 +6,8 @@
     "configKey": "originAccess",
     "displayName": "Origin Access Control (OAC)",
     "summary": "Lets CloudFront read a private S3 bucket; the bucket stays non-public.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
+    "values": ["OAC"]
   },
   {
     "id": "aws.s3.transfer-acceleration",

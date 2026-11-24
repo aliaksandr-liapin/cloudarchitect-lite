@@ -91,6 +91,9 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
                   disabled={disabled}
                   onChange={(e) => set(key, e.target.value)}
                 >
+                  {value !== undefined && !feature.values.includes(value) && (
+                    <option value={value}>{`${value} (not a catalog value)`}</option>
+                  )}
                   {feature.values.map((v) => (
                     <option key={v} value={v}>
                       {v}
@@ -102,6 +105,7 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
                 <Field
                   label={name}
                   value={value ?? ''}
+                  placeholder={exampleValue(feature.summary)}
                   max={200}
                   disabled={disabled}
                   commit={(v) => {
@@ -130,20 +134,25 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
 }
 
 /** A text field that commits on blur or Enter; `commit` gets the raw text. */
+/** The example a feature summary gives ("… Value: PITR."), shown as a placeholder. */
+const exampleValue = (summary: string) => /Value: "?([\w-]+)/.exec(summary)?.[1];
+
 function Field(props: {
   label: string;
   value: string;
+  placeholder?: string;
   max: number;
   disabled: boolean;
   multiline?: boolean;
   commit: (text: string) => void;
 }) {
-  const { label, value, max, disabled, multiline, commit } = props;
+  const { label, value, placeholder, max, disabled, multiline, commit } = props;
   const common = {
     key: `${label}:${value}`,
     className: 'input',
     'aria-label': label,
     defaultValue: value,
+    placeholder,
     maxLength: max,
     disabled,
   };

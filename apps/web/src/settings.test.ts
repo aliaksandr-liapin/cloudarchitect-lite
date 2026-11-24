@@ -167,4 +167,12 @@ describe('setSettingOps', () => {
       },
     ]);
   });
+
+  it('placeholder words like none or false count as blank', () => {
+    for (const word of ['none', 'Disabled', ' false ', 'no', 'off', 'n/a'])
+      expect(setSettingOps(p, { kind: 'node', id: 't' }, 'backup', word), word).toEqual([
+        { op: 'updateNode', id: 't', changes: { configuration: undefined } },
+      ]);
+    expect(setSettingOps(p, { kind: 'node', id: 't' }, 'encryption', 'none')).toEqual([]);
+  });
 });

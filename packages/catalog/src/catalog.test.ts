@@ -74,13 +74,17 @@ describe('feature values (settings editor)', () => {
       'HTTP',
       'WEBSOCKET',
     ]);
-    expect(awsCatalog.features.filter((f) => f.values).length).toBe(9);
+    // VR-001 needs exactly "OAC".
+    expect(awsCatalog.features.find((f) => f.id === 'aws.cloudfront.oac')?.values).toEqual(['OAC']);
+    expect(awsCatalog.features.filter((f) => f.values).length).toBe(10);
   });
 
   it('KMS clears VR-025 and VR-008; AWS-managed clears VR-008', () => {
     const base = migrateProject(samples.myblog);
     const withTable = (encryption: string) => ({
       ...base,
+      // VR-025 only applies with security hardening on.
+      generation: { ...base.generation!, toggles: { securityHardening: true } },
       nodes: [
         ...base.nodes,
         {
@@ -102,5 +106,6 @@ describe('feature values (settings editor)', () => {
     expect(rules('KMS')).not.toContain('VR-008');
     expect(rules('KMS')).not.toContain('VR-025');
     expect(rules('AWS-managed')).not.toContain('VR-008');
+    expect(rules('AWS-managed')).toContain('VR-025');
   });
 });

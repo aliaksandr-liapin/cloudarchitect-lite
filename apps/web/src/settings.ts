@@ -2,7 +2,13 @@
  * The Details panel's Settings section (docs/superpowers/specs/2026-11-24-settings-editor-design.md):
  * which catalog features a component or connector can have, and the edit that sets one.
  */
-import type { CatalogSnapshot, PatchOp, Project, ServiceFeature } from '@cloudarchitect/domain';
+import {
+  UNSET_FEATURE_VALUE,
+  type CatalogSnapshot,
+  type PatchOp,
+  type Project,
+  type ServiceFeature,
+} from '@cloudarchitect/domain';
 import type { Selection } from './Details';
 
 export type SettingRow = {
@@ -55,7 +61,7 @@ export function settingsView(
 }
 
 /**
- * The edit that sets `key` to `value` (trimmed; blank removes it). Empty when nothing changes.
+ * The edit that sets `key` to `value` (trimmed; blank or a "not used" word removes it). Empty when nothing changes.
  * The op carries the whole new configuration, or undefined when it becomes empty.
  */
 export function setSettingOps(
@@ -68,7 +74,9 @@ export function setSettingOps(
   if (!t) return [];
   const current: Configuration = t.configuration ?? {};
   const next: Configuration = { ...current };
-  const v = value.trim();
+  const trimmed = value.trim();
+  // "none", "false" and the like mean not used: remove, never store them.
+  const v = UNSET_FEATURE_VALUE.test(trimmed) ? '' : trimmed;
   if (v) {
     if (current[key] !== undefined && String(current[key]) === v) return [];
     next[key] = v;
