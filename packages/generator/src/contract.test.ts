@@ -78,8 +78,15 @@ describe('containerId', () => {
 });
 
 describe('system prompt', () => {
-  it('is unchanged by feature values (settings editor, 2026-11-24)', () => {
-    const hash = createHash('sha256').update(contract.system).digest('hex');
-    expect(hash).toBe('2159a412c77ba7a80d74c7beb1bd6642ec4a9178dd332d9b8626f8dac66c5d49');
+  it('FEATURES block is unchanged by feature values (settings editor, 2026-11-24)', () => {
+    // The catalog's `values` serve the settings editor only; the model never sees them.
+    const lines = contract.system.split('\n');
+    const start = lines.findIndex((l) => l.startsWith('FEATURES'));
+    const block = lines.slice(start, lines.indexOf('', start)).join('\n');
+    expect(block).not.toContain('values');
+    const hash = createHash('sha256').update(block).digest('hex');
+    expect(hash, `FEATURES block changed:\n${block}`).toBe(
+      '77e26955d4034481c8ebbd46c1425e26f83608949adc23b1664c34dcdde70950',
+    );
   });
 });

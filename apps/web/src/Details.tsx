@@ -106,6 +106,7 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
                   label={name}
                   value={value ?? ''}
                   placeholder={exampleValue(feature.summary)}
+                  autoFocus={adding === key}
                   max={200}
                   disabled={disabled}
                   commit={(v) => {
@@ -141,18 +142,21 @@ function Field(props: {
   label: string;
   value: string;
   placeholder?: string;
+  /** Put the cursor in the field when it appears (a setting just added). */
+  autoFocus?: boolean;
   max: number;
   disabled: boolean;
   multiline?: boolean;
   commit: (text: string) => void;
 }) {
-  const { label, value, placeholder, max, disabled, multiline, commit } = props;
+  const { label, value, placeholder, autoFocus, max, disabled, multiline, commit } = props;
   const common = {
     key: `${label}:${value}`,
     className: 'input',
     'aria-label': label,
     defaultValue: value,
     placeholder,
+    autoFocus,
     maxLength: max,
     disabled,
   };

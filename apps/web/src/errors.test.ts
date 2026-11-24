@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from './api';
 import { errorMessage, isTransient } from './errors';
+import { LayoutError } from './layout';
 
 const api = (code: string) => new ApiError(400, code);
 
@@ -36,5 +37,13 @@ describe('isTransient', () => {
   it('drops it when the operation itself is no longer usable', () => {
     for (const code of ['invalid_operation', 'operation_expired', 'invalid_request'])
       expect(isTransient(api(code))).toBe(false);
+  });
+});
+
+describe('layout errors', () => {
+  it('show their own message instead of the generic one', () => {
+    expect(errorMessage(new LayoutError())).toBe(
+      'Could not lay out the diagram: the layout engine did not load. Check your connection, then try again or reload the page.',
+    );
   });
 });

@@ -46,7 +46,6 @@ import {
   recoverRoutes,
   keepEdgeState,
   keepFlowState,
-  LEGACY_NODE_SIZE,
   NODE_SIZE,
   toFlow,
   type Routes,
@@ -73,6 +72,7 @@ import {
   connectionError,
   containerAt,
   deletionOps,
+  dragReparents,
   newContainer,
   newEdge,
   newExternalNode,
@@ -194,7 +194,7 @@ export function App() {
   const abortRef = useRef<AbortController>(undefined);
   /** Latest committed project, for async flows that outlive a render. */
   const projectRef = useRef<Project>(undefined);
-  const historyRef = useRef<History>(EMPTY_HISTORY);
+  const historyRef = useRef<History<Routes>>(EMPTY_HISTORY);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
@@ -202,7 +202,7 @@ export function App() {
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
 
-  const setHistory = useCallback((h: History) => {
+  const setHistory = useCallback((h: History<Routes>) => {
     historyRef.current = h;
     setCanUndo(h.past.length > 0);
     setCanRedo(h.future.length > 0);
@@ -257,18 +257,20 @@ export function App() {
 
   useEffect(() => {
     const sample = migrateProject(samples.myblog);
-    void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
-      storageDownRef.current = storage === 'unavailable';
-      setStorageDown(storageDownRef.current);
-      clearHistory();
-      return commit(project, false, { recover: true }).then(() => {
-        if (!DEMO) return;
-        const id = demoBootSelection(project);
-        if (!id) return;
-        setSelected({ kind: 'node', id });
-        setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
-      });
-    });
+    void bootProject(() => loadProject(sample.projectId), sample)
+      .then(({ project, storage }) => {
+        storageDownRef.current = storage === 'unavailable';
+        setStorageDown(storageDownRef.current);
+        clearHistory();
+        return commit(project, false, { recover: true }).then(() => {
+          if (!DEMO) return;
+          const id = demoBootSelection(project);
+          if (!id) return;
+          setSelected({ kind: 'node', id });
+          setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+        });
+      })
+      .catch((err: unknown) => setError(errorMessage(err)));
   }, [commit, clearHistory]);
 
   useEffect(() => {
@@ -577,12 +579,18 @@ export function App() {
         setError(errorMessage(err));
         return Promise.resolve();
       }
-      setHistory(record(historyRef.current, current));
+      const before = historyRef.current;
+      const recorded = record(before, current, routesRef.current);
+      setHistory(recorded);
       // A toast's Undo belongs to the edit that raised it: a later edit takes it away.
       setToast((t) => (opts.toast ? { text: opts.toast, undo: true } : t?.undo ? undefined : t));
       return commit(next, opts.forceLayout ?? false, {
         ...(opts.routes ? { routes: opts.routes } : {}),
         ...(opts.fit ? { fit: true } : {}),
+      }).catch((err: unknown) => {
+        // Nothing changed on screen, so the step recorded for this edit goes too.
+        if (historyRef.current === recorded) setHistory(before);
+        setError(errorMessage(err));
       });
     },
     [busy, commit, setHistory],
@@ -737,12 +745,21 @@ export function App() {
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
     if (busy || !current) return;
-    const moved = move(historyRef.current, current);
+    const before = historyRef.current;
+    const moved = move(before, current, routesRef.current);
     if (!moved) return;
     setHistory(moved.history);
     // A toast's Undo targets the edit it announced; once history moves, it would undo something else.
     setToast((t) => (t?.undo ? undefined : t));
-    void commit(moved.project, false, { recover: true });
+    // The step's own routes redraw it as it was; without them (none recorded) recover them.
+    void commit(
+      moved.project,
+      false,
+      moved.routes ? { routes: moved.routes } : { recover: true },
+    ).catch((err: unknown) => {
+      if (historyRef.current === moved.history) setHistory(before);
+      setError(errorMessage(err));
+    });
   };
   const undoEdit = () => stepHistory(undo);
   const redoEdit = () => stepHistory(redo);
@@ -798,19 +815,8 @@ export function App() {
         const old = box.position ?? { x: 0, y: 0 };
         if (old.x !== d.position.x || old.y !== d.position.y) moved.set(d.id, d.position);
       }
-      let reparent: { id: string; target: string | undefined } | undefined;
-      const single = all.length === 1 ? all[0] : undefined;
-      const node = single && p.nodes.find((n) => n.id === single.id);
-      if (single && node && single.type === 'service') {
-        const size = node.size ?? LEGACY_NODE_SIZE;
-        const origin = absolutePosition(p, node.containerId);
-        const target = containerAt(p, {
-          x: origin.x + single.position.x + size.width / 2,
-          y: origin.y + single.position.y + size.height / 2,
-        })?.id;
-        if (target !== node.containerId) reparent = { id: node.id, target };
-      }
-      if (!reparent && moved.size === 0) return;
+      const reparents = dragReparents(p, all);
+      if (reparents.length === 0 && moved.size === 0) return;
       void edit(
         (q) => {
           const placed = {
@@ -824,11 +830,11 @@ export function App() {
               return position ? { ...c, position } : c;
             }),
           };
-          return reparent ? reparentNode(placed, reparent.id, reparent.target) : placed;
+          return reparents.reduce((acc, r) => reparentNode(acc, r.id, r.target), placed);
         },
         {
           routes: dropRoutes(routesRef.current, p, [
-            ...new Set([...moved.keys(), ...(reparent ? [reparent.id] : [])]),
+            ...new Set([...moved.keys(), ...reparents.map((r) => r.id)]),
           ]),
         },
       );
@@ -1084,7 +1090,9 @@ export function App() {
               readJsonFile(file).then(
                 (p) => {
                   clearHistory();
-                  return commit(p, false, { recover: true, fit: true });
+                  return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
+                    setError(errorMessage(err)),
+                  );
                 },
                 (err: Error) => setError(err.message),
               );

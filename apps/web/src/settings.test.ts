@@ -1,5 +1,12 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
-import type { ArchEdge, ArchNode, Project } from '@cloudarchitect/domain';
+import {
+  applyPatch,
+  migrateProject,
+  type ArchEdge,
+  type ArchNode,
+  type Project,
+} from '@cloudarchitect/domain';
+import { samples } from '@cloudarchitect/catalog';
 import { describe, expect, it } from 'vitest';
 import { setSettingOps, settingsView } from './settings';
 
@@ -174,5 +181,22 @@ describe('setSettingOps', () => {
         { op: 'updateNode', id: 't', changes: { configuration: undefined } },
       ]);
     expect(setSettingOps(p, { kind: 'node', id: 't' }, 'encryption', 'none')).toEqual([]);
+  });
+});
+
+describe('round trip through the real patch', () => {
+  it('removing the last setting exports the component without configuration', () => {
+    const sample = migrateProject(samples.myblog);
+    const id = sample.nodes[0]!.id;
+    const base = {
+      ...sample,
+      nodes: sample.nodes.map((n) =>
+        n.id === id ? { ...n, configuration: { backup: 'PITR' } } : n,
+      ),
+    };
+    const ops = setSettingOps(base, { kind: 'node', id }, 'backup', '');
+    const after = applyPatch(base, { baseRevision: base.revision, ops });
+    const exported = JSON.parse(JSON.stringify(after)) as Project;
+    expect(exported.nodes.find((n) => n.id === id)).not.toHaveProperty('configuration');
   });
 });
