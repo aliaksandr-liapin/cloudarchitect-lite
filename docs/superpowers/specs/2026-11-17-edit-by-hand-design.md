@@ -44,6 +44,7 @@ fire" is the demo moment, and it falls out of the same build.
 
 - Editing requirement text, adding requirements, or editing `configuration` / feature keys
   (encryption, OAC and so on). Later release; the rules that depend on them stay as they are.
+  _Reversed 2026-11-24 for settings: see [Settings editor](2026-11-24-settings-editor-design.md)._
 - Copy/paste, multi-select bulk edits, alignment tools.
 - Changing a node's service type in place (delete and add instead).
 - Undo history that survives reload or crosses a generate, restore or import (Versions cover that).
