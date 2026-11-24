@@ -18,6 +18,9 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: undo and redo put connectors back exactly as they were, without re-running the layout.
+- Editor: dragging several components at once moves each into the container it is dropped in (before, only a single component could change containers).
+- Editor: if the layout engine fails to load (for example on a flaky connection), a message says so instead of an empty canvas or an Auto layout button that does nothing; trying again loads it afresh.
 - Editor: on Windows and Linux, Delete and Backspace stopped deleting after Ctrl+Z until the page was reloaded.
 - Editor: Backspace or Delete no longer hides a node or container while the design keeps it. Deletes now go through the design, its findings and the export.
 
