@@ -8,6 +8,7 @@ import {
   connectionError,
   containerAt,
   deletionOps,
+  dragReparents,
   EXTERNAL_LABELS,
   newContainer,
   newEdge,
@@ -132,6 +133,33 @@ describe('edit helpers', () => {
     expect(containerAt(p, { x: 100, y: 120 })?.id).toBe('S');
     expect(containerAt(p, { x: 440, y: 60 })?.id).toBe('V');
     expect(containerAt(p, { x: 700, y: 10 })).toBeUndefined();
+  });
+
+  it('dragReparents moves every dragged component into the container it lands in', () => {
+    // n (root, 168x64) dropped so its centre is in S; m dropped inside V but outside S.
+    const moves = dragReparents(p, [
+      { id: 'n', type: 'service', position: { x: 60, y: 80 } },
+      { id: 'm', type: 'service', position: { x: 300, y: 250 } },
+    ]);
+    expect(moves).toEqual([
+      { id: 'n', target: 'S' },
+      { id: 'm', target: 'V' },
+    ]);
+  });
+
+  it('dragReparents leaves components that stay in their container', () => {
+    expect(dragReparents(p, [{ id: 'm', type: 'service', position: { x: 700, y: 10 } }])).toEqual(
+      [],
+    );
+  });
+
+  it('dragReparents does nothing when a container is part of the drag', () => {
+    expect(
+      dragReparents(p, [
+        { id: 'n', type: 'service', position: { x: 60, y: 80 } },
+        { id: 'S', type: 'container', position: { x: 30, y: 40 } },
+      ]),
+    ).toEqual([]);
   });
 
   it('containerAt ignores the excluded container and its descendants', () => {

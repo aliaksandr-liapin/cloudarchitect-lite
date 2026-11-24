@@ -9,7 +9,7 @@ import {
   type PatchOp,
   type Project,
 } from '@cloudarchitect/domain';
-import { NODE_SIZE } from './layout';
+import { LEGACY_NODE_SIZE, NODE_SIZE } from './layout';
 
 export type Point = { x: number; y: number };
 
@@ -129,6 +129,33 @@ const depthOf = (project: Project, id: string): number => {
   }
   return depth;
 };
+
+/**
+ * After a drag, the components that now sit in a different container (by their centre), with
+ * their new container (undefined: none). `position` is the dropped position relative to the
+ * component's current container. A drag that includes a container moves no component between
+ * containers: that container's own box is changing in the same gesture.
+ */
+export function dragReparents(
+  project: Project,
+  dragged: { id: string; type?: string; position: Point }[],
+): { id: string; target: string | undefined }[] {
+  if (dragged.some((d) => d.type === 'container')) return [];
+  const out: { id: string; target: string | undefined }[] = [];
+  for (const d of dragged) {
+    if (d.type !== 'service') continue;
+    const node = project.nodes.find((n) => n.id === d.id);
+    if (!node) continue;
+    const size = node.size ?? LEGACY_NODE_SIZE;
+    const origin = absolutePosition(project, node.containerId);
+    const target = containerAt(project, {
+      x: origin.x + d.position.x + size.width / 2,
+      y: origin.y + d.position.y + size.height / 2,
+    })?.id;
+    if (target !== node.containerId) out.push({ id: node.id, target });
+  }
+  return out;
+}
 
 /** The innermost container whose box holds `point`, ignoring `exclude` and everything inside it. */
 export function containerAt(
