@@ -257,18 +257,20 @@ export function App() {
 
   useEffect(() => {
     const sample = migrateProject(samples.myblog);
-    void bootProject(() => loadProject(sample.projectId), sample).then(({ project, storage }) => {
-      storageDownRef.current = storage === 'unavailable';
-      setStorageDown(storageDownRef.current);
-      clearHistory();
-      return commit(project, false, { recover: true }).then(() => {
-        if (!DEMO) return;
-        const id = demoBootSelection(project);
-        if (!id) return;
-        setSelected({ kind: 'node', id });
-        setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
-      });
-    });
+    void bootProject(() => loadProject(sample.projectId), sample)
+      .then(({ project, storage }) => {
+        storageDownRef.current = storage === 'unavailable';
+        setStorageDown(storageDownRef.current);
+        clearHistory();
+        return commit(project, false, { recover: true }).then(() => {
+          if (!DEMO) return;
+          const id = demoBootSelection(project);
+          if (!id) return;
+          setSelected({ kind: 'node', id });
+          setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+        });
+      })
+      .catch((err: unknown) => setError(errorMessage(err)));
   }, [commit, clearHistory]);
 
   useEffect(() => {
@@ -577,12 +579,18 @@ export function App() {
         setError(errorMessage(err));
         return Promise.resolve();
       }
-      setHistory(record(historyRef.current, current, routesRef.current));
+      const before = historyRef.current;
+      const recorded = record(before, current, routesRef.current);
+      setHistory(recorded);
       // A toast's Undo belongs to the edit that raised it: a later edit takes it away.
       setToast((t) => (opts.toast ? { text: opts.toast, undo: true } : t?.undo ? undefined : t));
       return commit(next, opts.forceLayout ?? false, {
         ...(opts.routes ? { routes: opts.routes } : {}),
         ...(opts.fit ? { fit: true } : {}),
+      }).catch((err: unknown) => {
+        // Nothing changed on screen, so the step recorded for this edit goes too.
+        if (historyRef.current === recorded) setHistory(before);
+        setError(errorMessage(err));
       });
     },
     [busy, commit, setHistory],
@@ -737,13 +745,21 @@ export function App() {
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
     if (busy || !current) return;
-    const moved = move(historyRef.current, current, routesRef.current);
+    const before = historyRef.current;
+    const moved = move(before, current, routesRef.current);
     if (!moved) return;
     setHistory(moved.history);
     // A toast's Undo targets the edit it announced; once history moves, it would undo something else.
     setToast((t) => (t?.undo ? undefined : t));
     // The step's own routes redraw it as it was; without them (none recorded) recover them.
-    void commit(moved.project, false, moved.routes ? { routes: moved.routes } : { recover: true });
+    void commit(
+      moved.project,
+      false,
+      moved.routes ? { routes: moved.routes } : { recover: true },
+    ).catch((err: unknown) => {
+      if (historyRef.current === moved.history) setHistory(before);
+      setError(errorMessage(err));
+    });
   };
   const undoEdit = () => stepHistory(undo);
   const redoEdit = () => stepHistory(redo);
@@ -1074,7 +1090,9 @@ export function App() {
               readJsonFile(file).then(
                 (p) => {
                   clearHistory();
-                  return commit(p, false, { recover: true, fit: true });
+                  return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
+                    setError(errorMessage(err)),
+                  );
                 },
                 (err: Error) => setError(err.message),
               );

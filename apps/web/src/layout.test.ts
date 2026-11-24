@@ -2,6 +2,7 @@ import { samples } from '@cloudarchitect/catalog';
 import { migrateProject, type Project } from '@cloudarchitect/domain';
 import { describe, expect, it } from 'vitest';
 import {
+  cacheUntilRejected,
   keepFlowState,
   keepEdgeState,
   applyLayout,
@@ -317,5 +318,20 @@ describe('keepEdgeState', () => {
       ['e3', undefined],
     ]);
     expect(next[0]).toMatchObject({ label: 'new' });
+  });
+});
+
+describe('cacheUntilRejected', () => {
+  it('loads once while it works, and tries again after a failed load', async () => {
+    let calls = 0;
+    const load = cacheUntilRejected(async () => {
+      calls++;
+      if (calls === 1) throw new Error('chunk failed to load');
+      return `elk ${calls}`;
+    });
+    await expect(load()).rejects.toThrow('chunk failed to load');
+    expect(await load()).toBe('elk 2');
+    expect(await load()).toBe('elk 2');
+    expect(calls).toBe(2);
   });
 });

@@ -37,10 +37,43 @@ export type ServiceNodeData = {
 };
 export type ContainerNodeData = { container: Container };
 
+/**
+ * `load` once, sharing the result; a failed load is forgotten, so the next call tries again
+ * (a chunk that failed on a flaky connection would otherwise break layout until a reload).
+ */
+export function cacheUntilRejected<T>(load: () => Promise<T>): () => Promise<T> {
+  let cached: Promise<T> | undefined;
+  return () => {
+    if (!cached) {
+      const attempt = load();
+      cached = attempt;
+      attempt.catch(() => {
+        if (cached === attempt) cached = undefined;
+      });
+    }
+    return cached;
+  };
+}
+
+/** The layout engine could not run (usually: its ~1.5 MB chunk did not load). */
+export class LayoutError extends Error {
+  constructor(
+    message = 'Could not lay out the diagram: the layout engine did not load. Check your connection, then try again or reload the page.',
+  ) {
+    super(message);
+    this.name = 'LayoutError';
+  }
+}
+
 /** ELK is ~1.5 MB, so it is loaded on first layout instead of blocking first paint. TODO(E1): run in a Web Worker. */
-let elk: Promise<{ layout: (g: ElkNode) => Promise<ElkNode> }> | undefined;
-const getElk = () =>
-  (elk ??= import('elkjs/lib/elk.bundled.js').then(({ default: ELK }) => new ELK()));
+const getElk = cacheUntilRejected(() =>
+  import('elkjs/lib/elk.bundled.js').then(
+    ({ default: ELK }) => new ELK(),
+    () => {
+      throw new LayoutError();
+    },
+  ),
+);
 
 /** Builds the ELK hierarchy: containers become compound nodes so nested layout follows the container model (FR-019). */
 export function toElkGraph(project: Project): ElkNode {

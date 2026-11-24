@@ -1,4 +1,5 @@
 import { ApiError } from './api';
+import { LayoutError } from './layout';
 
 /** Plain messages for gateway error codes (spec §5); manual editing stays available for all of them. */
 const ERROR_MESSAGES: Record<string, string> = {
@@ -21,6 +22,7 @@ const TRANSIENT = new Set(['provider_error', 'generation_failed', 'rate_limited'
 export const errorCode = (err: unknown) => (err instanceof ApiError ? err.code : undefined);
 
 export function errorMessage(err: unknown): string {
+  if (err instanceof LayoutError) return err.message;
   const code = errorCode(err);
   return (code && ERROR_MESSAGES[code]) ?? GENERIC_ERROR;
 }
