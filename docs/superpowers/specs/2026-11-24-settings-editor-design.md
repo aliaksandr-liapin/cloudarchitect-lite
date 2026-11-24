@@ -92,7 +92,7 @@ editor is disabled (generation running), like the other fields.
   removable; disabled state.
 - Domain/catalog: `values` parses; every `values` entry is accepted by the rules that read the key
   (e.g. KMS clears VR-025).
-- e2e: open the demo design, select a data store with VR-008, set Encryption, the finding is gone;
+- e2e (Claude journey): add a DynamoDB table by hand, set Encryption, its VR-008 is gone;
   undo brings it back.
 - Generator: FEATURES block of the prompt unchanged.
 
