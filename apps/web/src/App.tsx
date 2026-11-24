@@ -77,6 +77,7 @@ import {
   newEdge,
   newExternalNode,
   newServiceNode,
+  placeNew,
   NEW_CONTAINER_SIZE,
   reparentNode,
   selectedIds,
@@ -674,6 +675,8 @@ export function App() {
     const size = isContainer ? NEW_CONTAINER_SIZE : NODE_SIZE;
     let parent: Container | undefined;
     let at: { x: number; y: number };
+    // Containers grown to make room, when the selected one is full.
+    let grow: PatchOp[] = [];
     if (drop) {
       parent = containerAt(current, drop);
       const origin = absolutePosition(current, parent?.id);
@@ -686,21 +689,37 @@ export function App() {
     } else {
       const sel = selected?.kind === 'node' ? selected.id : undefined;
       parent = current.containers.find((c) => c.id === sel);
-      if (parent?.size) {
-        at = isContainer
-          ? { x: 16, y: 32 }
-          : {
-              x: Math.max(8, (parent.size.width - size.width) / 2),
-              y: Math.max(32, (parent.size.height - size.height) / 2),
-            };
+      if (parent?.size && isContainer) {
+        at = { x: 16, y: 32 };
+      } else if (parent?.size) {
+        // The free spot nearest the selected container's centre, directly inside it.
+        const origin = absolutePosition(current, parent.id);
+        const centre = {
+          x: origin.x + parent.size.width / 2,
+          y: origin.y + parent.size.height / 2,
+        };
+        const placed = placeNew(current, centre, size, parent.id);
+        at = placed.at;
+        grow = (placed.grow ?? []).map((g): PatchOp => ({
+          op: 'updateContainer',
+          id: g.id,
+          changes: { size: g.size },
+        }));
       } else {
-        parent = undefined;
         const rect = canvasRef.current?.getBoundingClientRect();
         const centre = flow.screenToFlowPosition({
           x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
           y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
         });
-        at = { x: centre.x - size.width / 2, y: centre.y - size.height / 2 };
+        if (isContainer) {
+          parent = undefined;
+          at = { x: centre.x - size.width / 2, y: centre.y - size.height / 2 };
+        } else {
+          // The free spot nearest the view's centre, stored in the container it lands in.
+          const placed = placeNew(current, centre, size);
+          parent = current.containers.find((c) => c.id === placed.parentId);
+          at = placed.at;
+        }
       }
     }
     at = { x: Math.round(at.x), y: Math.round(at.y) };
@@ -719,7 +738,7 @@ export function App() {
         ? newServiceNode(item.serviceId, at, parent?.id)
         : newExternalNode(item.kind, at, parent?.id);
     pendingSelect.current = { kind: 'node', id: node.id };
-    void edit([{ op: 'addNode', node }]);
+    void edit([...grow, { op: 'addNode', node }]);
   };
 
   const onCanvasDragOver = (e: React.DragEvent) => {
