@@ -194,7 +194,7 @@ export function App() {
   const abortRef = useRef<AbortController>(undefined);
   /** Latest committed project, for async flows that outlive a render. */
   const projectRef = useRef<Project>(undefined);
-  const historyRef = useRef<History>(EMPTY_HISTORY);
+  const historyRef = useRef<History<Routes>>(EMPTY_HISTORY);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   /** The diagram the replace step already confirmed and kept, so a retry or Continue does not ask again. */
@@ -202,7 +202,7 @@ export function App() {
 
   const versionStore = () => (storageDownRef.current ? unavailableVersionStore : idbVersionStore);
 
-  const setHistory = useCallback((h: History) => {
+  const setHistory = useCallback((h: History<Routes>) => {
     historyRef.current = h;
     setCanUndo(h.past.length > 0);
     setCanRedo(h.future.length > 0);
@@ -577,7 +577,7 @@ export function App() {
         setError(errorMessage(err));
         return Promise.resolve();
       }
-      setHistory(record(historyRef.current, current));
+      setHistory(record(historyRef.current, current, routesRef.current));
       // A toast's Undo belongs to the edit that raised it: a later edit takes it away.
       setToast((t) => (opts.toast ? { text: opts.toast, undo: true } : t?.undo ? undefined : t));
       return commit(next, opts.forceLayout ?? false, {
@@ -737,12 +737,13 @@ export function App() {
   const stepHistory = (move: typeof undo) => {
     const current = projectRef.current;
     if (busy || !current) return;
-    const moved = move(historyRef.current, current);
+    const moved = move(historyRef.current, current, routesRef.current);
     if (!moved) return;
     setHistory(moved.history);
     // A toast's Undo targets the edit it announced; once history moves, it would undo something else.
     setToast((t) => (t?.undo ? undefined : t));
-    void commit(moved.project, false, { recover: true });
+    // The step's own routes redraw it as it was; without them (none recorded) recover them.
+    void commit(moved.project, false, moved.routes ? { routes: moved.routes } : { recover: true });
   };
   const undoEdit = () => stepHistory(undo);
   const redoEdit = () => stepHistory(redo);

@@ -41,7 +41,7 @@ describe('history', () => {
     let h = EMPTY_HISTORY;
     for (let i = 0; i < HISTORY_LIMIT + 1; i++) h = record(h, make(i, `v${i}`));
     expect(h.past).toHaveLength(HISTORY_LIMIT);
-    expect(h.past[0]!.revision).toBe(1);
+    expect(h.past[0]!.project.revision).toBe(1);
   });
 
   it('undo of a node delete brings back its connectors', () => {
@@ -56,5 +56,14 @@ describe('history', () => {
   it('nothing to undo or redo returns undefined', () => {
     expect(undo(EMPTY_HISTORY, a)).toBeUndefined();
     expect(redo(EMPTY_HISTORY, a)).toBeUndefined();
+  });
+
+  it('undo and redo bring back the connector routes of each step', () => {
+    const routesA = new Map([['e1', 'route of a']]);
+    const routesB = new Map([['e1', 'route of b']]);
+    const u = undo(record(EMPTY_HISTORY, a, routesA), b, routesB)!;
+    expect(u.routes).toBe(routesA);
+    const r = redo(u.history, u.project, routesA)!;
+    expect(r.routes).toBe(routesB);
   });
 });
