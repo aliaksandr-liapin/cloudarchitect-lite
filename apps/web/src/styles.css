@@ -121,9 +121,12 @@ button {
   width: 16px;
   height: 16px;
 }
-/* React Flow's zoom controls keep their own compact look. */
+/* React Flow's zoom controls keep their own compact look. xyflow 13 puts its styles in a CSS layer,
+   so the general button rules above win unless reset here. */
 .react-flow__controls-button {
   min-height: 0;
+  padding: 4px;
+  font-weight: inherit;
   box-shadow: none;
   border-radius: 0;
   line-height: 1;

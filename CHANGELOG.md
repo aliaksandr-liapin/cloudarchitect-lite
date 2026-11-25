@@ -16,6 +16,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Changed
 
+- Editor: upgraded the diagram library to React Flow (@xyflow/react) 13. Nothing should look or behave differently: the fit-to-view margin is kept (5%), the canvas still follows the app's own light/dark switch rather than the system setting, and the zoom controls keep their look.
 - Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the toolbar and closed by default, so the canvas can show the diagram alone. The side column defaults to the toolbar's width and its headings and buttons are easier to see.
 - Editor: a cleaner toolbar and buttons. The window toggles form one group, Undo and Redo are icon buttons, all buttons share one height and outline, and Delete is red.
 - Editor: the side column's default width lines up with the toolbar but is at most 420 px; dragging can still make it wider.

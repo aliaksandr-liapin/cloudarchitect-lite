@@ -17,14 +17,12 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
-  applyEdgeChanges,
-  applyNodeChanges,
+  EdgeChangeset,
   type Connection,
   type Edge,
-  type EdgeChange,
   type FitViewOptions,
   type Node,
-  type NodeChange,
+  type NodeChangeset,
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -81,6 +79,7 @@ import {
   NEW_CONTAINER_SIZE,
   reparentNode,
   selectedIds,
+  selectionFrom,
   shouldHandleShortcut,
 } from './edit';
 import { canExport, exportImage, type ImageFormat } from './exportImage';
@@ -157,7 +156,8 @@ const STORAGE_DIALOG: DialogSpec = {
 type Toast = { text: string; restore?: ProjectVersion; undo?: boolean };
 
 /** Fit the whole diagram with padding, never zooming past 100 %. */
-const FIT: FitViewOptions = { padding: 0.12, maxZoom: 1 };
+// xyflow 13 reads a bare number as pixels; 5% matches the old 0.12 (legacy units).
+const FIT: FitViewOptions = { padding: '5%', maxZoom: 1 };
 const NO_ROUTES: Routes = new Map();
 
 /**
@@ -846,18 +846,23 @@ export function App() {
   }, [focusedFindings, openWindows]);
 
   const onNodesChange = useCallback(
-    (changes: NodeChange[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
+    (changes: NodeChangeset) => setNodes((ns) => changes.applyTo(ns)),
+    [],
+  );
+
+  // Stable, and unchanged selections keep their object: xyflow 13 reports the selection again
+  // whenever this handler changes, which with a new handler per render looped forever.
+  const onSelectionChange = useCallback(
+    ({ nodes: ns, edges: es }: { nodes: Node[]; edges: Edge[] }) =>
+      setSelected((prev) => selectionFrom(prev, ns, es)),
     [],
   );
 
   // Edges take select changes only: removing or adding one is an edit of the Project.
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) =>
+    (changes: EdgeChangeset) =>
       setEdges((es) =>
-        applyEdgeChanges(
-          changes.filter((c) => c.type === 'select'),
-          es,
-        ),
+        new EdgeChangeset(changes.toArray().filter((c) => c.type === 'select')).applyTo(es),
       ),
     [],
   );
@@ -1325,19 +1330,11 @@ export function App() {
             edgesReconnectable={!busy}
             onInit={(flow) => (flowRef.current = flow)}
             nodesDraggable={!busy}
-            onSelectionChange={({ nodes: ns, edges: es }) =>
-              setSelected(
-                ns[0]
-                  ? { kind: 'node', id: ns[0].id }
-                  : es[0]
-                    ? { kind: 'edge', id: es[0].id }
-                    : undefined,
-              )
-            }
+            onSelectionChange={onSelectionChange}
             fitView
             fitViewOptions={FIT}
             minZoom={0.2}
-            colorMode={theme}
+            forceColorMode={theme}
           >
             <Background />
             <MiniMap pannable zoomable />

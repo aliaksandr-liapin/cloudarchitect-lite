@@ -21,6 +21,7 @@ import {
   shortcutFor,
   isTextTarget,
   shouldHandleShortcut,
+  selectionFrom,
   toggleRequirement,
 } from './edit';
 import { needsLayout } from './layout';
@@ -368,5 +369,18 @@ describe('placeNew', () => {
     const placed = placeNew(wide, { x: 620, y: 40 }, small); // in R's header band
     expect(placed.parentId).toBe('R');
     expect(placed.at.y).toBeGreaterThanOrEqual(32);
+  });
+});
+
+describe('selectionFrom', () => {
+  const prev = { kind: 'node' as const, id: 'a' };
+  it('keeps the same object when the selection did not change', () => {
+    expect(selectionFrom(prev, [{ id: 'a' }], [])).toBe(prev);
+  });
+  it('prefers the first node, then the first connector, else nothing', () => {
+    expect(selectionFrom(prev, [{ id: 'b' }], [{ id: 'e' }])).toEqual({ kind: 'node', id: 'b' });
+    expect(selectionFrom(prev, [], [{ id: 'e' }])).toEqual({ kind: 'edge', id: 'e' });
+    expect(selectionFrom(prev, [], [])).toBeUndefined();
+    expect(selectionFrom(undefined, [], [])).toBeUndefined();
   });
 });
