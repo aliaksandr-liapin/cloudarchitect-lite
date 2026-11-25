@@ -414,3 +414,21 @@ function growToFit(
   }
   return { at, parentId: host.id, grow };
 }
+
+/**
+ * The selection React Flow reports, as Details shows it: the first node, else the first connector.
+ * Returns `prev` itself when nothing changed, so reporting the same selection again does not
+ * re-render (xyflow 13 reports it whenever the handler is called again).
+ */
+export function selectionFrom(
+  prev: { kind: 'node' | 'edge'; id: string } | undefined,
+  nodes: readonly { id: string }[],
+  edges: readonly { id: string }[],
+): { kind: 'node' | 'edge'; id: string } | undefined {
+  const next = nodes[0]
+    ? { kind: 'node' as const, id: nodes[0].id }
+    : edges[0]
+      ? { kind: 'edge' as const, id: edges[0].id }
+      : undefined;
+  return prev && next && prev.kind === next.kind && prev.id === next.id ? prev : next;
+}
