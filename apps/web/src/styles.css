@@ -10,6 +10,8 @@
   --info: #3b5b8c;
   --ctr: rgba(35, 87, 217, 0.04);
   --ok: #1a7f37;
+  --control-line: #98a2b3;
+  --hover: #eef2f8;
   color-scheme: light;
   font-family:
     system-ui,
@@ -32,6 +34,8 @@
   --info: #9ab8e6;
   --ctr: rgba(122, 162, 255, 0.06);
   --ok: #56d364;
+  --control-line: #556175;
+  --hover: #232b37;
   color-scheme: dark;
 }
 * {
@@ -65,11 +69,14 @@ body {
 button {
   font: inherit;
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
   cursor: pointer;
+}
+button:not(:disabled):not(.link):not(.primary):not([aria-pressed='true']):hover {
+  background: var(--hover);
 }
 button:focus-visible,
 a:focus-visible {
@@ -98,7 +105,7 @@ button.link {
   position: relative;
   min-height: 0;
   font-size: 16px;
-  border-left: 1px solid var(--line);
+  border-left: 2px solid var(--control-line);
   background: var(--panel);
 }
 .side-scroll {
@@ -108,7 +115,10 @@ button.link {
 }
 .side h2 {
   font-size: 1.1em;
-  margin: 12px 0 8px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
 }
 /* Generate and the design options stay in view while the rest of the panel scrolls. */
 .side .generate {

@@ -49,10 +49,12 @@ their contents.
 ### Task 1: Open-window state
 
 **Files:**
+
 - Create: `apps/web/src/toolWindows.ts`
 - Test: `apps/web/src/toolWindows.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `export type ToolWindowId = 'add' | 'findings' | 'versions' | 'model'`
   - `export const TOOL_WINDOWS: readonly ToolWindowId[]` (the order above)
@@ -85,20 +87,22 @@ describe('tool windows', () => {
 ```
 
 - [ ] **Step 2: Run** `pnpm --filter @cloudarchitect/web exec vitest run src/toolWindows.test.ts`.
-  Expected: FAIL (module not found).
+      Expected: FAIL (module not found).
 - [ ] **Step 3: Implement** in `toolWindows.ts`. `parseOpenWindows` wraps `JSON.parse` in
-  try/catch and returns `TOOL_WINDOWS.filter((id) => list.includes(id))` for an array.
-  `readOpenWindows` is `readPref(TOOL_WINDOWS_KEY, parseOpenWindows, [])`.
+      try/catch and returns `TOOL_WINDOWS.filter((id) => list.includes(id))` for an array.
+      `readOpenWindows` is `readPref(TOOL_WINDOWS_KEY, parseOpenWindows, [])`.
 - [ ] **Step 4: Run** the same command. Expected: PASS.
 - [ ] **Step 5: Commit** `git commit -m "web: open tool-window state"`.
 
 ### Task 2: Column width defaults to the toolbar's width
 
 **Files:**
+
 - Modify: `apps/web/src/prefs.ts`, `apps/web/src/App.tsx` (header around 1042, width state at 172)
 - Test: `apps/web/src/prefs.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `export function toolbarPanelWidth(windowWidth: number, toolbarLeft: number): number`, which
     is `clampPanelWidth(windowWidth - toolbarLeft, windowWidth)`
@@ -121,7 +125,7 @@ it('readSavedPanelWidth is undefined when nothing is saved', () => {
 ```
 
 - [ ] **Step 2: Run** `pnpm --filter @cloudarchitect/web exec vitest run src/prefs.test.ts`.
-  Expected: FAIL (not exported).
+      Expected: FAIL (not exported).
 - [ ] **Step 3: Implement both in `prefs.ts`.** In App:
   - wrap the right-hand header buttons (Dark mode … the hidden file input) in
     `<div className="bar-actions" ref={barActions}>`;
@@ -132,12 +136,13 @@ it('readSavedPanelWidth is undefined when nothing is saved', () => {
     choice.
   - Add CSS `.bar-actions { display: flex; gap: <same as .bar> }`.
 - [ ] **Step 4: Run** the prefs tests and `pnpm --filter @cloudarchitect/web typecheck`.
-  Expected: PASS.
+      Expected: PASS.
 - [ ] **Step 5: Commit** `git commit -m "web: side column defaults to the toolbar's width"`.
 
 ### Task 3: Windows, toggles, and panels without `<details>`
 
 **Files:**
+
 - Create: `apps/web/src/ToolWindow.tsx`
 - Test: `apps/web/src/toolWindow.test.tsx`
 - Modify: `apps/web/src/App.tsx`, `apps/web/src/AddPanel.tsx`, `apps/web/src/VersionsPanel.tsx`,
@@ -146,6 +151,7 @@ it('readSavedPanelWidth is undefined when nothing is saved', () => {
 - Delete: `apps/web/src/Collapsible.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 1 (`ToolWindowId`, `TOOL_WINDOWS`, `TOOL_WINDOWS_KEY`, `readOpenWindows`,
   `toggleWindow`).
 - Produces:
@@ -157,26 +163,34 @@ it('readSavedPanelWidth is undefined when nothing is saved', () => {
 
 ```tsx
 it('ToolToggles labels each window, with counts, and marks the open ones', () => {
-  const html = render(<ToolToggles open={['findings']} findings={7} versions={2} onToggle={() => {}} />);
+  const html = render(
+    <ToolToggles open={['findings']} findings={7} versions={2} onToggle={() => {}} />,
+  );
   expect(html).toMatch(/aria-pressed="false"[^>]*>Add</);
   expect(html).toMatch(/aria-pressed="true"[^>]*>Findings \(7\)</);
   expect(html).toContain('>Versions (2)<');
   expect(html).toContain('>AI model<');
 });
 it('ToolWindow is a named region with a title and a close button', () => {
-  const html = render(<ToolWindow title="Findings" onClose={() => {}}><p>x</p></ToolWindow>);
+  const html = render(
+    <ToolWindow title="Findings" onClose={() => {}}>
+      <p>x</p>
+    </ToolWindow>,
+  );
   expect(html).toContain('aria-label="Findings"');
   expect(html).toContain('<h2>Findings</h2>');
   expect(html).toContain('aria-label="Close Findings"');
 });
 it('panels no longer render a details wrapper', () => {
-  expect(render(<AddPanel disabled={false} atLimit={false} iconUrls={{}} onAdd={() => {}} />)).not.toContain('<details');
+  expect(
+    render(<AddPanel disabled={false} atLimit={false} iconUrls={{}} onAdd={() => {}} />),
+  ).not.toContain('<details');
   expect(render(<VersionsPanel versions={[]} onRestore={() => {}} />)).not.toContain('<details');
 });
 ```
 
 - [ ] **Step 2: Run** `pnpm --filter @cloudarchitect/web exec vitest run src/toolWindow.test.tsx`.
-  Expected: FAIL.
+      Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - **`ToolWindow.tsx`:**
     - `ToolWindow` renders
@@ -200,15 +214,15 @@ it('panels no longer render a details wrapper', () => {
     - `.canvas { position: relative }` (if it isn't already).
     - `.tool-windows`: `position: absolute; left: 12px; top: 12px; bottom: 132px` (clear of the
       React Flow `<Controls />`); `width: 300px; display: flex; flex-direction: column; gap: 8px;
-      z-index: 5; pointer-events: none`.
+z-index: 5; pointer-events: none`.
     - `.tool-window`: `pointer-events: auto; flex: 1 1 0; min-height: 0; display: flex;
-      flex-direction: column`, with panel background, border and shadow.
+flex-direction: column`, with panel background, border and shadow.
     - `.tool-window-body`: `overflow: auto`.
     - Under `@media (max-width: 760px)`: `.tool-windows { right: 12px; width: auto }`.
 - [ ] **Step 4: Run** `pnpm --filter @cloudarchitect/web exec vitest run`, typecheck and
-  `pnpm exec eslint apps/web/src`. Expected: all PASS.
+      `pnpm exec eslint apps/web/src`. Expected: all PASS.
 - [ ] **Step 5: Browser check** on `VITE_DEMO=true pnpm --filter @cloudarchitect/web dev`, with
-  site storage cleared:
+      site storage cleared:
   - all four windows are closed on load;
   - each toggle opens and closes its window;
   - two windows open stack and scroll;
@@ -221,9 +235,11 @@ it('panels no longer render a details wrapper', () => {
 ### Task 4: e2e follows the windows
 
 **Files:**
+
 - Modify: `e2e/tests/helpers.ts`, `e2e/tests/claude.spec.ts`, `e2e/tests/gemini.spec.ts`
 
 **Interfaces:**
+
 - Produces: `export async function openWindow(page: Page, name: 'Add' | 'Findings' | 'Versions' | 'AI model'): Promise<void>`.
   It clicks the toolbar toggle whose accessible name starts with `name` when that toggle's
   `aria-pressed` is `"false"`.
@@ -237,12 +253,13 @@ it('panels no longer render a details wrapper', () => {
     - the `Restore` clicks (claude.spec 129 and 144).
   - `selectModel` replaces its `getByText('AI model')` click with `openWindow(page, 'AI model')`.
 - [ ] **Step 2: Run** `pnpm --filter @cloudarchitect/e2e exec tsc --noEmit` (or the package's
-  typecheck) and `pnpm run ci`. Expected: PASS. Full e2e runs in CI on the PR (Docker).
+      typecheck) and `pnpm run ci`. Expected: PASS. Full e2e runs in CI on the PR (Docker).
 - [ ] **Step 3: Commit** `git commit -m "e2e: open tool windows before using them"`.
 
 ### Task 5: Easier-to-see column, docs
 
 **Files:**
+
 - Modify: `apps/web/src/styles.css`, `CHANGELOG.md`, `docs/architecture/technical-architecture.md`
   (the editor layout paragraph, if it lists the side sections)
 
@@ -255,8 +272,9 @@ it('panels no longer render a details wrapper', () => {
   - `.tool-window header`: the title bar on a slightly tinted background.
 
   If a token is missing in either theme, add it to both theme blocks.
+
 - [ ] **Step 2: Browser check** in light and dark mode, at 1910 and 600 px wide. Text and borders
-  should be readable and nothing should overflow.
+      should be readable and nothing should overflow.
 - [ ] **Step 3: CHANGELOG** Unreleased → Changed:
 
   > Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the

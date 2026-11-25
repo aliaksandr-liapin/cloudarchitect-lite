@@ -13,6 +13,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Changed
 
+- Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the toolbar and closed by default, so the canvas can show the diagram alone. The side column defaults to the toolbar's width and its headings and buttons are easier to see.
 - GPT Luna's repair: a single-AZ load balancer warning gets its own repair turn first, then the remaining errors, warnings and five info rules (such as encryption at rest) go in a fresh turn. Measured twice on 110 designs each: errors and warnings per design 0.33 → 0.17 and 0.41 → 0.25, about $0.001 more per design ([report, follow-up 3](docs/product/info-repair-experiment.md#follow-up-3-continued-vs-clean-second-turn-gpt-luna)). Haiku and Flash-Lite are unchanged.
 - Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
 
