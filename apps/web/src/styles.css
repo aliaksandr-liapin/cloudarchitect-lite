@@ -580,6 +580,21 @@ a.button {
   border-radius: 6px;
   text-decoration: none;
 }
+/* The toolbar's Help link looks like the icon buttons next to it. */
+.bar a.icon-btn {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid var(--control-line);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.bar a.icon-btn:hover {
+  background: var(--hover);
+}
 .ok {
   color: var(--ok);
 }

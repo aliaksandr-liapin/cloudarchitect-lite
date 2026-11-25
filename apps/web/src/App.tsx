@@ -111,7 +111,7 @@ import {
   type Theme,
 } from './prefs';
 import { findingMarks } from './findingMarks';
-import { PanelToggle, ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
+import { HelpLink, PanelToggle, ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
 import {
   freeArea,
   readOpenWindows,
@@ -1243,6 +1243,7 @@ export function App() {
                 );
             }}
           />
+          <HelpLink />
           <PanelToggle open={sidePanel} onToggle={toggleSidePanel} />
         </div>
       </header>

@@ -8,7 +8,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "record": "tsx src/record.ts"
+    "record": "tsx src/record.ts",
+    "manual": "E2E_SETUP=manual playwright test"
   },
   "devDependencies": {
     "@cloudarchitect/catalog": "workspace:*",

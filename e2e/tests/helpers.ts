@@ -15,7 +15,7 @@ import { design, PROMPTS } from '../src/prompts.ts';
  * A generation (extraction, questions, design, repair) through the fake server takes seconds;
  * the margin covers a slow CI machine. Below the per-test timeout in playwright.config.ts.
  */
-const GENERATION_TIMEOUT_MS = 90_000;
+export const GENERATION_TIMEOUT_MS = 90_000;
 
 /**
  * Canvas nodes after a generate, import, restore or reload: React Flow hides nodes until it
@@ -260,4 +260,36 @@ export async function expectedDesigns(provider: Provider): Promise<Project[]> {
       else process.env[k] = saved[k];
     }
   }
+}
+
+/**
+ * Clicks a connector on its own stroke: connectors leaving the same handle share their first
+ * segment, so this picks a point along the path where this connector is the topmost element.
+ */
+export async function clickEdge(page: Page, id: string): Promise<void> {
+  const path = canvas(page).locator(
+    `.react-flow__edge[data-id="${id}"] path.react-flow__edge-path`,
+  );
+  const at = await path.evaluate((el, edgeId) => {
+    // The e2e tsconfig has no DOM lib; this runs in the browser.
+    type Hit = { closest(s: string): { getAttribute(n: string): string | null } | null } | null;
+    const p = el as unknown as {
+      getTotalLength(): number;
+      getPointAtLength(l: number): { x: number; y: number };
+      getScreenCTM(): { a: number; b: number; c: number; d: number; e: number; f: number } | null;
+      ownerDocument: { elementFromPoint(x: number, y: number): Hit };
+    };
+    const m = p.getScreenCTM()!;
+    const total = p.getTotalLength();
+    for (const f of [0.5, 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1]) {
+      const q = p.getPointAtLength(total * f);
+      const x = q.x * m.a + q.y * m.c + m.e;
+      const y = q.x * m.b + q.y * m.d + m.f;
+      const hit = p.ownerDocument.elementFromPoint(x, y)?.closest('.react-flow__edge');
+      if (hit?.getAttribute('data-id') === edgeId) return { x, y };
+    }
+    return undefined;
+  }, id);
+  if (!at) throw new Error(`no clickable point on connector ${id}`);
+  await page.mouse.click(at.x, at.y);
 }

@@ -60,41 +60,35 @@ Open that link. The wizard has five steps.
 
 **1. Welcome.** The setup code from the link proves you can see the server log.
 
-<img src="../images/setup-1-welcome.png" alt="Setup step 1: welcome page listing the five steps, with the setup code filled in" width="720">
+<img src="../manual/images/setup-1-welcome.png" alt="Setup step 1: welcome page listing the five steps, with the setup code filled in" width="720">
 
 **2. AI providers.** One card each for Claude, OpenAI and Gemini, with a link to the page where you create the key. Paste at least one key and press **Check key**; the provider confirms it before you can continue. You can add the other keys now or later by re-running setup. A key that comes from a `.env` file (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) is only shown as set.
 
-<img src="../images/setup-2-key.png" alt="Setup step 2: AI providers, masked API key field with the confirmation 'Key works'" width="720">
+<img src="../manual/images/setup-2-keys.png" alt="Setup step 2: AI providers, masked API key field with the confirmation 'Key works'" width="720">
 
 **3. Models.** Choose which models the editor can use (Claude Haiku 5.5, Claude Sonnet 5.5, GPT-6.1 Sol, Gemini 4 Argon; a model is offered only when its provider has a key) and the default. The table shows the measured quality, cost and speed of each. Models you leave off are shown in the editor but cannot be selected.
 
-<img src="../images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
+<img src="../manual/images/setup-3-models.png" alt="Setup step 3: model checkboxes and the comparison table of review score, checks passed, defects, cost and wait time" width="720">
 
 **4. Limits.** AI requests per minute, daily and monthly spending limits (defaults: 20 per minute, $5 a day, $50 a month). AI stops when a limit is reached; manual editing keeps working. The wizard estimates how many generations the budget covers.
 
-<img src="../images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of the generations the monthly budget covers" width="720">
+<img src="../manual/images/setup-4-limits.png" alt="Setup step 4: limit fields with an estimate of the generations the monthly budget covers" width="720">
 
 **5. Review.** Check the summary and press **Finish setup**.
 
-<img src="../images/setup-5-review.png" alt="Setup step 5: summary of key, models, budget and rate limit" width="720">
+<img src="../manual/images/setup-5-review.png" alt="Setup step 5: summary of key, models, budget and rate limit" width="720">
 
 Settings apply immediately and survive restarts. Then press **Open the editor**, or go to <http://localhost:8080>.
 
 ## 5. Design your first architecture
 
-The editor opens with a sample diagram, so you can try dragging, resizing, **Auto layout**, the findings list and **Export** right away.
+The editor opens with a sample diagram, so you can try it right away.
 
-<img src="../images/editor-light.png" alt="Editor with the sample blog architecture: AWS icons in nested cloud and region groups, the Generate panel and three findings on the right" width="720">
+<img src="../manual/images/editor-first-start.png" alt="Editor with the sample blog architecture: AWS icons in nested cloud and region groups, the toolbar on top and the Generate panel on the right" width="720">
 
-1. Describe your application in **Generate from a description**, for example who uses it, how much traffic you expect and what matters most. Optionally switch on design priorities such as **Serverless-first** or **High availability**.
-2. Press **Generate**. The AI asks up to three short questions; pick an answer, type your own, or choose **You decide**. You can also edit the list of requirements before it draws.
-
-   <img src="../images/generate-clarify.png" alt="Clarification card with suggested answers for traffic and thumbnail sizes, and an editable list of requirements" width="720">
-
-3. The design appears after 30 to 65 seconds, depending on the model. The 25 built-in rules check it; click a finding's rule id (for example VR-008) to select the component it is about. The previous diagram is kept: use **Restore previous** or **Versions**.
-4. Edit names and layout by hand, then **Export** a PNG or SVG image, or a JSON project you can **Import** later.
-
-Projects are saved in your browser on this computer. Export JSON to back them up or move them to another machine. **Dark mode** is in the top bar.
+Describe your application in **Generate from a description** and press **Generate**. The
+[user manual](../manual/README.md) walks through generating, editing by hand, findings, versions,
+import and export, with screenshots of each step.
 
 ## Everyday use
 
