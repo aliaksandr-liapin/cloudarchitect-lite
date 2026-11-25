@@ -108,6 +108,8 @@ import {
   writePref,
   type Theme,
 } from './prefs';
+import { ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
+import { readOpenWindows, TOOL_WINDOWS_KEY, toggleWindow, type ToolWindowId } from './toolWindows';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -183,7 +185,12 @@ export function App() {
   }, []);
   const [winWidth, setWinWidth] = useState(() => window.innerWidth);
   /** Counts versions saved by the replace step or Restore; opens the Versions section. */
-  const [versionsAdded, setVersionsAdded] = useState(0);
+  const [openWindows, setOpenWindows] = useState(readOpenWindows);
+  const toggleToolWindow = (id: ToolWindowId) => {
+    const next = toggleWindow(openWindows, id);
+    setOpenWindows(next);
+    writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
+  };
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   /** The request can still be aborted (false once its response has arrived). */
   const [cancellable, setCancellable] = useState(false);
@@ -393,10 +400,7 @@ export function App() {
     if (preparedRef.current && preparedRef.current.project === current) return true;
     const kept = await prepareReplace(versionStore(), current, replaceUi);
     if (!kept) return false;
-    if (kept.saved && current) {
-      await refreshVersions(current.projectId);
-      setVersionsAdded((n) => n + 1);
-    }
+    if (kept.saved && current) await refreshVersions(current.projectId);
     preparedRef.current = { ...kept, project: current };
     return true;
   };
@@ -427,10 +431,7 @@ export function App() {
       setToast(undefined);
       const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
-      if (kept.saved && current) {
-        await refreshVersions(current.projectId);
-        setVersionsAdded((n) => n + 1);
-      }
+      if (kept.saved && current) await refreshVersions(current.projectId);
       clearHistory();
       await commit(
         {
@@ -1053,6 +1054,12 @@ export function App() {
       <header className="bar">
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
+        <ToolToggles
+          open={openWindows}
+          findings={findings.length}
+          versions={versions.length}
+          onToggle={toggleToolWindow}
+        />
         <span className="spacer" />
         <div className="bar-actions" ref={barActions}>
           <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
@@ -1233,6 +1240,53 @@ export function App() {
             <MiniMap pannable zoomable />
             <Controls />
           </ReactFlow>
+          {openWindows.length > 0 && (
+            <div className="tool-windows">
+              {openWindows.map((id) => {
+                const body =
+                  id === 'add' ? (
+                    project ? (
+                      <AddPanel
+                        disabled={busy}
+                        atLimit={atNodeLimit(project)}
+                        iconUrls={iconUrls}
+                        onAdd={(item) => addItem(item)}
+                      />
+                    ) : (
+                      <p className="muted">Generate or import a design first.</p>
+                    )
+                  ) : id === 'findings' ? (
+                    <>
+                      {findings.length === 0 && <p className="muted">No rule findings.</p>}
+                      <ul className="findings">
+                        {findings.map((f) => (
+                          <li key={f.id} className={`sev-${f.severity}`}>
+                            <button className="link" onClick={() => locate(f)}>
+                              <span className="badge">{f.severity}</span> {f.ruleId}
+                            </button>
+                            <div>{f.explanation}</div>
+                            {f.remediation && <div className="muted">{f.remediation}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : id === 'versions' ? (
+                    <VersionsPanel versions={versions} onRestore={restore} disabled={busy} />
+                  ) : (
+                    <AiModelPanel state={modelState} />
+                  );
+                return (
+                  <ToolWindow
+                    key={id}
+                    title={WINDOW_TITLES[id]}
+                    onClose={() => toggleToolWindow(id)}
+                  >
+                    {body}
+                  </ToolWindow>
+                );
+              })}
+            </div>
+          )}
         </section>
         <aside className="side">
           <div
@@ -1282,36 +1336,6 @@ export function App() {
                 }}
               />
             )}
-            {project && (
-              <AddPanel
-                disabled={busy}
-                atLimit={atNodeLimit(project)}
-                iconUrls={iconUrls}
-                onAdd={(item) => addItem(item)}
-              />
-            )}
-            <section>
-              <h2>Findings ({findings.length})</h2>
-              {findings.length === 0 && <p className="muted">No rule findings.</p>}
-              <ul className="findings">
-                {findings.map((f) => (
-                  <li key={f.id} className={`sev-${f.severity}`}>
-                    <button className="link" onClick={() => locate(f)}>
-                      <span className="badge">{f.severity}</span> {f.ruleId}
-                    </button>
-                    <div>{f.explanation}</div>
-                    {f.remediation && <div className="muted">{f.remediation}</div>}
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <VersionsPanel
-              versions={versions}
-              onRestore={restore}
-              disabled={busy}
-              openSignal={versionsAdded}
-            />
-            <AiModelPanel state={modelState} />
             <p className="muted small">
               Generated designs require professional review before production use.{' '}
               {iconState === 'ready'

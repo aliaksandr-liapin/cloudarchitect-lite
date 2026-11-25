@@ -7,7 +7,6 @@ import {
 } from '@cloudarchitect/domain';
 import { useEffect, useState } from 'react';
 import { api } from './api';
-import { Collapsible } from './Collapsible';
 import { DEMO } from './demo';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -190,7 +189,7 @@ export function useModelChoice(): ModelState {
 export function AiModelPanel({ state }: { state: ModelState }) {
   const { enabled, available, choice, offline, select } = state;
   return (
-    <Collapsible id="model" title="AI model" defaultOpen={false}>
+    <>
       {offline && !DEMO && (
         <p className="muted small">AI service unavailable — manual editing still works.</p>
       )}
@@ -200,6 +199,6 @@ export function AiModelPanel({ state }: { state: ModelState }) {
         available={available}
         onSelect={offline || DEMO ? undefined : select}
       />
-    </Collapsible>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
 import type { CloudService, ContainerKind, ExternalKind } from '@cloudarchitect/domain';
 import { useState } from 'react';
-import { Collapsible } from './Collapsible';
 import { EXTERNAL_LABELS, newContainer } from './edit';
 import { containerIcon, type IconUrls } from './icons';
 
@@ -100,7 +99,7 @@ export function AddPanel({
   const externals = EXTERNAL_KINDS.filter((k) => EXTERNAL_LABELS[k].toLowerCase().includes(q));
   const containers = awsCatalog.containers.filter((c) => c.displayName.toLowerCase().includes(q));
   return (
-    <Collapsible id="add" title="Add" defaultOpen>
+    <>
       <div className="add-panel">
         {atLimit && <p className="muted small">This design has the maximum of 150 components.</p>}
         <input
@@ -168,6 +167,6 @@ export function AddPanel({
           </div>
         )}
       </div>
-    </Collapsible>
+    </>
   );
 }
