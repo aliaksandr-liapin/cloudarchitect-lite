@@ -10,8 +10,13 @@ they find is a **finding**:
 ## Markers on components
 
 A component with findings has a marker on its top-right corner, coloured by its worst finding:
-red **!** for an error, amber **!** for a warning, blue **i** for info. It stays the same size on screen when you zoom out, so you can spot it on a whole diagram. Hover over it to read the
+red **!** for an error, amber **!** for a warning, blue **i** for info. Markers don't shrink out
+of sight when you zoom out, so you can spot them on a whole diagram. Hover over one to read the
 findings. Click it to open the Findings window with that component's findings highlighted.
+
+A finding about a connector puts the marker on the component the connector points to. Two rules
+are about the design as a whole, not one component, so they have no marker and appear only in the
+Findings window: VR-007 (nothing for monitoring) and VR-012 (a requirement nothing serves).
 
 ![A component with a warning marker](images/finding-marker.png)
 
