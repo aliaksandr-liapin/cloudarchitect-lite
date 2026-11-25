@@ -18,6 +18,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: a component added with an Add button goes in the nearest free spot instead of on top of another component, and is stored in the container it appears in. When the selected container is full, it grows to make room (one undo takes both back).
 - Editor: undo and redo put connectors back exactly as they were, without re-running the layout.
 - Editor: dragging several components at once moves each into the container it is dropped in (before, only a single component could change containers).
 - Editor: if the layout engine fails to load (for example on a flaky connection), a message says so instead of an empty canvas or an Auto layout button that does nothing; trying again loads it afresh.

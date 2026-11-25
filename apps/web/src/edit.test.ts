@@ -15,6 +15,7 @@ import {
   newExternalNode,
   newId,
   newServiceNode,
+  placeNew,
   reparentNode,
   selectedIds,
   shortcutFor,
@@ -272,5 +273,100 @@ describe('selectedIds', () => {
         [{ id: 'e1' }, { id: 'e2', selected: true }],
       ),
     ).toEqual({ nodes: ['a'], edges: ['e2'] });
+  });
+});
+
+describe('placeNew', () => {
+  const small = { width: 160, height: 56 };
+  type Box = { x: number; y: number; width: number; height: number };
+  const overlaps = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const inside = (a: Box, b: Box) =>
+    a.x >= b.x && a.y >= b.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height;
+  /** The placed box in canvas coordinates. */
+  const absBox = (placed: { at: { x: number; y: number }; parentId?: string }, size = small) => {
+    const o = absolutePosition(p, placed.parentId);
+    return { x: o.x + placed.at.x, y: o.y + placed.at.y, ...size };
+  };
+  const nodeBoxes = p.nodes.map((n) => {
+    const o = absolutePosition(p, n.containerId);
+    return { x: o.x + n.position!.x, y: o.y + n.position!.y, width: 168, height: 64 };
+  });
+  const containerBoxes = p.containers
+    .filter((c) => c.position && c.size)
+    .map((c) => ({ ...absolutePosition(p, c.id), ...c.size! }));
+
+  it('keeps a free spot where it is, inside the container it lands in', () => {
+    // Centre (170, 170) is free and inside S (70..270, 90..240).
+    expect(placeNew(p, { x: 170, y: 170 }, small)).toEqual({ at: { x: 20, y: 52 }, parentId: 'S' });
+  });
+
+  it('moves off an existing service instead of covering it', () => {
+    const placed = absBox(placeNew(p, { x: 384, y: 332 }, small)); // n's centre
+    for (const b of nodeBoxes) expect(overlaps(placed, b)).toBe(false);
+  });
+
+  it('never straddles a container border', () => {
+    const placed = absBox(placeNew(p, { x: 50, y: 200 }, small)); // on V's left edge
+    for (const c of containerBoxes) expect(inside(placed, c) || !overlaps(placed, c)).toBe(true);
+  });
+
+  // R widened to 800x500, so it has free room right of V (V ends at x 450).
+  const wide = {
+    ...p,
+    containers: p.containers.map((c) =>
+      c.id === 'R' ? { ...c, size: { width: 800, height: 500 } } : c,
+    ),
+  };
+
+  it('stores the container it visually sits in', () => {
+    expect(placeNew(wide, { x: 620, y: 200 }, small)).toEqual({
+      at: { x: 540, y: 172 },
+      parentId: 'R',
+    });
+  });
+
+  it('keeps the new service directly in the selected container', () => {
+    // V's centre is inside S; with V selected the service goes in V, not S.
+    const placed = placeNew(p, { x: 250, y: 200 }, small, 'V');
+    expect(placed.parentId).toBe('V');
+    const box = absBox(placed);
+    expect(inside(box, containerBoxes[1]!)).toBe(true);
+    expect(overlaps(box, containerBoxes[2]!)).toBe(false);
+  });
+
+  it('grows a full selected container to fit, below its contents', () => {
+    // 220 wide does not fit in S (200 wide): S grows; V still holds the grown S.
+    expect(placeNew(p, { x: 170, y: 165 }, { width: 220, height: 72 }, 'S')).toEqual({
+      at: { x: 8, y: 32 },
+      parentId: 'S',
+      grow: [{ id: 'S', size: { width: 236, height: 150 } }],
+    });
+  });
+
+  it('grows the containers around a grown container too', () => {
+    expect(placeNew(p, { x: 170, y: 165 }, { width: 400, height: 72 }, 'S').grow).toEqual([
+      { id: 'S', size: { width: 416, height: 150 } },
+      { id: 'V', size: { width: 444, height: 300 } },
+    ]);
+  });
+
+  it('puts the service below what a full container already holds', () => {
+    // m moved into S fills its top: 168x64 at (0, 40) relative to S.
+    const full = {
+      ...p,
+      nodes: p.nodes.map((n) =>
+        n.id === 'm' ? { ...n, containerId: 'S', position: { x: 0, y: 40 } } : n,
+      ),
+    };
+    const placed = placeNew(full, { x: 170, y: 165 }, { width: 220, height: 72 }, 'S');
+    expect(placed.at).toEqual({ x: 8, y: 112 });
+    expect(placed.grow).toEqual([{ id: 'S', size: { width: 236, height: 192 } }]);
+  });
+
+  it('starts below a container header', () => {
+    const placed = placeNew(wide, { x: 620, y: 40 }, small); // in R's header band
+    expect(placed.parentId).toBe('R');
+    expect(placed.at.y).toBeGreaterThanOrEqual(32);
   });
 });
