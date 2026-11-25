@@ -809,6 +809,8 @@ table.models caption {
   text-align: center;
   color: #fff;
   box-shadow: var(--shadow-sm);
+  /* Set by MarkScale so the marker stays readable when zoomed out; it grows around the corner. */
+  scale: var(--mark-scale, 1);
 }
 button.mark-error,
 button.mark-error:hover {

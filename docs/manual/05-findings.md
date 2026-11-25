@@ -10,10 +10,10 @@ they find is a **finding**:
 ## Markers on components
 
 A component with findings has a marker on its top-right corner, coloured by its worst finding:
-red **!** for an error, amber **!** for a warning, blue **i** for info. Hover over it to read the
+red **!** for an error, amber **!** for a warning, blue **i** for info. It stays the same size on screen when you zoom out, so you can spot it on a whole diagram. Hover over it to read the
 findings. Click it to open the Findings window with that component's findings highlighted.
 
-![A component with an info marker](images/finding-marker.png)
+![A component with a warning marker](images/finding-marker.png)
 
 ## The Findings window
 

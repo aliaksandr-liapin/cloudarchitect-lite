@@ -32,3 +32,16 @@ export function findingMarks(
   }
   return marks;
 }
+
+/** The marker's drawn size in pixels at 100% zoom (`.mark` in styles.css). */
+export const MARK_SIZE = 18;
+/** The smallest the marker gets on screen, however far out the canvas is zoomed. */
+const MIN_SCREEN_SIZE = 14;
+
+/**
+ * How much to enlarge the marker at a canvas zoom level. Markers live inside the components, so
+ * they shrink with them; without this a whole-diagram view draws them about 5 pixels wide.
+ */
+export function markScale(zoom: number): number {
+  return Math.max(1, MIN_SCREEN_SIZE / MARK_SIZE / zoom);
+}

@@ -58,7 +58,7 @@ import {
   type IconState,
   type IconUrls,
 } from './icons';
-import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { MarkScale, nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
 import { Details, type Selection } from './Details';
 import { AddPanel, DRAG_MIME, type AddItem } from './AddPanel';
@@ -1339,6 +1339,7 @@ export function App() {
             <Background />
             <MiniMap pannable zoomable />
             <Controls />
+            <MarkScale />
           </ReactFlow>
           {openWindows.length > 0 && (
             <div className="tool-windows">

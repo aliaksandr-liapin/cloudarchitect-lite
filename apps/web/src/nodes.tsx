@@ -1,6 +1,14 @@
-import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
+import {
+  Handle,
+  NodeResizer,
+  Position,
+  useOptionsStore,
+  useViewportStore,
+  type NodeProps,
+} from '@xyflow/react';
+import { useEffect } from 'react';
 import { MIN_CONTAINER_SIZE, MIN_NODE_SIZE } from './layout';
-import type { Mark } from './findingMarks';
+import { markScale, type Mark } from './findingMarks';
 import type { ContainerNodeData, ServiceNodeData } from './layout';
 
 export type ResizeRect = { x: number; y: number; width: number; height: number };
@@ -18,6 +26,19 @@ export type EditableData = {
   mark?: Mark;
   onMark?: (id: string) => void;
 };
+
+/**
+ * Keeps finding markers readable when the canvas is zoomed out, by setting `--mark-scale` on the
+ * flow. Render it inside `<ReactFlow>`.
+ */
+export function MarkScale() {
+  const zoom = useViewportStore((s) => s.transform[2]);
+  const flow = useOptionsStore((s) => s.domNode);
+  useEffect(() => {
+    flow?.style.setProperty('--mark-scale', String(markScale(zoom)));
+  }, [flow, zoom]);
+  return null;
+}
 
 /** A corner marker for a component's findings: red !, amber !, or blue i, worst first. */
 export function FindingMark({ mark, onClick }: { mark: Mark; onClick?: () => void }) {
