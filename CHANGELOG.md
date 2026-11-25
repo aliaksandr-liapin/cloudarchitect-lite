@@ -26,7 +26,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
-- Editor: the Origin Access Control setting is offered only on a connector between CloudFront and S3, not on every connector that touches CloudFront (for example browser → CDN). The catalog can now limit a connector setting to certain services at the other end (`peerServiceIds`).
+- Editor: connector settings are offered only where they make sense. Origin Access Control: only between CloudFront and S3 (not browser → CDN). S3 Event Notifications: only towards Lambda, SQS, SNS or EventBridge. Presigned URL upload: only from an outside client or a backend that issues the URLs (Lambda, Fargate, ECS, EC2, EKS, API Gateway), so a CDN → bucket connector no longer offers either. The catalog can now limit a connector setting to certain services at the other end (`peerServiceIds`, with `external` for outside actors). A value already stored where it is no longer offered is kept and shown under "Not in catalog".
 - Editor: a component added with an Add button goes in the nearest free spot instead of on top of another component, and is stored in the container it appears in. When the selected container is full, it grows to make room (one undo takes both back).
 - Editor: undo and redo put connectors back exactly as they were, without re-running the layout.
 - Editor: dragging several components at once moves each into the container it is dropped in (before, only a single component could change containers).
