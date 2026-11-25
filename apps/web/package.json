@@ -14,7 +14,7 @@
   "dependencies": {
     "@cloudarchitect/catalog": "workspace:*",
     "@cloudarchitect/domain": "workspace:*",
-    "@xyflow/react": "^12.12.1",
+    "@xyflow/react": "^13.0.2",
     "elkjs": "^0.12.1",
     "html-to-image": "1.11.13",
     "react": "^19.3.1",
