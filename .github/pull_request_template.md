@@ -14,3 +14,4 @@
 - [ ] Project schema change includes a migration (`packages/domain/src/migrate.ts`)
 - [ ] Catalog change includes evidence (`sourceUrl`, `checkedAt`) and stays `needs_review` until approved
 - [ ] Docs updated (`docs/`) if behavior or architecture changed
+- [ ] User manual updated (`docs/manual/`, screenshots via `pnpm --filter @cloudarchitect/e2e manual`), or nothing a user sees changed

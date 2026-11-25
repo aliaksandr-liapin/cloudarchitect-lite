@@ -10,6 +10,7 @@ import { FAKE_KEYS, REJECTED_KEY, startStack, type Stack } from '../src/stack.ts
 import { PROMPTS } from '../src/prompts.ts';
 import {
   canvas,
+  clickEdge,
   closeWindows,
   openWindow,
   download,
@@ -245,38 +246,6 @@ const centre = async (selector: string) => {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 };
 
-/**
- * Clicks a connector on its own stroke: connectors leaving the same handle share their first
- * segment, so this picks a point along the path where this connector is the topmost element.
- */
-async function clickEdge(id: string): Promise<void> {
-  const path = canvas(page).locator(
-    `.react-flow__edge[data-id="${id}"] path.react-flow__edge-path`,
-  );
-  const at = await path.evaluate((el, edgeId) => {
-    // The e2e tsconfig has no DOM lib; this runs in the browser.
-    type Hit = { closest(s: string): { getAttribute(n: string): string | null } | null } | null;
-    const p = el as unknown as {
-      getTotalLength(): number;
-      getPointAtLength(l: number): { x: number; y: number };
-      getScreenCTM(): { a: number; b: number; c: number; d: number; e: number; f: number } | null;
-      ownerDocument: { elementFromPoint(x: number, y: number): Hit };
-    };
-    const m = p.getScreenCTM()!;
-    const total = p.getTotalLength();
-    for (const f of [0.5, 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1]) {
-      const q = p.getPointAtLength(total * f);
-      const x = q.x * m.a + q.y * m.c + m.e;
-      const y = q.x * m.b + q.y * m.d + m.f;
-      const hit = p.ownerDocument.elementFromPoint(x, y)?.closest('.react-flow__edge');
-      if (hit?.getAttribute('data-id') === edgeId) return { x, y };
-    }
-    return undefined;
-  }, id);
-  if (!at) throw new Error(`no clickable point on connector ${id}`);
-  await page.mouse.click(at.x, at.y);
-}
-
 test('connectors: connect, select, edit, delete and undo', async () => {
   // Two dental components that are still on the canvas and not yet connected that way.
   const gone = dental.nodes[0]!.id;
@@ -310,7 +279,7 @@ test('connectors: connect, select, edit, delete and undo', async () => {
     .locator('.react-flow__pane')
     .click({ position: { x: 5, y: 5 } });
   await expect(details).toHaveCount(0);
-  await clickEdge(id);
+  await clickEdge(page, id);
   const kind = details.getByRole('combobox', { name: 'Kind' });
   await expect(kind).toBeVisible();
   await expect(details.getByRole('button', { name: 'Delete connector' })).toBeVisible();
@@ -322,7 +291,7 @@ test('connectors: connect, select, edit, delete and undo', async () => {
   expect(json.edges.find((e) => e.id === id)?.kind).toBe('invoke');
   await expect(kind).toHaveValue('invoke');
 
-  await clickEdge(id);
+  await clickEdge(page, id);
   await page.keyboard.press('Delete');
   await expect(shown).toHaveCount(0);
   json = await exportJson();

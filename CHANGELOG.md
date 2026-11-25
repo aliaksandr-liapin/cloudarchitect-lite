@@ -6,6 +6,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
+- [User manual](docs/manual/README.md): an illustrated guide to everything the app does, from install to export, with every rule explained. Its screenshots are generated from the running app (`pnpm --filter @cloudarchitect/e2e manual`), and a **?** button in the toolbar opens it.
 - Validation rule VR-026 (warning): a component that is not connected to anything. Baseline services such as CloudWatch are exempt, and a design with one component is not flagged. It is shown in the editor only and not sent to the AI repair turn, so generation is unchanged.
 - Editor: a component with findings shows a marker on its corner (red for an error, amber for a warning, blue for info). Hovering lists the findings; clicking opens the Findings window with them highlighted.
 - Edit by hand: add services, outside actors and containers from the Add panel; connect, re-plug and edit connectors; link components to requirements; move components into and out of containers; delete; undo and redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Findings update after every edit.
