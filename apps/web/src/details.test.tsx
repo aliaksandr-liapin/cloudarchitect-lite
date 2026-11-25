@@ -162,11 +162,12 @@ describe('Details', () => {
       ],
     });
     const off = render({ kind: 'edge', id: 'o' }, p(false));
-    expect(off).toMatch(
-      new RegExp(
-        `<input[^>]*type="checkbox"[^>]*role="switch"[^>]*aria-label="${access.displayName.replace(/[()]/g, '\\$&')}"`,
-      ),
-    );
+    // The switch input, found by its accessible name without building a regex from catalog text.
+    const input = off
+      .split('<input')
+      .find((tag) => tag.includes(`aria-label="${access.displayName}"`));
+    expect(input).toContain('type="checkbox"');
+    expect(input).toContain('role="switch"');
     expect(off).not.toMatch(/role="switch"[^>]*checked=""/);
     expect(render({ kind: 'edge', id: 'o' }, p(true))).toMatch(/role="switch"[^>]*checked=""/);
   });
