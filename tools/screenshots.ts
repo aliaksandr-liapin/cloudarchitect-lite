@@ -1,12 +1,14 @@
 /**
- * Regenerates the screenshots in docs/images (`pnpm screenshots`). Serves the built web app with
+ * Regenerates docs/images/social-preview.png (`pnpm screenshots`) and, with `--gif`, the README's
+ * docs/images/demo.gif. The setup and editor screenshots are the user manual's
+ * (`pnpm --filter @cloudarchitect/e2e manual`, docs/manual/images). Serves the built web app with
  * `vite preview` and drives the locally installed Google Chrome. Every /api call is answered with a
  * fixed response, so no gateway, API key or network access is needed and the images are repeatable.
  * The responses are one real generation recorded by tools/record-generation.ts. `--gif` records only
  * docs/images/demo.gif; it needs `ffmpeg` on the PATH and Playwright's recorder (`pnpm exec playwright-core install ffmpeg`).
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
@@ -14,10 +16,6 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 const PORT = 4179;
 const BASE = `http://localhost:${PORT}`;
 const OUT = new URL('../docs/images/', import.meta.url).pathname;
-/** Same placeholder as docs/operations/installation.md; not a real setup code. */
-const SETUP_CODE = '1a2b3c4d5e6f';
-/** Typed into a password field, so only dots appear in the image. Never a real key. */
-const FAKE_KEY = 'sk-ant-api03-placeholder-for-screenshots-0000000000';
 
 const WIZARD_DEFAULTS = {
   models: ['haiku'],
@@ -98,91 +96,6 @@ async function mockApi(
   });
 }
 
-async function shot(page: Page, name: string, fullPage = false) {
-  await page.waitForTimeout(400); // let transitions and fitView settle
-  await page.screenshot({ path: `${OUT}${name}.png`, fullPage });
-  console.log(`docs/images/${name}.png`);
-}
-
-/**
- * The bundled sample has no findings, so the editor shot imports a copy without the thumbnail
- * function's failure queue: a realistic mistake that shows a rule finding and its remediation.
- */
-async function sampleWithFinding() {
-  const sample = JSON.parse(
-    await readFile(
-      new URL('../packages/catalog/samples/myblog.project.json', import.meta.url),
-      'utf8',
-    ),
-  );
-  sample.nodes = sample.nodes.filter((n: { id: string }) => n.id !== 'dlq');
-  sample.edges = sample.edges
-    .filter((e: { target: string }) => e.target !== 'dlq')
-    .map((e: { id: string; configuration?: Record<string, unknown> }) =>
-      e.id === 'e9' ? { ...e, configuration: { eventNotification: 'ObjectCreated' } } : e,
-    );
-  const file = join(
-    await mkdtemp(join(tmpdir(), 'screenshots-')),
-    'myblog-with-finding.project.json',
-  );
-  await writeFile(file, JSON.stringify(sample));
-  return file;
-}
-
-async function editor(context: BrowserContext, name: string, projectFile: string) {
-  await mockApi(context, true);
-  const page = await context.newPage();
-  await page.goto(BASE);
-  await page.locator('.react-flow__node').first().waitFor();
-  await page.locator('input[type=file]').setInputFiles(projectFile);
-  await page.getByRole('heading', { name: /Findings \([1-9]/ }).waitFor();
-  await page.locator('.findings button').first().click();
-  await page.getByRole('heading', { name: 'Details' }).waitFor();
-  await shot(page, name);
-}
-
-/** The clarification round over the editor: quick answers, You decide, editable requirements. */
-async function clarification(context: BrowserContext) {
-  await mockApi(context, true);
-  const page = await context.newPage();
-  await page.goto(BASE);
-  await page.locator('.react-flow__node').first().waitFor();
-  await page.getByPlaceholder(/Describe your application/).fill(BLOG_PROMPT);
-  await page.getByRole('button', { name: 'Backups' }).click();
-  await page.getByRole('button', { name: 'Generate', exact: true }).click();
-  await page.getByRole('heading', { name: 'A few questions before drawing' }).waitFor();
-  const first = FIXTURE.questions.questions[0];
-  await page.getByRole('button', { name: first.suggestions[0], exact: true }).click();
-  await shot(page, 'generate-clarify');
-}
-
-async function wizard(context: BrowserContext) {
-  await mockApi(context, false);
-  const page = await context.newPage();
-  const next = () => page.getByRole('button', { name: 'Next' }).click();
-  await page.goto(`${BASE}/setup?code=${SETUP_CODE}`);
-  await page.getByRole('heading', { name: 'Welcome' }).waitFor();
-  await shot(page, 'setup-1-welcome');
-  await next();
-  await page.getByLabel('Claude API key').fill(FAKE_KEY);
-  await page.getByRole('button', { name: 'Check key' }).first().click();
-  await page.getByText('✓ Key works').waitFor();
-  await shot(page, 'setup-2-key', true);
-  await next();
-  await page.getByRole('heading', { name: 'Models' }).waitFor();
-  await shot(page, 'setup-3-models');
-  await next();
-  await page.getByRole('heading', { name: 'Limits' }).waitFor();
-  await shot(page, 'setup-4-limits');
-  await next();
-  await page.getByRole('heading', { name: 'Review' }).waitFor();
-  await shot(page, 'setup-5-review');
-}
-
-/** README GIF must stay below this size. */
-const GIF_MAX_BYTES = 5 * 1024 * 1024;
-const FFMPEG = process.env.FFMPEG ?? 'ffmpeg';
-
 /**
  * Types the prompt, answers the clarification card and waits for the finished diagram, the way a
  * person would. Returns the seconds of video to skip (the blank page load before typing starts).
@@ -258,7 +171,7 @@ async function socialPreview(browser: Browser) {
   await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await page.getByRole('heading', { name: 'A few questions before drawing' }).waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByRole('heading', { name: /Findings/ }).waitFor();
+  await page.getByRole('status').filter({ hasText: 'New diagram generated' }).waitFor();
   await page.waitForTimeout(2500); // fitView animation
   const diagram = (await page.locator('.react-flow').screenshot()).toString('base64');
   await context.close();
@@ -275,7 +188,7 @@ async function socialPreview(browser: Browser) {
       background: #fff url(data:image/png;base64,${diagram}) center / cover no-repeat;
       box-shadow: 0 10px 40px rgba(23, 32, 46, 0.18); }
   </style><div class="text"><h1>CloudArchitect Lite</h1>
-  <p>Describe your app, get an AWS architecture checked against 25 rules, on your own key.</p></div>
+  <p>Describe your app, get an AWS architecture checked against 26 rules, on your own key.</p></div>
   <div class="shot"></div>`);
   await cardPage.screenshot({ path: `${OUT}social-preview.png` });
   await card.close();
@@ -312,35 +225,10 @@ try {
   await waitForServer();
   await mkdir(OUT, { recursive: true });
   const browser = await chromium.launch({ channel: 'chrome' });
-  const viewport = { width: 1440, height: 900 };
   try {
     if (process.argv.includes('--gif')) {
       await gif(browser);
     } else {
-      const projectFile = await sampleWithFinding();
-      for (const colorScheme of ['light', 'dark'] as const) {
-        const context = await browser.newContext({ viewport, deviceScaleFactor: 2, colorScheme });
-        // The editor follows its own theme switch (light by default), not the OS preference.
-        await context.addInitScript((theme) => {
-          localStorage.setItem('cloudarchitect.theme', theme);
-        }, colorScheme);
-        await editor(context, `editor-${colorScheme}`, projectFile);
-        await context.close();
-      }
-      const clarifyContext = await browser.newContext({
-        viewport,
-        deviceScaleFactor: 2,
-        colorScheme: 'light',
-      });
-      await clarification(clarifyContext);
-      await clarifyContext.close();
-      const context = await browser.newContext({
-        viewport: { width: 1100, height: 700 },
-        deviceScaleFactor: 2,
-        colorScheme: 'light',
-      });
-      await wizard(context);
-      await context.close();
       await socialPreview(browser);
     }
   } finally {

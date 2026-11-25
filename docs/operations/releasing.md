@@ -7,7 +7,7 @@ How a maintainer ships a new version (for example `0.3.0`). Versions follow [Sem
 1. Set the new version in the root `package.json`, every workspace `package.json` and the default image tag in `compose.yaml` (`CLOUDARCHITECT_VERSION:-…`). `node tools/check-versions.ts` fails if they disagree; CI runs it.
 2. Point the install links at the new tag: `README.md`, `docs/operations/installation.md` (install and upgrade commands).
 3. Add the CHANGELOG section with the release date and the compare link at the bottom.
-4. Regenerate screenshots if the UI changed: `pnpm screenshots`.
+4. Regenerate screenshots if the UI changed: the user manual's (`pnpm --filter @cloudarchitect/e2e manual`, needs Docker), and the social preview and README GIF (`pnpm screenshots`, `pnpm screenshots --gif`). Check that [docs/manual](../manual/README.md) covers the release's user-visible changes.
 5. Run `pnpm run ci` locally, open the pull request and merge it once all checks are green.
 
 ## 2. Tag and publish

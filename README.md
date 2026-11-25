@@ -68,7 +68,7 @@ Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked
 
 ## What's next
 
-0.3 added OpenAI and Gemini next to Claude and the public benchmark above. 0.4 adds Review (an AI critique of any diagram) and Mermaid export. See the [roadmap](docs/product/roadmap.md#2-public-release-roadmap-from-2026-10-26).
+0.3 added OpenAI and Gemini next to Claude and the public benchmark above. 0.4 (planned for 8 December 2026) adds editing by hand: add, connect and configure components, undo and redo, finding markers on the canvas, and an illustrated [user manual](docs/manual/README.md). 0.5 adds Review (an AI critique of any diagram) and Mermaid export. See the [roadmap](docs/product/roadmap.md#2-public-release-roadmap-from-2026-10-26).
 
 ## Documentation
 
@@ -91,7 +91,7 @@ Only what generation needs, and only to the AI provider of the model you picked:
 The design is a JSON project (components, connections, containers such as VPCs and subnets) checked against a schema. That makes it possible to restrict services to a catalog, run deterministic rules on it, edit it on a canvas, and export it as JSON, PNG or SVG. A picture could only be looked at.
 
 **What do the rules check, and how is that different from an AI review?**
-25 deterministic rules (plain code, not the model) check the graph after generation, for example a database outside a VPC, a database in a public subnet, or a queue consumer without a dead-letter queue. They catch the same problems every time. An AI review that critiques the whole design is planned for 0.4; it will add judgement on top of the rules, not replace them.
+26 deterministic rules (plain code, not the model) check the graph after generation and after every edit, for example a database outside a VPC, a database in a public subnet, or a queue consumer without a dead-letter queue. They catch the same problems every time. An AI review that critiques the whole design is planned for 0.5; it will add judgement on top of the rules, not replace them.
 
 **Does it work offline?**
 Editing, validation and export work without internet or an API key. Generation needs your AI provider. Without internet on first start, diagrams use generic tiles instead of the AWS icons.
