@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   clampPanelWidth,
   maxPanelWidth,
+  PANEL_DEFAULT_MAX,
   PANEL_MIN,
   readPref,
   readSavedPanelWidth,
@@ -57,9 +58,13 @@ describe('maxPanelWidth', () => {
 
 describe('toolbarPanelWidth', () => {
   it('spans from the toolbar group to the window edge', () =>
-    expect(toolbarPanelWidth(1910, 1398)).toBe(512));
+    expect(toolbarPanelWidth(1910, 1520)).toBe(390));
+  it('never defaults wider than 420 px; a dragged width may be wider', () => {
+    expect(toolbarPanelWidth(1440, 855)).toBe(PANEL_DEFAULT_MAX);
+    expect(PANEL_DEFAULT_MAX).toBe(420);
+  });
   it('is clamped like a dragged width', () => {
-    expect(toolbarPanelWidth(1000, 100)).toBe(500);
+    expect(toolbarPanelWidth(700, 100)).toBe(350); // at most half the window
     expect(toolbarPanelWidth(1910, 1800)).toBe(PANEL_MIN);
   });
   it('readSavedPanelWidth is undefined when nothing is saved', () =>

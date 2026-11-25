@@ -38,6 +38,11 @@ export const ServiceFeature = z.object({
   documentationUrl: z.url(),
   /** Allowed values, when the feature has a fixed set (the settings editor shows a select). */
   values: z.array(z.string().min(1)).min(1).optional(),
+  /**
+   * Connector features only: the feature applies only when the service at the connector's other
+   * end is one of these (Origin Access Control: CloudFront to S3). Absent: any other end.
+   */
+  peerServiceIds: z.array(z.string()).min(1).optional(),
 });
 export type ServiceFeature = z.infer<typeof ServiceFeature>;
 

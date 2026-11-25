@@ -17,6 +17,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 - Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the toolbar and closed by default, so the canvas can show the diagram alone. The side column defaults to the toolbar's width and its headings and buttons are easier to see.
 - Editor: a cleaner toolbar and buttons. The window toggles form one group, Undo and Redo are icon buttons, all buttons share one height and outline, and Delete is red.
+- Editor: the side column's default width lines up with the toolbar but is at most 420 px; dragging can still make it wider.
 - Editor: a button at the right end of the toolbar hides and shows the side panel, like draw.io's Format panel; the canvas takes the freed width, and the choice is remembered.
 - Editor: Settings in Details is a two-column list with a control on every row and no Add step. A setting with one allowed value is a switch (Origin Access Control), one with several is a dropdown that starts at "Not set" (encryption), and a free-text setting is a field where clearing the text removes it. Each name links to the AWS documentation (↗).
 - GPT Luna's repair: a single-AZ load balancer warning gets its own repair turn first, then the remaining errors, warnings and five info rules (such as encryption at rest) go in a fresh turn. Measured twice on 110 designs each: errors and warnings per design 0.33 → 0.17 and 0.41 → 0.25, about $0.001 more per design ([report, follow-up 3](docs/product/info-repair-experiment.md#follow-up-3-continued-vs-clean-second-turn-gpt-luna)). Haiku and Flash-Lite are unchanged.
@@ -24,6 +25,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Fixed
 
+- Editor: the Origin Access Control setting is offered only on a connector between CloudFront and S3, not on every connector that touches CloudFront (for example browser → CDN). The catalog can now limit a connector setting to certain services at the other end (`peerServiceIds`).
 - Editor: a component added with an Add button goes in the nearest free spot instead of on top of another component, and is stored in the container it appears in. When the selected container is full, it grows to make room (one undo takes both back).
 - Editor: undo and redo put connectors back exactly as they were, without re-running the layout.
 - Editor: dragging several components at once moves each into the container it is dropped in (before, only a single component could change containers).
