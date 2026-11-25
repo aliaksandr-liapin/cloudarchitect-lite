@@ -58,7 +58,7 @@ import {
   type IconState,
   type IconUrls,
 } from './icons';
-import { nodeTypes, type EditableData, type ResizeRect } from './nodes';
+import { MarkScale, nodeTypes, type EditableData, type ResizeRect } from './nodes';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
 import { Details, type Selection } from './Details';
 import { AddPanel, DRAG_MIME, type AddItem } from './AddPanel';
@@ -100,8 +100,6 @@ import {
   PANEL_STEP,
   PANEL_WIDTH_KEY,
   PANEL_DEFAULT,
-  readSidePanelOpen,
-  SIDE_PANEL_KEY,
   readSavedPanelWidth,
   toolbarPanelWidth,
   readTheme,
@@ -202,11 +200,9 @@ export function App() {
     setOpenWindows(next);
     writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
   };
-  const [sidePanel, setSidePanel] = useState(readSidePanelOpen);
-  const toggleSidePanel = () => {
-    setSidePanel(!sidePanel);
-    writePref(SIDE_PANEL_KEY, sidePanel ? 'hidden' : 'shown');
-  };
+  /** The side panel starts shown on every load; hiding it lasts until the next reload. */
+  const [sidePanel, setSidePanel] = useState(true);
+  const toggleSidePanel = () => setSidePanel(!sidePanel);
   /** The component whose findings a marker click asked to see; they are highlighted in Findings. */
   const [focusedFindings, setFocusedFindings] = useState<string>();
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
@@ -1339,6 +1335,7 @@ export function App() {
             <Background />
             <MiniMap pannable zoomable />
             <Controls />
+            <MarkScale />
           </ReactFlow>
           {openWindows.length > 0 && (
             <div className="tool-windows">

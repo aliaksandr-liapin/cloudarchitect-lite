@@ -794,21 +794,23 @@ table.models caption {
 /* Finding markers on the canvas: a small badge on a component's top-right corner. */
 .mark {
   position: absolute;
-  top: -9px;
-  right: -9px;
+  top: -10px;
+  right: -10px;
   z-index: 2;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   min-height: 0;
   padding: 0;
   border-radius: 50%;
   border: 1.5px solid var(--panel);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 15px;
+  line-height: 17px;
   text-align: center;
   color: #fff;
   box-shadow: var(--shadow-sm);
+  /* Set by MarkScale so the marker stays readable when zoomed out; it grows around the corner. */
+  scale: var(--mark-scale, 1);
 }
 button.mark-error,
 button.mark-error:hover {

@@ -34,7 +34,8 @@ The right-hand column holds the diagram's properties:
 - **Details** of the selected component or connector: see [Edit by hand](04-edit-by-hand.md).
 
 Drag its left edge to resize it; the width you choose is remembered. To see only the diagram, hide
-the panel with the button at the right end of the toolbar.
+the panel with the button at the right end of the toolbar. It is shown again the next time you open
+the app.
 
 ![The canvas with the side panel hidden](images/editor-canvas-only.png)
 

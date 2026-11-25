@@ -1,7 +1,7 @@
 import type { Finding } from '@cloudarchitect/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { findingMarks } from './findingMarks';
+import { findingMarks, MARK_SIZE, markScale } from './findingMarks';
 import { FindingMark } from './nodes';
 
 const f = (severity: Finding['severity'], ruleId: string, over: Partial<Finding> = {}): Finding =>
@@ -60,5 +60,24 @@ describe('FindingMark', () => {
     );
     expect(html).toContain('aria-label="2 findings: a; b"');
     expect(html).toContain('>i<');
+  });
+});
+
+describe('markScale', () => {
+  it('leaves the marker as drawn at 100% zoom and closer', () => {
+    expect(markScale(1)).toBe(1);
+    expect(markScale(2)).toBe(1);
+  });
+
+  it('keeps the marker at least 16 screen pixels when zoomed out', () => {
+    for (const zoom of [0.75, 0.5, 0.37, 0.2]) {
+      expect(MARK_SIZE * markScale(zoom) * zoom).toBeCloseTo(16);
+    }
+  });
+});
+
+describe('MARK_SIZE', () => {
+  it('is the 20-pixel marker drawn in styles.css', () => {
+    expect(MARK_SIZE).toBe(20);
   });
 });
