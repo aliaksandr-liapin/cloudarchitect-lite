@@ -109,7 +109,15 @@ import {
   type Theme,
 } from './prefs';
 import { ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
-import { readOpenWindows, TOOL_WINDOWS_KEY, toggleWindow, type ToolWindowId } from './toolWindows';
+import {
+  freeArea,
+  readOpenWindows,
+  revealDelta,
+  TOOL_WINDOWS_KEY,
+  toggleWindow,
+  type Box,
+  type ToolWindowId,
+} from './toolWindows';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -718,10 +726,11 @@ export function App() {
           changes: { size: g.size },
         }));
       } else {
-        const rect = canvasRef.current?.getBoundingClientRect();
+        // The middle of what the open tool windows leave visible, so the new item isn't under them.
+        const rect = visibleCanvas();
         const centre = flow.screenToFlowPosition({
-          x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
-          y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
+          x: (rect.left + rect.right) / 2,
+          y: (rect.top + rect.bottom) / 2,
         });
         if (isContainer) {
           parent = undefined;
@@ -975,6 +984,17 @@ export function App() {
     [nodes, busy, onResized, project, iconUrls],
   );
 
+  /** The canvas on screen, less the strip the open tool windows cover. */
+  const visibleCanvas = (): Box => {
+    const canvas = canvasRef.current;
+    const empty = { left: 0, top: 0, right: 0, bottom: 0 };
+    if (!canvas) return empty;
+    return freeArea(
+      canvas.getBoundingClientRect(),
+      canvas.querySelector('.tool-windows')?.getBoundingClientRect(),
+    );
+  };
+
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
   const locate = (f: Finding) => {
     const id =
@@ -984,6 +1004,14 @@ export function App() {
     if (!id) return;
     setSelected({ kind: 'node', id });
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+    // Pan if it is off screen or under a tool window (the Findings window itself, often).
+    const el = canvasRef.current?.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+    const flow = flowRef.current;
+    const delta = el && revealDelta(el.getBoundingClientRect(), visibleCanvas());
+    if (flow && delta) {
+      const vp = flow.getViewport();
+      void flow.setViewport({ ...vp, x: vp.x + delta.dx, y: vp.y + delta.dy }, { duration: 300 });
+    }
   };
 
   const exportMenu = useRef<HTMLDetailsElement>(null);

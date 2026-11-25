@@ -211,8 +211,9 @@ export async function download(
 }
 
 /** The diagram area. */
+/** The diagram itself: the canvas region without the tool windows that float over it. */
 export const canvas = (page: Page): Locator =>
-  page.getByRole('region', { name: 'Architecture canvas' });
+  page.getByRole('region', { name: 'Architecture canvas' }).locator('.react-flow');
 
 /** Asserts every node label of `project` is shown on the canvas. */
 export async function expectNodes(page: Page, project: Project): Promise<void> {
