@@ -57,6 +57,11 @@ body {
 .spacer {
   flex: 1;
 }
+.bar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 button {
   font: inherit;
   padding: 6px 10px;

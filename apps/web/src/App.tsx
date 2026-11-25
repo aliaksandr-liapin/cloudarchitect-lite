@@ -28,7 +28,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from './api';
 import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
@@ -100,7 +100,9 @@ import {
   PANEL_MIN,
   PANEL_STEP,
   PANEL_WIDTH_KEY,
-  readPanelWidth,
+  PANEL_DEFAULT,
+  readSavedPanelWidth,
+  toolbarPanelWidth,
   readTheme,
   THEME_KEY,
   writePref,
@@ -169,7 +171,16 @@ export function App() {
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
   const [theme, setTheme] = useState<Theme>(readTheme);
-  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [panelWidth, setPanelWidth] = useState(() => readSavedPanelWidth() ?? PANEL_DEFAULT);
+  const barActions = useRef<HTMLDivElement>(null);
+  // Until the user drags the column, line its left edge up with the toolbar's right-hand group.
+  // Plain setPanelWidth: the default is not saved as the user's choice.
+  useLayoutEffect(() => {
+    if (readSavedPanelWidth() !== undefined || !barActions.current) return;
+    setPanelWidth(
+      toolbarPanelWidth(window.innerWidth, barActions.current.getBoundingClientRect().left),
+    );
+  }, []);
   const [winWidth, setWinWidth] = useState(() => window.innerWidth);
   /** Counts versions saved by the replace step or Restore; opens the Versions section. */
   const [versionsAdded, setVersionsAdded] = useState(0);
@@ -1043,80 +1054,88 @@ export function App() {
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
         <span className="spacer" />
-        <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
-          Dark mode
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => {
-            setLayingOut(true);
-            void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
-              setLayingOut(false),
-            );
-          }}
-        >
-          Auto layout
-        </button>
-        <button
-          aria-label="Undo"
-          title="Undo (⌘Z / Ctrl+Z)"
-          aria-keyshortcuts="Meta+Z Control+Z"
-          disabled={busy || !canUndo}
-          onClick={undoEdit}
-        >
-          Undo
-        </button>
-        <button
-          aria-label="Redo"
-          title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
-          aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
-          disabled={busy || !canRedo}
-          onClick={redoEdit}
-        >
-          Redo
-        </button>
-        <details className="menu" ref={exportMenu}>
-          <summary>Export</summary>
-          <div className="menu-items">
-            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('png')}>
-              PNG image
-            </button>
-            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('svg')}>
-              SVG image
-            </button>
-            <button
-              disabled={!project}
-              onClick={() => {
-                if (project) downloadJson(project);
-                if (exportMenu.current) exportMenu.current.open = false;
-              }}
-            >
-              JSON project
-            </button>
-          </div>
-        </details>
-        <button disabled={busy} onClick={() => fileInput.current?.click()}>
-          Import JSON
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file)
-              readJsonFile(file).then(
-                (p) => {
-                  clearHistory();
-                  return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
-                    setError(errorMessage(err)),
-                  );
-                },
-                (err: Error) => setError(err.message),
+        <div className="bar-actions" ref={barActions}>
+          <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
+            Dark mode
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setLayingOut(true);
+              void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
+                setLayingOut(false),
               );
-          }}
-        />
+            }}
+          >
+            Auto layout
+          </button>
+          <button
+            aria-label="Undo"
+            title="Undo (⌘Z / Ctrl+Z)"
+            aria-keyshortcuts="Meta+Z Control+Z"
+            disabled={busy || !canUndo}
+            onClick={undoEdit}
+          >
+            Undo
+          </button>
+          <button
+            aria-label="Redo"
+            title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
+            aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
+            disabled={busy || !canRedo}
+            onClick={redoEdit}
+          >
+            Redo
+          </button>
+          <details className="menu" ref={exportMenu}>
+            <summary>Export</summary>
+            <div className="menu-items">
+              <button
+                disabled={!project || !canExport(project)}
+                onClick={() => void exportAs('png')}
+              >
+                PNG image
+              </button>
+              <button
+                disabled={!project || !canExport(project)}
+                onClick={() => void exportAs('svg')}
+              >
+                SVG image
+              </button>
+              <button
+                disabled={!project}
+                onClick={() => {
+                  if (project) downloadJson(project);
+                  if (exportMenu.current) exportMenu.current.open = false;
+                }}
+              >
+                JSON project
+              </button>
+            </div>
+          </details>
+          <button disabled={busy} onClick={() => fileInput.current?.click()}>
+            Import JSON
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file)
+                readJsonFile(file).then(
+                  (p) => {
+                    clearHistory();
+                    return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
+                      setError(errorMessage(err)),
+                    );
+                  },
+                  (err: Error) => setError(err.message),
+                );
+            }}
+          />
+        </div>
       </header>
       {DEMO && (
         <div className="notice">

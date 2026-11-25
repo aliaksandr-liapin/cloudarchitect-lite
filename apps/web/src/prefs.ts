@@ -40,10 +40,16 @@ export function clampPanelWidth(width: number, windowWidth: number): number {
   return Math.max(PANEL_MIN, Math.min(width, windowWidth * 0.5));
 }
 
-export function readPanelWidth(): number {
-  return readPref(
+/** The width the user dragged to, or undefined if they never chose one. */
+export function readSavedPanelWidth(): number | undefined {
+  return readPref<number | undefined>(
     PANEL_WIDTH_KEY,
-    (raw) => (Number.isFinite(Number(raw)) ? Number(raw) : undefined),
-    PANEL_DEFAULT,
+    (raw) => (raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : undefined),
+    undefined,
   );
+}
+
+/** Default column width: from the toolbar's right-hand group to the window edge, clamped. */
+export function toolbarPanelWidth(windowWidth: number, toolbarLeft: number): number {
+  return clampPanelWidth(windowWidth - toolbarLeft, windowWidth);
 }

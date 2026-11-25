@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clampPanelWidth, maxPanelWidth, readPref, readTheme } from './prefs';
+import {
+  clampPanelWidth,
+  maxPanelWidth,
+  PANEL_MIN,
+  readPref,
+  readSavedPanelWidth,
+  readTheme,
+  toolbarPanelWidth,
+} from './prefs';
 
 const throwing = {
   getItem() {
@@ -44,4 +52,15 @@ describe('readPref', () => {
 describe('maxPanelWidth', () => {
   it('is half the window', () => expect(maxPanelWidth(1601)).toBe(800));
   it('never drops below the minimum', () => expect(maxPanelWidth(500)).toBe(320));
+});
+
+describe('toolbarPanelWidth', () => {
+  it('spans from the toolbar group to the window edge', () =>
+    expect(toolbarPanelWidth(1910, 1398)).toBe(512));
+  it('is clamped like a dragged width', () => {
+    expect(toolbarPanelWidth(1000, 100)).toBe(500);
+    expect(toolbarPanelWidth(1910, 1800)).toBe(PANEL_MIN);
+  });
+  it('readSavedPanelWidth is undefined when nothing is saved', () =>
+    expect(readSavedPanelWidth()).toBeUndefined());
 });
