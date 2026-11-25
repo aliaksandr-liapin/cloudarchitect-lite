@@ -108,6 +108,7 @@ import {
   writePref,
   type Theme,
 } from './prefs';
+import { findingMarks } from './findingMarks';
 import { ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
 import {
   freeArea,
@@ -199,6 +200,8 @@ export function App() {
     setOpenWindows(next);
     writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
   };
+  /** The component whose findings a marker click asked to see; they are highlighted in Findings. */
+  const [focusedFindings, setFocusedFindings] = useState<string>();
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   /** The request can still be aborted (false once its response has arrived). */
   const [cancellable, setCancellable] = useState(false);
@@ -820,6 +823,20 @@ export function App() {
     () => (project ? validateProject(project, awsCatalog) : []),
     [project],
   );
+  const marks = useMemo(() => findingMarks(findings, project?.edges ?? []), [findings, project]);
+  /** The components each finding is about, as its marker shows it. */
+  const findingTargets = (f: Finding) => [
+    ...f.nodeIds,
+    ...f.containerIds,
+    ...(project?.edges ?? []).filter((e) => f.edgeIds.includes(e.id)).map((e) => e.target),
+  ];
+  // A marker click opens Findings on that component's findings.
+  useEffect(() => {
+    if (!focusedFindings) return;
+    canvasRef.current
+      ?.querySelector('.findings li.is-focus')
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [focusedFindings, openWindows]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
@@ -959,6 +976,20 @@ export function App() {
     );
   };
 
+  /** A marker click: select the component and show its findings in the Findings window. */
+  const openWindowsRef = useRef(openWindows);
+  openWindowsRef.current = openWindows;
+  const showFindingsFor = useCallback((id: string) => {
+    if (!openWindowsRef.current.includes('findings')) {
+      const next = toggleWindow(openWindowsRef.current, 'findings');
+      setOpenWindows(next);
+      writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
+    }
+    setFocusedFindings(id);
+    setSelected({ kind: 'node', id });
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+  }, []);
+
   /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
   const shownNodes = useMemo(
     () =>
@@ -979,9 +1010,18 @@ export function App() {
           : data.container
             ? containerIcon(data.container, iconUrls)
             : undefined;
-        return { ...n, data: { ...n.data, ...editable, ...(iconUrl ? { iconUrl } : {}) } };
+        const mark = marks.get(n.id);
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            ...editable,
+            ...(iconUrl ? { iconUrl } : {}),
+            ...(mark ? { mark, onMark: showFindingsFor } : {}),
+          },
+        };
       }),
-    [nodes, busy, onResized, project, iconUrls],
+    [nodes, busy, onResized, project, iconUrls, marks, showFindingsFor],
   );
 
   /** The canvas on screen, less the strip the open tool windows cover. */
@@ -1104,24 +1144,50 @@ export function App() {
           >
             Auto layout
           </button>
-          <button
-            aria-label="Undo"
-            title="Undo (⌘Z / Ctrl+Z)"
-            aria-keyshortcuts="Meta+Z Control+Z"
-            disabled={busy || !canUndo}
-            onClick={undoEdit}
-          >
-            Undo
-          </button>
-          <button
-            aria-label="Redo"
-            title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
-            aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
-            disabled={busy || !canRedo}
-            onClick={redoEdit}
-          >
-            Redo
-          </button>
+          <div className="seg">
+            <button
+              className="icon-btn"
+              aria-label="Undo"
+              title="Undo (⌘Z / Ctrl+Z)"
+              aria-keyshortcuts="Meta+Z Control+Z"
+              disabled={busy || !canUndo}
+              onClick={undoEdit}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 3.5 2.5 7 6 10.5" />
+                <path d="M2.5 7H10a3.5 3.5 0 0 1 0 7H8" />
+              </svg>
+            </button>
+            <button
+              className="icon-btn"
+              aria-label="Redo"
+              title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
+              aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
+              disabled={busy || !canRedo}
+              onClick={redoEdit}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M10 3.5 13.5 7 10 10.5" />
+                <path d="M13.5 7H6a3.5 3.5 0 0 0 0 7h2" />
+              </svg>
+            </button>
+          </div>
           <details className="menu" ref={exportMenu}>
             <summary>Export</summary>
             <div className="menu-items">
@@ -1288,7 +1354,14 @@ export function App() {
                       {findings.length === 0 && <p className="muted">No rule findings.</p>}
                       <ul className="findings">
                         {findings.map((f) => (
-                          <li key={f.id} className={`sev-${f.severity}`}>
+                          <li
+                            key={f.id}
+                            className={`sev-${f.severity}${
+                              focusedFindings && findingTargets(f).includes(focusedFindings)
+                                ? ' is-focus'
+                                : ''
+                            }`}
+                          >
                             <button className="link" onClick={() => locate(f)}>
                               <span className="badge">{f.severity}</span> {f.ruleId}
                             </button>

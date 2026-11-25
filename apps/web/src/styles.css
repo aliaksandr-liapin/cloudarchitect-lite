@@ -10,8 +10,11 @@
   --info: #3b5b8c;
   --ctr: rgba(35, 87, 217, 0.04);
   --ok: #1a7f37;
-  --control-line: #98a2b3;
-  --hover: #eef2f8;
+  --control-line: #c9cfd8;
+  --hover: #f2f4f7;
+  --danger: #c4320a;
+  --add: #1a7f37;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   color-scheme: light;
   font-family:
     system-ui,
@@ -34,8 +37,11 @@
   --info: #9ab8e6;
   --ctr: rgba(122, 162, 255, 0.06);
   --ok: #56d364;
-  --control-line: #556175;
+  --control-line: #3d4756;
   --hover: #232b37;
+  --danger: #ff8a80;
+  --add: #56d364;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 * {
@@ -68,14 +74,82 @@ body {
 }
 button {
   font: inherit;
-  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  min-height: 32px;
+  padding: 5px 12px;
   border: 1px solid var(--control-line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
-button:not(:disabled):not(.link):not(.primary):not([aria-pressed='true']):hover {
+/* Joined buttons: the window toggles, and Undo/Redo. */
+.seg {
+  display: inline-flex;
+}
+.seg > button {
+  border-radius: 0;
+}
+.seg > button + button {
+  margin-left: -1px;
+}
+.seg > button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.seg > button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.seg > button[aria-pressed='true'],
+.seg > button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  padding: 5px 9px;
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+/* React Flow's zoom controls keep their own compact look. */
+.react-flow__controls-button {
+  min-height: 0;
+  box-shadow: none;
+  border-radius: 0;
+  line-height: 1;
+}
+/* Add in green, Delete in red: outlined, filled on hover. */
+button.btn-add {
+  color: var(--add);
+  border-color: var(--add);
+}
+button.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+button.btn-add:not(:disabled):hover,
+.add-row button:not(:disabled):hover {
+  background: var(--add);
+  border-color: var(--add);
+  color: var(--panel);
+}
+button.btn-danger:not(:disabled):hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--panel);
+}
+/* Low specificity on purpose: coloured buttons (primary, Add, Delete, pressed, markers) keep theirs. */
+button:where(:not(:disabled)):hover {
   background: var(--hover);
 }
 button:focus-visible,
@@ -89,6 +163,11 @@ a {
 button.link {
   border: none;
   padding: 0;
+  min-height: 0;
+  box-shadow: none;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   background: none;
   color: var(--accent);
 }
@@ -147,8 +226,6 @@ button.link {
 }
 /* Tool windows: float over the canvas's left edge, stacked, clear of the zoom controls. */
 .tool-toggles {
-  display: flex;
-  gap: 6px;
   margin-left: 8px;
 }
 .tool-windows {
@@ -191,8 +268,10 @@ button.link {
   font-weight: 600;
 }
 .tool-window-close {
-  padding: 0 8px;
-  line-height: 1.6;
+  min-height: 28px;
+  padding: 0 9px;
+  box-shadow: none;
+  line-height: 1;
 }
 .tool-window-body {
   overflow: auto;
@@ -620,6 +699,9 @@ table.models caption {
   margin: 6px 0;
 }
 .chip {
+  min-height: 0;
+  box-shadow: none;
+  font-weight: 400;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 13px;
@@ -630,6 +712,53 @@ table.models caption {
   background: var(--ctr);
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+.bar .seg > button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  box-shadow: none;
+}
+/* Finding markers on the canvas: a small badge on a component's top-right corner. */
+.mark {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--panel);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+button.mark-error,
+button.mark-error:hover {
+  background: var(--error);
+}
+button.mark-warning,
+button.mark-warning:hover {
+  background: #d97706;
+}
+button.mark-info,
+button.mark-info:hover {
+  background: var(--info);
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+button.mark:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+.findings li.is-focus {
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--ctr);
+  outline: 1px solid var(--accent);
 }
 .check {
   display: flex;
@@ -797,12 +926,19 @@ dialog.confirm::backdrop {
 }
 .menu summary {
   list-style: none;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  padding: 5px 12px;
+  border: 1px solid var(--control-line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+}
+.menu summary:hover {
+  background: var(--hover);
 }
 .menu summary::-webkit-details-marker {
   display: none;
@@ -910,6 +1046,8 @@ dialog.confirm::backdrop {
   white-space: nowrap;
 }
 .add-row button {
-  padding: 2px 8px;
+  min-height: 24px;
+  padding: 1px 10px;
   font-size: 12px;
+  line-height: 20px;
 }

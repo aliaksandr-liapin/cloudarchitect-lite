@@ -135,6 +135,11 @@ describe('Details', () => {
     );
   });
 
+  it('Add is marked as adding and Delete as destructive', () => {
+    const html = render({ kind: 'node', id: 't' }, withSettings);
+    expect(html).toMatch(/class="btn btn-add"[^>]*aria-label="Add DynamoDB global tables"/);
+    expect(html).toMatch(/class="btn btn-danger"[^>]*aria-label="Delete component"/);
+  });
   it('connector shows settings from both ends', () => {
     const html = render({ kind: 'edge', id: 'e2' }, withSettings);
     expect(html).toContain('aria-label="Add SQS dead-letter queue"');

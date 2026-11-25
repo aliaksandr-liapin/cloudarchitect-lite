@@ -55,7 +55,7 @@ export function ToolToggles({
         ? `Versions (${versions})`
         : WINDOW_TITLES[id];
   return (
-    <div className="tool-toggles">
+    <div className="tool-toggles seg">
       {TOOL_WINDOWS.map((id) => (
         <button
           key={id}

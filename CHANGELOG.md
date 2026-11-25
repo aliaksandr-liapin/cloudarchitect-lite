@@ -6,6 +6,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
+- Validation rule VR-026 (warning): a component that is not connected to anything. Baseline services such as CloudWatch are exempt, and a design with one component is not flagged. It is shown in the editor only and not sent to the AI repair turn, so generation is unchanged.
+- Editor: a component with findings shows a marker on its corner (red for an error, amber for a warning, blue for info). Hovering lists the findings; clicking opens the Findings window with them highlighted.
 - Edit by hand: add services, outside actors and containers from the Add panel; connect, re-plug and edit connectors; link components to requirements; move components into and out of containers; delete; undo and redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z). Findings update after every edit.
 - Edit by hand: a Settings section in Details sets, changes and removes catalog settings (encryption, authorizer, dead-letter queue, Multi-AZ, backup and more) on the selected component or connector, with fixed choices where the catalog has them (encryption: KMS or AWS-managed). Findings update as you edit, and undo works.
 - A browser end-to-end test runs the app in Docker on every pull request, with recorded AI responses instead of paid calls.
@@ -14,6 +16,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Changed
 
 - Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the toolbar and closed by default, so the canvas can show the diagram alone. The side column defaults to the toolbar's width and its headings and buttons are easier to see.
+- Editor: a cleaner toolbar and buttons. The window toggles form one group, Undo and Redo are icon buttons, all buttons share one height and outline, and Add settings and Delete are coloured green and red.
 - GPT Luna's repair: a single-AZ load balancer warning gets its own repair turn first, then the remaining errors, warnings and five info rules (such as encryption at rest) go in a fresh turn. Measured twice on 110 designs each: errors and warnings per design 0.33 → 0.17 and 0.41 → 0.25, about $0.001 more per design ([report, follow-up 3](docs/product/info-repair-experiment.md#follow-up-3-continued-vs-clean-second-turn-gpt-luna)). Haiku and Flash-Lite are unchanged.
 - Setup wizard: **Check key** honors `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL` and `GOOGLE_GEMINI_BASE_URL`, like generation (useful behind a proxy).
 

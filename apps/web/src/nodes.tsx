@@ -1,5 +1,6 @@
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { MIN_CONTAINER_SIZE, MIN_NODE_SIZE } from './layout';
+import type { Mark } from './findingMarks';
 import type { ContainerNodeData, ServiceNodeData } from './layout';
 
 export type ResizeRect = { x: number; y: number; width: number; height: number };
@@ -13,7 +14,29 @@ export type EditableData = {
   fits?: (rect: ResizeRect) => boolean;
   /** Data URL of the official icon, once the pack is ready; absent means a generic tile. */
   iconUrl?: string;
+  /** This component's findings, if any; the marker opens them in the Findings window. */
+  mark?: Mark;
+  onMark?: (id: string) => void;
 };
+
+/** A corner marker for a component's findings: red !, amber !, or blue i, worst first. */
+export function FindingMark({ mark, onClick }: { mark: Mark; onClick?: () => void }) {
+  const n = mark.lines.length;
+  return (
+    <button
+      type="button"
+      className={`mark mark-${mark.severity} nodrag nopan`}
+      title={mark.lines.join('\n')}
+      aria-label={`${n} finding${n === 1 ? '' : 's'}: ${mark.lines.join('; ')}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+    >
+      {mark.severity === 'info' ? 'i' : '!'}
+    </button>
+  );
+}
 
 /**
  * Service node. Shows the official icon (unaltered, on a neutral tile) when `iconUrl` is set; nodes
@@ -21,8 +44,8 @@ export type EditableData = {
  * marked as generic — never a look-alike of an official icon.
  */
 export function ServiceNode({ id, data, selected }: NodeProps) {
-  const { node, displayName, variant, resizable, onResized, iconUrl } = data as ServiceNodeData &
-    EditableData;
+  const { node, displayName, variant, resizable, onResized, iconUrl, mark, onMark } =
+    data as ServiceNodeData & EditableData;
   const unresolved = variant === 'unresolved';
   const service = unresolved ? `${displayName} · not in verified catalog` : displayName;
   return (
@@ -52,13 +75,14 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
         </div>
       </div>
       <Handle type="source" position={Position.Right} />
+      {mark && <FindingMark mark={mark} onClick={() => onMark?.(id)} />}
     </div>
   );
 }
 
 export function ContainerNode({ id, data, selected }: NodeProps) {
-  const { container, resizable, onResized, minSize, fits, iconUrl } = data as ContainerNodeData &
-    EditableData;
+  const { container, resizable, onResized, minSize, fits, iconUrl, mark, onMark } =
+    data as ContainerNodeData & EditableData;
   const subnet = container.properties?.subnetType;
   return (
     <div
@@ -76,6 +100,7 @@ export function ContainerNode({ id, data, selected }: NodeProps) {
         {container.label}
         <span className="ctr-kind">{subnet ? `${subnet} subnet` : container.kind}</span>
       </div>
+      {mark && <FindingMark mark={mark} onClick={() => onMark?.(id)} />}
     </div>
   );
 }

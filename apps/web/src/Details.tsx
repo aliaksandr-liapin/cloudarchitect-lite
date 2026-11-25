@@ -75,7 +75,7 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
               {!editing && (
                 <button
                   type="button"
-                  className="btn"
+                  className="btn btn-add"
                   aria-label={`Add ${name}`}
                   disabled={disabled}
                   onClick={() => (feature.values ? set(key, feature.values[0]!) : setAdding(key))}
@@ -176,7 +176,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
   const del = (what: 'component' | 'connector' | 'container', nodes: string[], edges: string[]) => (
     <button
       type="button"
-      className="btn"
+      className="btn btn-danger"
       aria-label={`Delete ${what}`}
       disabled={disabled}
       onClick={() => onEdit(deletionOps(project, { nodes, edges }))}

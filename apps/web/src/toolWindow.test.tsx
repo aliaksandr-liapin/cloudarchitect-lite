@@ -14,6 +14,10 @@ describe('tool windows UI', () => {
     expect(html).toContain('>Versions (2)<');
     expect(html).toContain('>AI model<');
   });
+  it('ToolToggles are one joined group', () => {
+    const html = render(<ToolToggles open={[]} findings={0} versions={0} onToggle={() => {}} />);
+    expect(html).toContain('class="tool-toggles seg"');
+  });
   it('ToolWindow is a named region with a title and a close button', () => {
     const html = render(
       <ToolWindow title="Findings" onClose={() => {}}>
