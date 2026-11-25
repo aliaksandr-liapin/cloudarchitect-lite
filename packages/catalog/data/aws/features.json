@@ -26,7 +26,8 @@
     "configKey": "eventNotification",
     "displayName": "S3 Event Notifications",
     "summary": "Emits object events (e.g. ObjectCreated) to Lambda, SQS, SNS or EventBridge.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html",
+    "peerServiceIds": ["aws.lambda", "aws.sqs", "aws.sns", "aws.eventbridge"]
   },
   {
     "id": "aws.s3.presigned-upload",
@@ -35,7 +36,16 @@
     "configKey": "presignedUrl",
     "displayName": "Presigned URL upload",
     "summary": "Time-limited signed URL that lets a client upload one object without AWS credentials.",
-    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html"
+    "documentationUrl": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html",
+    "peerServiceIds": [
+      "external",
+      "aws.lambda",
+      "aws.fargate",
+      "aws.ecs",
+      "aws.ec2",
+      "aws.eks",
+      "aws.apigateway"
+    ]
   },
   {
     "id": "aws.apigateway.authorizer",

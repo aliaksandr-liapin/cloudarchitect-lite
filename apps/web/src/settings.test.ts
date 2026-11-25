@@ -92,6 +92,41 @@ describe('settingsView', () => {
     expect(keys('apiE')).not.toContain('originAccess');
   });
 
+  it('S3 event notifications are offered only towards Lambda, SQS, SNS or EventBridge', () => {
+    const p = project(
+      [
+        node('b', { serviceId: 'aws.s3' }),
+        node('fn', { serviceId: 'aws.lambda' }),
+        node('q', { serviceId: 'aws.sqs' }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+      ],
+      [edge('toFn', 'b', 'fn'), edge('toQ', 'b', 'q'), edge('origin', 'cdn', 'b')],
+    );
+    const keys = (id: string) =>
+      settingsView(p, { kind: 'edge', id }, awsCatalog)!.rows.map((r) => r.key);
+    expect(keys('toFn')).toContain('eventNotification');
+    expect(keys('toQ')).toContain('eventNotification');
+    expect(keys('origin')).not.toContain('eventNotification');
+  });
+
+  it('presigned upload is offered from a client or a backend, not from CloudFront', () => {
+    const p = project(
+      [
+        node('user', { external: { kind: 'user', name: 'Browser' } }),
+        node('b', { serviceId: 'aws.s3' }),
+        node('fn', { serviceId: 'aws.lambda' }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+      ],
+      [edge('client', 'user', 'b'), edge('backend', 'fn', 'b'), edge('origin', 'cdn', 'b')],
+    );
+    const keys = (id: string) =>
+      settingsView(p, { kind: 'edge', id }, awsCatalog)!.rows.map((r) => r.key);
+    expect(keys('client')).toContain('presignedUrl');
+    expect(keys('backend')).toContain('presignedUrl');
+    expect(keys('origin')).not.toContain('presignedUrl');
+    expect(keys('origin')).toEqual(['originAccess']);
+  });
+
   it('a stored setting the catalog no longer offers there is kept as not in catalog', () => {
     const p = project(
       [

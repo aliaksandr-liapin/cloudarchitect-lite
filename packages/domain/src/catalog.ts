@@ -40,7 +40,8 @@ export const ServiceFeature = z.object({
   values: z.array(z.string().min(1)).min(1).optional(),
   /**
    * Connector features only: the feature applies only when the service at the connector's other
-   * end is one of these (Origin Access Control: CloudFront to S3). Absent: any other end.
+   * end is one of these (Origin Access Control: CloudFront to S3). "external" stands for an
+   * outside actor (a user, client or external system). Absent: any other end.
    */
   peerServiceIds: z.array(z.string()).min(1).optional(),
 });

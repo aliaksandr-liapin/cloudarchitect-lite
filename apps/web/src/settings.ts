@@ -31,7 +31,11 @@ function target(project: Project, selection: Selection) {
   }
   const edge = project.edges.find((e) => e.id === selection.id);
   if (!edge) return undefined;
-  const serviceOf = (id: string) => project.nodes.find((n) => n.id === id)?.serviceId;
+  // An outside actor has no service; connector features name it "external" (peerServiceIds).
+  const serviceOf = (id: string) => {
+    const node = project.nodes.find((n) => n.id === id);
+    return node?.external ? 'external' : node?.serviceId;
+  };
   return {
     configuration: edge.configuration,
     services: [serviceOf(edge.source), serviceOf(edge.target)],
