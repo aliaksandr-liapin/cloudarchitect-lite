@@ -122,28 +122,64 @@ describe('Details', () => {
     expect(render({ kind: 'node', id: 'nope' })).toBe('');
   });
 
-  it('component shows its catalog settings', () => {
+  it('component shows its catalog settings, each with a control and no Add step', () => {
     const html = render({ kind: 'node', id: 't' }, withSettings);
     expect(html).toContain('Settings');
     expect(html).toMatch(/<select[^>]*aria-label="DynamoDB encryption at rest"/);
+    expect(html).toContain('<option value="">Not set</option>');
     expect(html).toContain('<option value="KMS" selected="">KMS</option>');
     expect(html).toContain('<option value="AWS-managed">AWS-managed</option>');
-    expect(html).toContain('aria-label="Remove DynamoDB encryption at rest"');
-    expect(html).toContain('aria-label="Add DynamoDB global tables"');
-    expect(html).toContain(
-      'href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"',
+    // Free text: an empty field right away; clearing it removes the setting.
+    expect(html).toMatch(/<input[^>]*aria-label="DynamoDB global tables"/);
+    expect(html).not.toContain('aria-label="Add DynamoDB');
+    expect(html).not.toContain('aria-label="Remove DynamoDB');
+    expect(html).toMatch(
+      /href="https:\/\/docs.aws.amazon.com\/amazondynamodb\/latest\/developerguide\/EncryptionAtRest.html"[^>]*aria-label="DynamoDB encryption at rest documentation"/,
     );
   });
 
-  it('Add is marked as adding and Delete as destructive', () => {
+  it('an unset choice shows Not set', () => {
+    const p: Project = { ...withSettings, nodes: [svcNode('k', 'aws.dynamodb')] };
+    expect(render({ kind: 'node', id: 'k' }, p)).toContain(
+      '<option value="" selected="">Not set</option>',
+    );
+  });
+
+  it('a setting with a single allowed value is a switch', () => {
+    const access = awsCatalog.features.find((f) => f.configKey === 'originAccess')!;
+    const p = (on: boolean): Project => ({
+      ...withSettings,
+      nodes: [svcNode('cf', 'aws.cloudfront'), svcNode('s3', 'aws.s3')],
+      edges: [
+        {
+          id: 'o',
+          source: 'cf',
+          target: 's3',
+          kind: 'origin',
+          requirementIds: [],
+          ...(on ? { configuration: { originAccess: 'OAC' } } : {}),
+        },
+      ],
+    });
+    const off = render({ kind: 'edge', id: 'o' }, p(false));
+    expect(off).toMatch(
+      new RegExp(
+        `<input[^>]*type="checkbox"[^>]*role="switch"[^>]*aria-label="${access.displayName.replace(/[()]/g, '\\$&')}"`,
+      ),
+    );
+    expect(off).not.toMatch(/role="switch"[^>]*checked=""/);
+    expect(render({ kind: 'edge', id: 'o' }, p(true))).toMatch(/role="switch"[^>]*checked=""/);
+  });
+
+  it('Delete is marked as destructive', () => {
     const html = render({ kind: 'node', id: 't' }, withSettings);
-    expect(html).toMatch(/class="btn btn-add"[^>]*aria-label="Add DynamoDB global tables"/);
     expect(html).toMatch(/class="btn btn-danger"[^>]*aria-label="Delete component"/);
   });
+
   it('connector shows settings from both ends', () => {
     const html = render({ kind: 'edge', id: 'e2' }, withSettings);
-    expect(html).toContain('aria-label="Add SQS dead-letter queue"');
-    expect(html).toContain('aria-label="Add Lambda on-failure destination"');
+    expect(html).toContain('aria-label="SQS dead-letter queue"');
+    expect(html).toContain('aria-label="Lambda on-failure destination"');
   });
 
   it('unknown keys are listed and removable', () => {
@@ -156,10 +192,7 @@ describe('Details', () => {
   it('disabled editor disables settings', () => {
     const html = render({ kind: 'node', id: 't' }, withSettings, true);
     expect(html).toMatch(/<select[^>]*aria-label="DynamoDB encryption at rest"[^>]*disabled=""/);
-    expect(html).toMatch(/<button[^>]*aria-label="Add DynamoDB global tables"[^>]*disabled=""/);
-    expect(html).toMatch(
-      /<button[^>]*aria-label="Remove DynamoDB encryption at rest"[^>]*disabled=""/,
-    );
+    expect(html).toMatch(/<input[^>]*aria-label="DynamoDB global tables"[^>]*disabled=""/);
   });
 
   it('container shows no settings', () => {

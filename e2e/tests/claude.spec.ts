@@ -195,16 +195,14 @@ test('a setting clears its finding, and undo brings it back', async () => {
   await page.getByRole('button', { name: 'Add Amazon DynamoDB', exact: true }).click();
   // The new table is selected, so Details shows it; it has no encryption at rest (VR-008).
   const details = page.getByRole('region', { name: 'Details' });
-  const add = details.getByRole('button', { name: 'Add DynamoDB encryption at rest' });
-  await expect(add).toBeVisible({ timeout: CANVAS_TIMEOUT_MS });
+  const encryption = details.getByRole('combobox', { name: 'DynamoDB encryption at rest' });
+  await expect(encryption).toHaveValue('', { timeout: CANVAS_TIMEOUT_MS });
   const vr008 = page.locator('.findings').getByText('VR-008');
   const before = await vr008.count();
   expect(before).toBeGreaterThan(0);
 
-  await add.click();
-  await expect(details.getByRole('combobox', { name: 'DynamoDB encryption at rest' })).toHaveValue(
-    'KMS',
-  );
+  await encryption.selectOption('KMS');
+  await expect(encryption).toHaveValue('KMS');
   await expect(vr008).toHaveCount(before - 1);
   const json = Project.parse(JSON.parse((await download(page, 'JSON project')).toString('utf8')));
   const kmsTables = (p: Project) =>
