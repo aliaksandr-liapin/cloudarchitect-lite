@@ -101,6 +101,8 @@ import {
   PANEL_STEP,
   PANEL_WIDTH_KEY,
   PANEL_DEFAULT,
+  readSidePanelOpen,
+  SIDE_PANEL_KEY,
   readSavedPanelWidth,
   toolbarPanelWidth,
   readTheme,
@@ -109,7 +111,7 @@ import {
   type Theme,
 } from './prefs';
 import { findingMarks } from './findingMarks';
-import { ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
+import { PanelToggle, ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
 import {
   freeArea,
   readOpenWindows,
@@ -199,6 +201,11 @@ export function App() {
     const next = toggleWindow(openWindows, id);
     setOpenWindows(next);
     writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
+  };
+  const [sidePanel, setSidePanel] = useState(readSidePanelOpen);
+  const toggleSidePanel = () => {
+    setSidePanel(!sidePanel);
+    writePref(SIDE_PANEL_KEY, sidePanel ? 'hidden' : 'shown');
   };
   /** The component whose findings a marker click asked to see; they are highlighted in Findings. */
   const [focusedFindings, setFocusedFindings] = useState<string>();
@@ -1236,6 +1243,7 @@ export function App() {
                 );
             }}
           />
+          <PanelToggle open={sidePanel} onToggle={toggleSidePanel} />
         </div>
       </header>
       {DEMO && (
@@ -1277,7 +1285,7 @@ export function App() {
         </div>
       )}
       <main
-        className="main"
+        className={sidePanel ? 'main' : 'main no-side'}
         style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
       >
         <section
@@ -1389,62 +1397,64 @@ export function App() {
             </div>
           )}
         </section>
-        <aside className="side">
-          <div
-            className="resize-handle"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize panel"
-            aria-valuenow={Math.round(sideWidth)}
-            aria-valuemin={PANEL_MIN}
-            aria-valuemax={maxPanelWidth(winWidth)}
-            tabIndex={0}
-            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-            onPointerMove={(e) => {
-              if (e.currentTarget.hasPointerCapture(e.pointerId))
-                chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
-            }}
-            onPointerUp={persistWidth}
-            onPointerCancel={persistWidth}
-            onKeyDown={(e) => {
-              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-              e.preventDefault();
-              const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
-              chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
-            }}
-            onKeyUp={persistWidth}
-          />
-          <div className="side-scroll">
-            <GeneratePanel
-              hasDiagram={Boolean(project?.nodes.length)}
-              busy={busy}
-              cancellable={cancellable}
-              step={step}
-              startedAt={startedAt}
-              typicalSeconds={typicalSeconds}
-              onGenerate={generate}
-              onCancel={cancel}
+        {sidePanel && (
+          <aside className="side">
+            <div
+              className="resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize panel"
+              aria-valuenow={Math.round(sideWidth)}
+              aria-valuemin={PANEL_MIN}
+              aria-valuemax={maxPanelWidth(winWidth)}
+              tabIndex={0}
+              onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId))
+                  chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+              }}
+              onPointerUp={persistWidth}
+              onPointerCancel={persistWidth}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                e.preventDefault();
+                const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
+                chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
+              }}
+              onKeyUp={persistWidth}
             />
-            {project && selected && (
-              <Details
-                project={project}
-                selection={selected}
-                disabled={busy}
-                onEdit={(ops) => {
-                  const removing = ops.some((o) => o.op === 'removeContainer');
-                  void edit(ops, removing ? { toast: 'Container deleted' } : {});
-                  if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
-                }}
+            <div className="side-scroll">
+              <GeneratePanel
+                hasDiagram={Boolean(project?.nodes.length)}
+                busy={busy}
+                cancellable={cancellable}
+                step={step}
+                startedAt={startedAt}
+                typicalSeconds={typicalSeconds}
+                onGenerate={generate}
+                onCancel={cancel}
               />
-            )}
-            <p className="muted small">
-              Generated designs require professional review before production use.{' '}
-              {iconState === 'ready'
-                ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
-                : 'Icons shown are generic placeholders until the official icons are downloaded.'}
-            </p>
-          </div>
-        </aside>
+              {project && selected && (
+                <Details
+                  project={project}
+                  selection={selected}
+                  disabled={busy}
+                  onEdit={(ops) => {
+                    const removing = ops.some((o) => o.op === 'removeContainer');
+                    void edit(ops, removing ? { toast: 'Container deleted' } : {});
+                    if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
+                  }}
+                />
+              )}
+              <p className="muted small">
+                Generated designs require professional review before production use.{' '}
+                {iconState === 'ready'
+                  ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
+                  : 'Icons shown are generic placeholders until the official icons are downloaded.'}
+              </p>
+            </div>
+          </aside>
+        )}
       </main>
       {toast && (
         <div className="toast" role="status">

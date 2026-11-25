@@ -175,6 +175,11 @@ button.link {
 .canvas {
   min-height: 0;
 }
+/* Side panel hidden from the toolbar: the canvas takes the whole width. */
+.main.no-side {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
 .side {
   position: relative;
   min-height: 0;

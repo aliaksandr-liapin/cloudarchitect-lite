@@ -24,7 +24,7 @@ AI model and the review note. The column is 380 px wide by default and its contr
 ## Non-goals
 
 - Windows the user can drag or resize. They can come later, on top of this design.
-- Hiding the right column.
+- ~~Hiding the right column.~~ Added after owner testing: a toolbar button (right end, panel icon) hides and shows it; remembered per browser.
 - Changes to what each section does: only where it lives and how it looks.
 
 ## Approaches

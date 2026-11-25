@@ -69,3 +69,34 @@ export function ToolToggles({
     </div>
   );
 }
+
+/** Toolbar button that shows and hides the right-hand side panel (like draw.io's Format panel). */
+export function PanelToggle({ open, onToggle }: { open: boolean; onToggle(): void }) {
+  return (
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label="Side panel"
+      aria-pressed={open}
+      title={open ? 'Hide side panel' : 'Show side panel'}
+      onClick={onToggle}
+    >
+      <svg
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        aria-hidden="true"
+      >
+        <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" />
+        <path d="M10 2.75v10.5" />
+        {open && (
+          <path
+            d="M10 2.75h2.75a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H10z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </button>
+  );
+}

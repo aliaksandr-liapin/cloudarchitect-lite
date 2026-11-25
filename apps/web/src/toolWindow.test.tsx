@@ -1,7 +1,7 @@
 import { renderToStaticMarkup as render } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AddPanel } from './AddPanel';
-import { ToolToggles, ToolWindow } from './ToolWindow';
+import { PanelToggle, ToolToggles, ToolWindow } from './ToolWindow';
 import { VersionsPanel } from './VersionsPanel';
 
 describe('tool windows UI', () => {
@@ -17,6 +17,15 @@ describe('tool windows UI', () => {
   it('ToolToggles are one joined group', () => {
     const html = render(<ToolToggles open={[]} findings={0} versions={0} onToggle={() => {}} />);
     expect(html).toContain('class="tool-toggles seg"');
+  });
+  it('PanelToggle shows and hides the side panel, saying which', () => {
+    const open = render(<PanelToggle open onToggle={() => {}} />);
+    expect(open).toContain('aria-label="Side panel"');
+    expect(open).toContain('aria-pressed="true"');
+    expect(open).toContain('title="Hide side panel"');
+    expect(render(<PanelToggle open={false} onToggle={() => {}} />)).toContain(
+      'title="Show side panel"',
+    );
   });
   it('ToolWindow is a named region with a title and a close button', () => {
     const html = render(

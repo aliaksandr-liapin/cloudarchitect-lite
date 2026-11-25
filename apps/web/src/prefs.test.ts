@@ -5,6 +5,7 @@ import {
   PANEL_MIN,
   readPref,
   readSavedPanelWidth,
+  readSidePanelOpen,
   readTheme,
   toolbarPanelWidth,
 } from './prefs';
@@ -63,4 +64,8 @@ describe('toolbarPanelWidth', () => {
   });
   it('readSavedPanelWidth is undefined when nothing is saved', () =>
     expect(readSavedPanelWidth()).toBeUndefined());
+});
+
+describe('readSidePanelOpen', () => {
+  it('is open unless the user hid it', () => expect(readSidePanelOpen()).toBe(true));
 });

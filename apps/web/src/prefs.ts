@@ -53,3 +53,10 @@ export function readSavedPanelWidth(): number | undefined {
 export function toolbarPanelWidth(windowWidth: number, toolbarLeft: number): number {
   return clampPanelWidth(windowWidth - toolbarLeft, windowWidth);
 }
+
+export const SIDE_PANEL_KEY = 'cloudarchitect.sidePanel';
+
+/** The side panel is shown unless the user hid it ('hidden'). */
+export function readSidePanelOpen(): boolean {
+  return readPref(SIDE_PANEL_KEY, (raw) => (raw === 'hidden' ? false : undefined), true);
+}
