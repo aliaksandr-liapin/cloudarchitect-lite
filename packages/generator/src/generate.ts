@@ -1,4 +1,5 @@
 import {
+  EDITOR_ONLY_RULES,
   graphContentHash,
   modelOption,
   Project,
@@ -82,7 +83,9 @@ export const infoRepairMessage = (list: string) =>
 /** Findings the repair turn sends: every error and warning, plus info findings of `infoRules`. */
 export function repairFindings(findings: Finding[], infoRules: readonly string[] = []): Finding[] {
   return findings.filter(
-    (f) => f.severity !== 'info' || (f.ruleId !== undefined && infoRules.includes(f.ruleId)),
+    (f) =>
+      !(f.ruleId !== undefined && EDITOR_ONLY_RULES.includes(f.ruleId)) &&
+      (f.severity !== 'info' || (f.ruleId !== undefined && infoRules.includes(f.ruleId))),
   );
 }
 

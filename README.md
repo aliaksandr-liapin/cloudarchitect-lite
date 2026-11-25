@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)
 
-> Describe your app in plain English and get an AWS architecture, checked against 25 rules, running on your own machine with your own key.
+> Describe your app in plain English and get an AWS architecture, checked against 26 rules, running on your own machine with your own key.
 
 ![Replay of a recorded generation: CloudArchitect Lite turns a plain-English description into an AWS architecture diagram](docs/images/demo.gif)
 
@@ -41,7 +41,7 @@ Details, upgrading and troubleshooting: [installation guide](docs/operations/ins
 
 1. **Describe** your application in plain language. The AI asks up to three clarifying questions.
 2. **Generate** a design built only from a curated catalog of 38 AWS services, placed in containers (cloud, region, VPC, availability zone, subnet). A service the catalog does not know is flagged as unresolved instead of invented.
-3. **Validate**: 25 deterministic rules (VR-001 to VR-025, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
+3. **Validate**: 26 deterministic rules (VR-001 to VR-026, not the AI) check the design and report findings, for example a queue consumer without a dead-letter queue or a single-AZ load balancer.
 4. **Edit and export** on the canvas, then export JSON, PNG or SVG.
 
 ## Claude vs GPT vs Gemini
@@ -60,7 +60,7 @@ Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked
 ## What works today
 
 - Plain-English description, clarifying questions and design-priority toggles (serverless-first, backups, disaster recovery, high availability, cost-optimized, security hardening).
-- AWS diagrams with official icons, containers and 25 validation rules with findings.
+- AWS diagrams with official icons, containers and 26 validation rules with findings.
 - Editor: drag, resize, auto layout, light and dark theme, and versions that keep earlier diagrams.
 - Import and export JSON; export PNG and SVG.
 - Self-hosted with Docker on your own Anthropic, OpenAI or Gemini key (one is enough), with daily and monthly spending limits that count all providers together.

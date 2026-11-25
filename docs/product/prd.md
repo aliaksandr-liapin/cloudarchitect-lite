@@ -159,10 +159,11 @@ Rule findings are deterministic and versioned; advisory findings (FR-021) are a 
 | VR-023 | VPC resources not placed in at least two Availability Zones; only when the high-availability or any disaster-recovery toggle is enabled | warning |
 | VR-024 | DAX / NAT Gateway / EC2 / EKS linked to no requirement besides toggle ones; only when the cost-optimized toggle is enabled | info |
 | VR-025 | Public API Gateway / ALB / CloudFront without WAF, or a data store without KMS encryption; only when the security-hardening toggle is enabled | warning |
+| VR-026 | Component not connected to anything (skipped while the design has one component; baseline services such as CloudWatch exempt). Editor only: not sent to the AI repair turn | warning |
 
 VR-019 flags EC2, RDS, ECS and EKS only. Aurora is excluded on purpose because Aurora Serverless v2 exists, so an Aurora node is not necessarily server-based (spec §6 lists "RDS/Aurora (non-serverless)").
 
-Every rule has positive and negative fixture tests. All rules VR-001…VR-025 are implemented.
+Every rule has positive and negative fixture tests. All rules VR-001…VR-026 are implemented.
 
 ## 12. Icons — sources and usage terms
 

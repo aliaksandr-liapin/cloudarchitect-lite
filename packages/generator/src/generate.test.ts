@@ -1,5 +1,6 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
 import {
+  EDITOR_ONLY_RULES,
   graphContentHash,
   validateProject,
   YOU_DECIDE,
@@ -309,7 +310,11 @@ describe('generateArchitecture', () => {
     const infoOnly = { ...g, nodes: [...g.nodes, node('table', 'aws.dynamodb', ['R1'])] };
     const { llm, requests } = fake(infoOnly);
     const r = await generateArchitecture(llm, awsCatalog, input());
-    const severities = validateProject(r.project, awsCatalog).map((f) => f.severity);
+    // The unconnected table also raises VR-026, a warning the repair turn never gets.
+    const severities = validateProject(r.project, awsCatalog)
+      .filter((f) => !EDITOR_ONLY_RULES.includes(f.ruleId ?? ''))
+      .map((f) => f.severity);
+    expect(validateProject(r.project, awsCatalog).map((f) => f.ruleId)).toContain('VR-026');
     expect(severities).toContain('info');
     expect(severities).not.toContain('error');
     expect(severities).not.toContain('warning');
@@ -386,6 +391,13 @@ describe('repairFindings', () => {
       'VR-009',
       'VR-004',
       'VR-008',
+    ]);
+  });
+
+  it('never sends the editor-only VR-026 (not connected) warning', () => {
+    expect(repairFindings([...all, f('warning', 'VR-026')]).map((x) => x.ruleId)).toEqual([
+      'VR-009',
+      'VR-004',
     ]);
   });
 });

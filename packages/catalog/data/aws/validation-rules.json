@@ -126,5 +126,10 @@
     "id": "VR-025",
     "severity": "warning",
     "title": "Security hardening gap: public entry point without WAF or data store without KMS"
+  },
+  {
+    "id": "VR-026",
+    "severity": "warning",
+    "title": "Component not connected to anything"
   }
 ]
