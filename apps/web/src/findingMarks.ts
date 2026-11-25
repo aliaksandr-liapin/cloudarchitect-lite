@@ -34,9 +34,9 @@ export function findingMarks(
 }
 
 /** The marker's drawn size in pixels at 100% zoom (`.mark` in styles.css). */
-export const MARK_SIZE = 18;
+export const MARK_SIZE = 20;
 /** The smallest the marker gets on screen, however far out the canvas is zoomed. */
-const MIN_SCREEN_SIZE = 14;
+const MIN_SCREEN_SIZE = 16;
 
 /**
  * How much to enlarge the marker at a canvas zoom level. Markers live inside the components, so

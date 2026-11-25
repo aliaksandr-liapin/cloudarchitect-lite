@@ -69,9 +69,15 @@ describe('markScale', () => {
     expect(markScale(2)).toBe(1);
   });
 
-  it('keeps the marker at least 14 screen pixels when zoomed out', () => {
-    for (const zoom of [0.7, 0.5, 0.37, 0.2]) {
-      expect(MARK_SIZE * markScale(zoom) * zoom).toBeCloseTo(14);
+  it('keeps the marker at least 16 screen pixels when zoomed out', () => {
+    for (const zoom of [0.75, 0.5, 0.37, 0.2]) {
+      expect(MARK_SIZE * markScale(zoom) * zoom).toBeCloseTo(16);
     }
+  });
+});
+
+describe('MARK_SIZE', () => {
+  it('is the 20-pixel marker drawn in styles.css', () => {
+    expect(MARK_SIZE).toBe(20);
   });
 });
