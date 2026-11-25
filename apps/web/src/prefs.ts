@@ -7,6 +7,8 @@ export const THEME_KEY = 'cloudarchitect.theme';
 export const PANEL_DEFAULT = 380;
 export const PANEL_STEP = 16;
 export const PANEL_MIN = 320;
+/** The toolbar-aligned default never exceeds this; a width the user drags to may. */
+export const PANEL_DEFAULT_MAX = 420;
 
 export function readPref<T>(key: string, parse: (raw: string) => T | undefined, fallback: T): T {
   try {
@@ -49,9 +51,9 @@ export function readSavedPanelWidth(): number | undefined {
   );
 }
 
-/** Default column width: from the toolbar's right-hand group to the window edge, clamped. */
+/** Default column width: from the toolbar's right-hand group to the window edge, at most 420 px, clamped. */
 export function toolbarPanelWidth(windowWidth: number, toolbarLeft: number): number {
-  return clampPanelWidth(windowWidth - toolbarLeft, windowWidth);
+  return clampPanelWidth(Math.min(windowWidth - toolbarLeft, PANEL_DEFAULT_MAX), windowWidth);
 }
 
 export const SIDE_PANEL_KEY = 'cloudarchitect.sidePanel';
