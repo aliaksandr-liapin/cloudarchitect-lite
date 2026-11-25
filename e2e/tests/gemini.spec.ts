@@ -79,7 +79,7 @@ test('export JSON', async () => {
   expect(project.nodes.map((n) => n.label).sort()).toEqual(dental.nodes.map((n) => n.label).sort());
   const findings = validateProject(project, awsCatalog);
   await expect(
-    page.getByRole('heading', { name: `Findings (${findings.length})`, exact: true }),
+    page.getByRole('button', { name: `Findings (${findings.length})`, exact: true }),
   ).toBeVisible();
 });
 

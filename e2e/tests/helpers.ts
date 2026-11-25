@@ -138,8 +138,27 @@ export async function fakeLog(control: string): Promise<FakeCall[]> {
   return (await res.json()) as FakeCall[];
 }
 
+/** Opens a tool window from its toolbar toggle, unless it is already open. */
+export async function openWindow(
+  page: Page,
+  name: 'Add' | 'Findings' | 'Versions' | 'AI model',
+): Promise<void> {
+  // Findings and Versions toggles carry a count, e.g. "Findings (3)".
+  const toggle = page
+    .getByRole('banner')
+    .getByRole('button', { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
+  if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
+  await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
+}
+
+/** Closes every open tool window, so none covers the canvas. */
+export async function closeWindows(page: Page): Promise<void> {
+  const close = page.getByRole('button', { name: /^Close (Add|Findings|Versions|AI model)$/ });
+  while ((await close.count()) > 0) await close.first().click();
+}
+
 /**
- * Opens the editor's "AI model" section if needed and presses `label`'s select button. The
+ * Opens the editor's "AI model" window if needed and presses `label`'s select button. The
  * buttons all read "Use" or "Selected", so the button is found by its column: the model's
  * column header in the provider's comparison table.
  */
@@ -147,15 +166,14 @@ export async function selectModel(page: Page, label: string): Promise<void> {
   const table = page
     .getByRole('table')
     .filter({ has: page.getByRole('columnheader', { name: label, exact: true }) });
-  if (!(await table.isVisible())) {
-    // The section is a <details>; its <summary> has no accessible role, so it is found by its text.
-    await page.getByText('AI model', { exact: true }).click();
-  }
+  await openWindow(page, 'AI model');
   const headers = await table.getByRole('columnheader').allTextContents();
   // The first column header is the empty one above the row labels.
   const button = table.getByRole('button').nth(headers.indexOf(label) - 1);
   await button.click();
   await expect(button).toHaveText('Selected');
+  // The window floats over the canvas; later steps click on it.
+  await closeWindows(page);
 }
 
 /** Generates from `prompt`, answering the questions with their defaults ("You decide"). */

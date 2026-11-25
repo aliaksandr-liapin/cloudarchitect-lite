@@ -10,6 +10,8 @@ import { FAKE_KEYS, REJECTED_KEY, startStack, type Stack } from '../src/stack.ts
 import { PROMPTS } from '../src/prompts.ts';
 import {
   canvas,
+  closeWindows,
+  openWindow,
   download,
   expectedDesigns,
   CANVAS_TIMEOUT_MS,
@@ -32,7 +34,8 @@ let photos: Project;
 /** The JSON export of the first design. */
 let exported: Buffer;
 
-const versionsHeading = (n: number) => page.getByText(`Versions (${n})`, { exact: true });
+const versionsHeading = (n: number) =>
+  page.getByRole('button', { name: `Versions (${n})`, exact: true });
 
 test.beforeAll(async ({ browser }, testInfo) => {
   // A local image build on a cold cache takes several minutes.
@@ -108,7 +111,7 @@ test('export', async () => {
   expect(project.nodes.map((n) => n.label).sort()).toEqual(dental.nodes.map((n) => n.label).sort());
   const findings = validateProject(project, awsCatalog);
   await expect(
-    page.getByRole('heading', { name: `Findings (${findings.length})`, exact: true }),
+    page.getByRole('button', { name: `Findings (${findings.length})`, exact: true }),
   ).toBeVisible();
 });
 
@@ -126,6 +129,7 @@ test('versions', async () => {
   await expect(versionsHeading(2)).toBeVisible();
 
   // Newest first: the first design.
+  await openWindow(page, 'Versions');
   await page.getByRole('button', { name: 'Restore', exact: true }).first().click();
   await expectNodes(page, dental);
   for (const label of onlyIn(photos, dental)) {
@@ -141,6 +145,7 @@ test('import', async () => {
   expect(onlyIn(dental, photos).length, 'fixture designs must differ').toBeGreaterThan(0);
   expect(onlyIn(photos, dental).length, 'fixture designs must differ').toBeGreaterThan(0);
   // Bring the second design back first, so the import visibly replaces it.
+  await openWindow(page, 'Versions');
   await page.getByRole('button', { name: 'Restore', exact: true }).first().click();
   await expectNodes(page, photos);
   await expect(versionsHeading(4)).toBeVisible();
@@ -168,6 +173,8 @@ test('reload', async () => {
 });
 
 test('add a service by hand and see its finding', async () => {
+  await openWindow(page, 'Add');
+  await openWindow(page, 'Findings');
   await page.getByRole('searchbox', { name: 'Search services' }).fill('dax');
   await page.getByRole('button', { name: 'Add DynamoDB Accelerator (DAX)' }).click();
   await expect(canvas(page).getByText('DynamoDB Accelerator (DAX)').first()).toBeVisible({
@@ -211,6 +218,7 @@ test('a setting clears its finding, and undo brings it back', async () => {
 
 // Runs right after a Ctrl+Z: guards the stuck-key bug where Delete stopped working after undo.
 test('delete keys delete from the design, and undo brings it back', async () => {
+  await closeWindows(page);
   const first = dental.nodes[0]!;
   const label = first.label;
   await canvas(page).getByText(label, { exact: true }).first().click();
