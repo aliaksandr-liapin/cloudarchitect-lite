@@ -28,7 +28,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from './api';
 import { errorCode, errorMessage, isTransient } from './errors';
 import { ClarifyCard } from './ClarifyCard';
@@ -100,12 +100,27 @@ import {
   PANEL_MIN,
   PANEL_STEP,
   PANEL_WIDTH_KEY,
-  readPanelWidth,
+  PANEL_DEFAULT,
+  readSidePanelOpen,
+  SIDE_PANEL_KEY,
+  readSavedPanelWidth,
+  toolbarPanelWidth,
   readTheme,
   THEME_KEY,
   writePref,
   type Theme,
 } from './prefs';
+import { findingMarks } from './findingMarks';
+import { PanelToggle, ToolToggles, ToolWindow, WINDOW_TITLES } from './ToolWindow';
+import {
+  freeArea,
+  readOpenWindows,
+  revealDelta,
+  TOOL_WINDOWS_KEY,
+  toggleWindow,
+  type Box,
+  type ToolWindowId,
+} from './toolWindows';
 import { VersionsPanel } from './VersionsPanel';
 
 const services = new Map(awsCatalog.services.map((s) => [s.id, s]));
@@ -169,10 +184,31 @@ export function App() {
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [toast, setToast] = useState<Toast>();
   const [theme, setTheme] = useState<Theme>(readTheme);
-  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [panelWidth, setPanelWidth] = useState(() => readSavedPanelWidth() ?? PANEL_DEFAULT);
+  const barActions = useRef<HTMLDivElement>(null);
+  // Until the user drags the column, line its left edge up with the toolbar's right-hand group.
+  // Plain setPanelWidth: the default is not saved as the user's choice.
+  useLayoutEffect(() => {
+    if (readSavedPanelWidth() !== undefined || !barActions.current) return;
+    setPanelWidth(
+      toolbarPanelWidth(window.innerWidth, barActions.current.getBoundingClientRect().left),
+    );
+  }, []);
   const [winWidth, setWinWidth] = useState(() => window.innerWidth);
   /** Counts versions saved by the replace step or Restore; opens the Versions section. */
-  const [versionsAdded, setVersionsAdded] = useState(0);
+  const [openWindows, setOpenWindows] = useState(readOpenWindows);
+  const toggleToolWindow = (id: ToolWindowId) => {
+    const next = toggleWindow(openWindows, id);
+    setOpenWindows(next);
+    writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
+  };
+  const [sidePanel, setSidePanel] = useState(readSidePanelOpen);
+  const toggleSidePanel = () => {
+    setSidePanel(!sidePanel);
+    writePref(SIDE_PANEL_KEY, sidePanel ? 'hidden' : 'shown');
+  };
+  /** The component whose findings a marker click asked to see; they are highlighted in Findings. */
+  const [focusedFindings, setFocusedFindings] = useState<string>();
   const [dialog, setDialog] = useState<DialogSpec & { resolve(value: string): void }>();
   /** The request can still be aborted (false once its response has arrived). */
   const [cancellable, setCancellable] = useState(false);
@@ -382,10 +418,7 @@ export function App() {
     if (preparedRef.current && preparedRef.current.project === current) return true;
     const kept = await prepareReplace(versionStore(), current, replaceUi);
     if (!kept) return false;
-    if (kept.saved && current) {
-      await refreshVersions(current.projectId);
-      setVersionsAdded((n) => n + 1);
-    }
+    if (kept.saved && current) await refreshVersions(current.projectId);
     preparedRef.current = { ...kept, project: current };
     return true;
   };
@@ -416,10 +449,7 @@ export function App() {
       setToast(undefined);
       const kept = await keepCurrent(versionStore(), current, replaceUi);
       if (!kept) return;
-      if (kept.saved && current) {
-        await refreshVersions(current.projectId);
-        setVersionsAdded((n) => n + 1);
-      }
+      if (kept.saved && current) await refreshVersions(current.projectId);
       clearHistory();
       await commit(
         {
@@ -706,10 +736,11 @@ export function App() {
           changes: { size: g.size },
         }));
       } else {
-        const rect = canvasRef.current?.getBoundingClientRect();
+        // The middle of what the open tool windows leave visible, so the new item isn't under them.
+        const rect = visibleCanvas();
         const centre = flow.screenToFlowPosition({
-          x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
-          y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
+          x: (rect.left + rect.right) / 2,
+          y: (rect.top + rect.bottom) / 2,
         });
         if (isContainer) {
           parent = undefined;
@@ -799,6 +830,20 @@ export function App() {
     () => (project ? validateProject(project, awsCatalog) : []),
     [project],
   );
+  const marks = useMemo(() => findingMarks(findings, project?.edges ?? []), [findings, project]);
+  /** The components each finding is about, as its marker shows it. */
+  const findingTargets = (f: Finding) => [
+    ...f.nodeIds,
+    ...f.containerIds,
+    ...(project?.edges ?? []).filter((e) => f.edgeIds.includes(e.id)).map((e) => e.target),
+  ];
+  // A marker click opens Findings on that component's findings.
+  useEffect(() => {
+    if (!focusedFindings) return;
+    canvasRef.current
+      ?.querySelector('.findings li.is-focus')
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [focusedFindings, openWindows]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
@@ -938,6 +983,20 @@ export function App() {
     );
   };
 
+  /** A marker click: select the component and show its findings in the Findings window. */
+  const openWindowsRef = useRef(openWindows);
+  openWindowsRef.current = openWindows;
+  const showFindingsFor = useCallback((id: string) => {
+    if (!openWindowsRef.current.includes('findings')) {
+      const next = toggleWindow(openWindowsRef.current, 'findings');
+      setOpenWindows(next);
+      writePref(TOOL_WINDOWS_KEY, JSON.stringify(next));
+    }
+    setFocusedFindings(id);
+    setSelected({ kind: 'node', id });
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+  }, []);
+
   /** Nodes as drawn: resize handles only while nothing else is running; containers know their minimum. */
   const shownNodes = useMemo(
     () =>
@@ -958,10 +1017,30 @@ export function App() {
           : data.container
             ? containerIcon(data.container, iconUrls)
             : undefined;
-        return { ...n, data: { ...n.data, ...editable, ...(iconUrl ? { iconUrl } : {}) } };
+        const mark = marks.get(n.id);
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            ...editable,
+            ...(iconUrl ? { iconUrl } : {}),
+            ...(mark ? { mark, onMark: showFindingsFor } : {}),
+          },
+        };
       }),
-    [nodes, busy, onResized, project, iconUrls],
+    [nodes, busy, onResized, project, iconUrls, marks, showFindingsFor],
   );
+
+  /** The canvas on screen, less the strip the open tool windows cover. */
+  const visibleCanvas = (): Box => {
+    const canvas = canvasRef.current;
+    const empty = { left: 0, top: 0, right: 0, bottom: 0 };
+    if (!canvas) return empty;
+    return freeArea(
+      canvas.getBoundingClientRect(),
+      canvas.querySelector('.tool-windows')?.getBoundingClientRect(),
+    );
+  };
 
   /** Selects and highlights what a finding is about; edge findings point at the consuming node. */
   const locate = (f: Finding) => {
@@ -972,6 +1051,14 @@ export function App() {
     if (!id) return;
     setSelected({ kind: 'node', id });
     setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === id })));
+    // Pan if it is off screen or under a tool window (the Findings window itself, often).
+    const el = canvasRef.current?.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+    const flow = flowRef.current;
+    const delta = el && revealDelta(el.getBoundingClientRect(), visibleCanvas());
+    if (flow && delta) {
+      const vp = flow.getViewport();
+      void flow.setViewport({ ...vp, x: vp.x + delta.dx, y: vp.y + delta.dy }, { duration: 300 });
+    }
   };
 
   const exportMenu = useRef<HTMLDetailsElement>(null);
@@ -1042,81 +1129,122 @@ export function App() {
       <header className="bar">
         <strong>CloudArchitect Lite</strong>
         <span className="muted">{project?.name}</span>
+        <ToolToggles
+          open={openWindows}
+          findings={findings.length}
+          versions={versions.length}
+          onToggle={toggleToolWindow}
+        />
         <span className="spacer" />
-        <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
-          Dark mode
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => {
-            setLayingOut(true);
-            void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
-              setLayingOut(false),
-            );
-          }}
-        >
-          Auto layout
-        </button>
-        <button
-          aria-label="Undo"
-          title="Undo (⌘Z / Ctrl+Z)"
-          aria-keyshortcuts="Meta+Z Control+Z"
-          disabled={busy || !canUndo}
-          onClick={undoEdit}
-        >
-          Undo
-        </button>
-        <button
-          aria-label="Redo"
-          title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
-          aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
-          disabled={busy || !canRedo}
-          onClick={redoEdit}
-        >
-          Redo
-        </button>
-        <details className="menu" ref={exportMenu}>
-          <summary>Export</summary>
-          <div className="menu-items">
-            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('png')}>
-              PNG image
-            </button>
-            <button disabled={!project || !canExport(project)} onClick={() => void exportAs('svg')}>
-              SVG image
+        <div className="bar-actions" ref={barActions}>
+          <button aria-pressed={theme === 'dark'} onClick={toggleTheme}>
+            Dark mode
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setLayingOut(true);
+              void edit((p) => p, { forceLayout: true, fit: true }).finally(() =>
+                setLayingOut(false),
+              );
+            }}
+          >
+            Auto layout
+          </button>
+          <div className="seg">
+            <button
+              className="icon-btn"
+              aria-label="Undo"
+              title="Undo (⌘Z / Ctrl+Z)"
+              aria-keyshortcuts="Meta+Z Control+Z"
+              disabled={busy || !canUndo}
+              onClick={undoEdit}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 3.5 2.5 7 6 10.5" />
+                <path d="M2.5 7H10a3.5 3.5 0 0 1 0 7H8" />
+              </svg>
             </button>
             <button
-              disabled={!project}
-              onClick={() => {
-                if (project) downloadJson(project);
-                if (exportMenu.current) exportMenu.current.open = false;
-              }}
+              className="icon-btn"
+              aria-label="Redo"
+              title="Redo (⇧⌘Z / Ctrl+Shift+Z)"
+              aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y"
+              disabled={busy || !canRedo}
+              onClick={redoEdit}
             >
-              JSON project
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M10 3.5 13.5 7 10 10.5" />
+                <path d="M13.5 7H6a3.5 3.5 0 0 0 0 7h2" />
+              </svg>
             </button>
           </div>
-        </details>
-        <button disabled={busy} onClick={() => fileInput.current?.click()}>
-          Import JSON
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file)
-              readJsonFile(file).then(
-                (p) => {
-                  clearHistory();
-                  return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
-                    setError(errorMessage(err)),
-                  );
-                },
-                (err: Error) => setError(err.message),
-              );
-          }}
-        />
+          <details className="menu" ref={exportMenu}>
+            <summary>Export</summary>
+            <div className="menu-items">
+              <button
+                disabled={!project || !canExport(project)}
+                onClick={() => void exportAs('png')}
+              >
+                PNG image
+              </button>
+              <button
+                disabled={!project || !canExport(project)}
+                onClick={() => void exportAs('svg')}
+              >
+                SVG image
+              </button>
+              <button
+                disabled={!project}
+                onClick={() => {
+                  if (project) downloadJson(project);
+                  if (exportMenu.current) exportMenu.current.open = false;
+                }}
+              >
+                JSON project
+              </button>
+            </div>
+          </details>
+          <button disabled={busy} onClick={() => fileInput.current?.click()}>
+            Import JSON
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file)
+                readJsonFile(file).then(
+                  (p) => {
+                    clearHistory();
+                    return commit(p, false, { recover: true, fit: true }).catch((err: unknown) =>
+                      setError(errorMessage(err)),
+                    );
+                  },
+                  (err: Error) => setError(err.message),
+                );
+            }}
+          />
+          <PanelToggle open={sidePanel} onToggle={toggleSidePanel} />
+        </div>
       </header>
       {DEMO && (
         <div className="notice">
@@ -1157,7 +1285,7 @@ export function App() {
         </div>
       )}
       <main
-        className="main"
+        className={sidePanel ? 'main' : 'main no-side'}
         style={{ '--panel-w': `${Math.round(sideWidth)}px` } as React.CSSProperties}
       >
         <section
@@ -1214,93 +1342,119 @@ export function App() {
             <MiniMap pannable zoomable />
             <Controls />
           </ReactFlow>
+          {openWindows.length > 0 && (
+            <div className="tool-windows">
+              {openWindows.map((id) => {
+                const body =
+                  id === 'add' ? (
+                    project ? (
+                      <AddPanel
+                        disabled={busy}
+                        atLimit={atNodeLimit(project)}
+                        iconUrls={iconUrls}
+                        onAdd={(item) => addItem(item)}
+                      />
+                    ) : (
+                      <p className="muted">Generate or import a design first.</p>
+                    )
+                  ) : id === 'findings' ? (
+                    <>
+                      {findings.length === 0 && <p className="muted">No rule findings.</p>}
+                      <ul className="findings">
+                        {findings.map((f) => (
+                          <li
+                            key={f.id}
+                            className={`sev-${f.severity}${
+                              focusedFindings && findingTargets(f).includes(focusedFindings)
+                                ? ' is-focus'
+                                : ''
+                            }`}
+                          >
+                            <button className="link" onClick={() => locate(f)}>
+                              <span className="badge">{f.severity}</span> {f.ruleId}
+                            </button>
+                            <div>{f.explanation}</div>
+                            {f.remediation && <div className="muted">{f.remediation}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : id === 'versions' ? (
+                    <VersionsPanel versions={versions} onRestore={restore} disabled={busy} />
+                  ) : (
+                    <AiModelPanel state={modelState} />
+                  );
+                return (
+                  <ToolWindow
+                    key={id}
+                    title={WINDOW_TITLES[id]}
+                    onClose={() => toggleToolWindow(id)}
+                  >
+                    {body}
+                  </ToolWindow>
+                );
+              })}
+            </div>
+          )}
         </section>
-        <aside className="side">
-          <div
-            className="resize-handle"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize panel"
-            aria-valuenow={Math.round(sideWidth)}
-            aria-valuemin={PANEL_MIN}
-            aria-valuemax={maxPanelWidth(winWidth)}
-            tabIndex={0}
-            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-            onPointerMove={(e) => {
-              if (e.currentTarget.hasPointerCapture(e.pointerId))
-                chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
-            }}
-            onPointerUp={persistWidth}
-            onPointerCancel={persistWidth}
-            onKeyDown={(e) => {
-              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-              e.preventDefault();
-              const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
-              chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
-            }}
-            onKeyUp={persistWidth}
-          />
-          <div className="side-scroll">
-            <GeneratePanel
-              hasDiagram={Boolean(project?.nodes.length)}
-              busy={busy}
-              cancellable={cancellable}
-              step={step}
-              startedAt={startedAt}
-              typicalSeconds={typicalSeconds}
-              onGenerate={generate}
-              onCancel={cancel}
+        {sidePanel && (
+          <aside className="side">
+            <div
+              className="resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize panel"
+              aria-valuenow={Math.round(sideWidth)}
+              aria-valuemin={PANEL_MIN}
+              aria-valuemax={maxPanelWidth(winWidth)}
+              tabIndex={0}
+              onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId))
+                  chooseWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+              }}
+              onPointerUp={persistWidth}
+              onPointerCancel={persistWidth}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                e.preventDefault();
+                const delta = e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP;
+                chooseWidth(clampPanelWidth(sideWidth + delta, window.innerWidth));
+              }}
+              onKeyUp={persistWidth}
             />
-            {project && selected && (
-              <Details
-                project={project}
-                selection={selected}
-                disabled={busy}
-                onEdit={(ops) => {
-                  const removing = ops.some((o) => o.op === 'removeContainer');
-                  void edit(ops, removing ? { toast: 'Container deleted' } : {});
-                  if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
-                }}
+            <div className="side-scroll">
+              <GeneratePanel
+                hasDiagram={Boolean(project?.nodes.length)}
+                busy={busy}
+                cancellable={cancellable}
+                step={step}
+                startedAt={startedAt}
+                typicalSeconds={typicalSeconds}
+                onGenerate={generate}
+                onCancel={cancel}
               />
-            )}
-            {project && (
-              <AddPanel
-                disabled={busy}
-                atLimit={atNodeLimit(project)}
-                iconUrls={iconUrls}
-                onAdd={(item) => addItem(item)}
-              />
-            )}
-            <section>
-              <h2>Findings ({findings.length})</h2>
-              {findings.length === 0 && <p className="muted">No rule findings.</p>}
-              <ul className="findings">
-                {findings.map((f) => (
-                  <li key={f.id} className={`sev-${f.severity}`}>
-                    <button className="link" onClick={() => locate(f)}>
-                      <span className="badge">{f.severity}</span> {f.ruleId}
-                    </button>
-                    <div>{f.explanation}</div>
-                    {f.remediation && <div className="muted">{f.remediation}</div>}
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <VersionsPanel
-              versions={versions}
-              onRestore={restore}
-              disabled={busy}
-              openSignal={versionsAdded}
-            />
-            <AiModelPanel state={modelState} />
-            <p className="muted small">
-              Generated designs require professional review before production use.{' '}
-              {iconState === 'ready'
-                ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
-                : 'Icons shown are generic placeholders until the official icons are downloaded.'}
-            </p>
-          </div>
-        </aside>
+              {project && selected && (
+                <Details
+                  project={project}
+                  selection={selected}
+                  disabled={busy}
+                  onEdit={(ops) => {
+                    const removing = ops.some((o) => o.op === 'removeContainer');
+                    void edit(ops, removing ? { toast: 'Container deleted' } : {});
+                    if (ops.some((o) => o.op.startsWith('remove'))) setSelected(undefined);
+                  }}
+                />
+              )}
+              <p className="muted small">
+                Generated designs require professional review before production use.{' '}
+                {iconState === 'ready'
+                  ? 'Official AWS icons are shown unmodified; generic tiles mark anything without one.'
+                  : 'Icons shown are generic placeholders until the official icons are downloaded.'}
+              </p>
+            </div>
+          </aside>
+        )}
       </main>
       {toast && (
         <div className="toast" role="status">

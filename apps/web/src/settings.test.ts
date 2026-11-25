@@ -75,6 +75,71 @@ describe('settingsView', () => {
     expect(keys('e1')).not.toContain('eventNotification');
   });
 
+  it('Origin Access Control is offered only between CloudFront and S3', () => {
+    const p = project(
+      [
+        node('user', { external: { kind: 'user', name: 'Browser' } }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+        node('b', { serviceId: 'aws.s3' }),
+        node('api', { serviceId: 'aws.apigateway' }),
+      ],
+      [edge('in', 'user', 'cdn'), edge('s3', 'cdn', 'b'), edge('apiE', 'cdn', 'api')],
+    );
+    const keys = (id: string) =>
+      settingsView(p, { kind: 'edge', id }, awsCatalog)!.rows.map((r) => r.key);
+    expect(keys('s3')).toContain('originAccess');
+    expect(keys('in')).not.toContain('originAccess');
+    expect(keys('apiE')).not.toContain('originAccess');
+  });
+
+  it('S3 event notifications are offered only towards Lambda, SQS, SNS or EventBridge', () => {
+    const p = project(
+      [
+        node('b', { serviceId: 'aws.s3' }),
+        node('fn', { serviceId: 'aws.lambda' }),
+        node('q', { serviceId: 'aws.sqs' }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+      ],
+      [edge('toFn', 'b', 'fn'), edge('toQ', 'b', 'q'), edge('origin', 'cdn', 'b')],
+    );
+    const keys = (id: string) =>
+      settingsView(p, { kind: 'edge', id }, awsCatalog)!.rows.map((r) => r.key);
+    expect(keys('toFn')).toContain('eventNotification');
+    expect(keys('toQ')).toContain('eventNotification');
+    expect(keys('origin')).not.toContain('eventNotification');
+  });
+
+  it('presigned upload is offered from a client or a backend, not from CloudFront', () => {
+    const p = project(
+      [
+        node('user', { external: { kind: 'user', name: 'Browser' } }),
+        node('b', { serviceId: 'aws.s3' }),
+        node('fn', { serviceId: 'aws.lambda' }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+      ],
+      [edge('client', 'user', 'b'), edge('backend', 'fn', 'b'), edge('origin', 'cdn', 'b')],
+    );
+    const keys = (id: string) =>
+      settingsView(p, { kind: 'edge', id }, awsCatalog)!.rows.map((r) => r.key);
+    expect(keys('client')).toContain('presignedUrl');
+    expect(keys('backend')).toContain('presignedUrl');
+    expect(keys('origin')).not.toContain('presignedUrl');
+    expect(keys('origin')).toEqual(['originAccess']);
+  });
+
+  it('a stored setting the catalog no longer offers there is kept as not in catalog', () => {
+    const p = project(
+      [
+        node('user', { external: { kind: 'user', name: 'Browser' } }),
+        node('cdn', { serviceId: 'aws.cloudfront' }),
+      ],
+      [edge('in', 'user', 'cdn', { configuration: { originAccess: 'OAC' } })],
+    );
+    expect(settingsView(p, { kind: 'edge', id: 'in' }, awsCatalog)!.other).toEqual([
+      { key: 'originAccess', value: 'OAC' },
+    ]);
+  });
+
   it('external and unresolved nodes have no rows', () => {
     const p = project([
       node('u', { external: { kind: 'user', name: 'User' }, configuration: { tier: 'gold' } }),

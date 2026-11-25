@@ -7,6 +7,8 @@ export const THEME_KEY = 'cloudarchitect.theme';
 export const PANEL_DEFAULT = 380;
 export const PANEL_STEP = 16;
 export const PANEL_MIN = 320;
+/** The toolbar-aligned default never exceeds this; a width the user drags to may. */
+export const PANEL_DEFAULT_MAX = 420;
 
 export function readPref<T>(key: string, parse: (raw: string) => T | undefined, fallback: T): T {
   try {
@@ -40,10 +42,23 @@ export function clampPanelWidth(width: number, windowWidth: number): number {
   return Math.max(PANEL_MIN, Math.min(width, windowWidth * 0.5));
 }
 
-export function readPanelWidth(): number {
-  return readPref(
+/** The width the user dragged to, or undefined if they never chose one. */
+export function readSavedPanelWidth(): number | undefined {
+  return readPref<number | undefined>(
     PANEL_WIDTH_KEY,
-    (raw) => (Number.isFinite(Number(raw)) ? Number(raw) : undefined),
-    PANEL_DEFAULT,
+    (raw) => (raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : undefined),
+    undefined,
   );
+}
+
+/** Default column width: from the toolbar's right-hand group to the window edge, at most 420 px, clamped. */
+export function toolbarPanelWidth(windowWidth: number, toolbarLeft: number): number {
+  return clampPanelWidth(Math.min(windowWidth - toolbarLeft, PANEL_DEFAULT_MAX), windowWidth);
+}
+
+export const SIDE_PANEL_KEY = 'cloudarchitect.sidePanel';
+
+/** The side panel is shown unless the user hid it ('hidden'). */
+export function readSidePanelOpen(): boolean {
+  return readPref(SIDE_PANEL_KEY, (raw) => (raw === 'hidden' ? false : undefined), true);
 }

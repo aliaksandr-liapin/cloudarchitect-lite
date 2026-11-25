@@ -1,6 +1,6 @@
 import { awsCatalog } from '@cloudarchitect/catalog';
 import { EdgeKind, type ArchEdge, type PatchOp, type Project } from '@cloudarchitect/domain';
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { deletionOps, toggleRequirement } from './edit';
 import { setSettingOps, settingsView } from './settings';
 
@@ -38,24 +38,12 @@ export function Details(props: Props) {
 
 /** Catalog settings of the selected component or connector (settings editor, 0.4). */
 function Settings({ project, selection, disabled, onEdit }: Props) {
-  const [adding, setAdding] = useState<string | null>(null);
   const view = settingsView(project, selection, awsCatalog);
   if (!view) return null;
   const set = (key: string, value: string) => {
     const ops = setSettingOps(project, selection, key, value);
     if (ops.length) onEdit(ops);
   };
-  const remove = (key: string, name: string) => (
-    <button
-      type="button"
-      className="btn"
-      aria-label={`Remove ${name}`}
-      disabled={disabled}
-      onClick={() => set(key, '')}
-    >
-      ✕
-    </button>
-  );
   return (
     <>
       <dt>Settings</dt>
@@ -63,68 +51,85 @@ function Settings({ project, selection, disabled, onEdit }: Props) {
         {view.rows.length === 0 && view.other.length === 0 && (
           <div>No settings for this {selection.kind === 'node' ? 'component' : 'connector'}</div>
         )}
-        {view.rows.map(({ key, feature, value }) => {
-          const name = feature.displayName;
-          const editing = value !== undefined || adding === key;
-          return (
-            <div key={key} className="setting">
-              <span title={feature.summary}>{name}</span>{' '}
-              <a href={feature.documentationUrl} target="_blank" rel="noreferrer">
-                docs
-              </a>
-              {!editing && (
-                <button
-                  type="button"
-                  className="btn"
-                  aria-label={`Add ${name}`}
-                  disabled={disabled}
-                  onClick={() => (feature.values ? set(key, feature.values[0]!) : setAdding(key))}
-                >
-                  Add
-                </button>
-              )}
-              {editing && feature.values && (
-                <select
-                  className="input"
-                  aria-label={name}
-                  value={value ?? ''}
-                  disabled={disabled}
-                  onChange={(e) => set(key, e.target.value)}
-                >
-                  {value !== undefined && !feature.values.includes(value) && (
-                    <option value={value}>{`${value} (not a catalog value)`}</option>
+        {view.rows.length > 0 && (
+          <div className="settings">
+            {view.rows.map(({ key, feature, value }) => {
+              const name = feature.displayName;
+              const values = feature.values;
+              // One allowed value: the setting is on or off. A stored value outside it falls back to a select.
+              const isSwitch = values?.length === 1 && (value === undefined || value === values[0]);
+              return (
+                <div key={key} className="setting">
+                  <span className="setting-name" title={feature.summary}>
+                    {name}{' '}
+                    <a
+                      href={feature.documentationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${name} documentation`}
+                      title="AWS documentation"
+                    >
+                      ↗
+                    </a>
+                  </span>
+                  {isSwitch ? (
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className="switch"
+                      aria-label={name}
+                      checked={value !== undefined}
+                      disabled={disabled}
+                      onChange={(e) => set(key, e.target.checked ? values[0]! : '')}
+                    />
+                  ) : values ? (
+                    <select
+                      className="input"
+                      aria-label={name}
+                      value={value ?? ''}
+                      disabled={disabled}
+                      onChange={(e) => set(key, e.target.value)}
+                    >
+                      <option value="">Not set</option>
+                      {value !== undefined && !values.includes(value) && (
+                        <option value={value}>{`${value} (not a catalog value)`}</option>
+                      )}
+                      {values.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Field
+                      label={name}
+                      value={value ?? ''}
+                      placeholder={exampleValue(feature.summary) ?? 'Not set'}
+                      max={200}
+                      disabled={disabled}
+                      commit={(v) => set(key, v)}
+                    />
                   )}
-                  {feature.values.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {editing && !feature.values && (
-                <Field
-                  label={name}
-                  value={value ?? ''}
-                  placeholder={exampleValue(feature.summary)}
-                  autoFocus={adding === key}
-                  max={200}
-                  disabled={disabled}
-                  commit={(v) => {
-                    if (adding === key) setAdding(null);
-                    set(key, v);
-                  }}
-                />
-              )}
-              {value !== undefined && remove(key, name)}
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {view.other.length > 0 && (
           <>
             <div className="small">Not in catalog</div>
             {view.other.map(({ key, value }) => (
               <div key={`other:${key}`} className="setting">
-                <code>{`${key} = ${value}`}</code> {remove(key, key)}
+                <code>{`${key} = ${value}`}</code>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-label={`Remove ${key}`}
+                  disabled={disabled}
+                  onClick={() => set(key, '')}
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </>
@@ -176,7 +181,7 @@ function describe({ project, selection, disabled, onEdit }: Props) {
   const del = (what: 'component' | 'connector' | 'container', nodes: string[], edges: string[]) => (
     <button
       type="button"
-      className="btn"
+      className="btn btn-danger"
       aria-label={`Delete ${what}`}
       disabled={disabled}
       onClick={() => onEdit(deletionOps(project, { nodes, edges }))}

@@ -31,11 +31,23 @@ function target(project: Project, selection: Selection) {
   }
   const edge = project.edges.find((e) => e.id === selection.id);
   if (!edge) return undefined;
-  const serviceOf = (id: string) => project.nodes.find((n) => n.id === id)?.serviceId;
+  // An outside actor has no service; connector features name it "external" (peerServiceIds).
+  const serviceOf = (id: string) => {
+    const node = project.nodes.find((n) => n.id === id);
+    return node?.external ? 'external' : node?.serviceId;
+  };
   return {
     configuration: edge.configuration,
     services: [serviceOf(edge.source), serviceOf(edge.target)],
   };
+}
+
+/** A connector feature with peer services needs one of them at the end opposite its own service. */
+function peerFits(feature: ServiceFeature, services: (string | undefined)[]): boolean {
+  if (!feature.peerServiceIds) return true;
+  const own = services.indexOf(feature.serviceId);
+  const other = services[own === 0 ? 1 : 0];
+  return other !== undefined && feature.peerServiceIds.includes(other);
 }
 
 /** Rows for the selected component or connector; undefined for containers and unknown ids. */
@@ -50,6 +62,7 @@ export function settingsView(
   const rows: SettingRow[] = [];
   for (const feature of catalog.features) {
     if (feature.appliesTo !== selection.kind || !t.services.includes(feature.serviceId)) continue;
+    if (!peerFits(feature, t.services)) continue;
     if (rows.some((r) => r.key === feature.configKey)) continue;
     const v = config[feature.configKey];
     rows.push({ key: feature.configKey, feature, value: v === undefined ? undefined : String(v) });

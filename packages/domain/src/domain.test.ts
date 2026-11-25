@@ -818,6 +818,26 @@ describe('toggle rules VR-019…VR-025', () => {
     expect(found(ok, 'VR-025')).toHaveLength(0);
   });
 
+  it('VR-026 flags a component with no connections, except baseline services', () => {
+    const p = base({
+      nodes: [
+        ext('u'),
+        node('api', 'aws.apigateway'),
+        node('s3', 'aws.s3'),
+        node('cw', 'aws.cloudwatch'),
+      ],
+      edges: [edge('u', 'api')],
+    });
+    const f = found(p, 'VR-026');
+    expect(f.map((x) => x.nodeIds)).toEqual([['s3']]);
+    expect(f[0]!.severity).toBe('warning');
+    expect(f[0]!.explanation).toBe('s3 is not connected to anything.');
+  });
+
+  it('VR-026 stays quiet while the design has a single component', () => {
+    expect(found(base({ nodes: [node('s3', 'aws.s3')], edges: [] }), 'VR-026')).toHaveLength(0);
+  });
+
   it('never fires without project.generation', () => {
     const p = base({
       nodes: [node('vm', 'aws.ec2'), node('s3', 'aws.s3'), node('api', 'aws.apigateway'), ext('u')],

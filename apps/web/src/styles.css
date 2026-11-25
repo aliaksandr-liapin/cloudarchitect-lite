@@ -10,6 +10,11 @@
   --info: #3b5b8c;
   --ctr: rgba(35, 87, 217, 0.04);
   --ok: #1a7f37;
+  --control-line: #c9cfd8;
+  --hover: #f2f4f7;
+  --danger: #c4320a;
+  --add: #1a7f37;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   color-scheme: light;
   font-family:
     system-ui,
@@ -32,6 +37,11 @@
   --info: #9ab8e6;
   --ctr: rgba(122, 162, 255, 0.06);
   --ok: #56d364;
+  --control-line: #3d4756;
+  --hover: #232b37;
+  --danger: #ff8a80;
+  --add: #56d364;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 * {
@@ -57,14 +67,85 @@ body {
 .spacer {
   flex: 1;
 }
+.bar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 button {
   font: inherit;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--control-line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+/* Joined buttons: the window toggles, and Undo/Redo. */
+.seg {
+  display: inline-flex;
+}
+.seg > button {
+  border-radius: 0;
+}
+.seg > button + button {
+  margin-left: -1px;
+}
+.seg > button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.seg > button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.seg > button[aria-pressed='true'],
+.seg > button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  padding: 5px 9px;
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+/* React Flow's zoom controls keep their own compact look. */
+.react-flow__controls-button {
+  min-height: 0;
+  box-shadow: none;
+  border-radius: 0;
+  line-height: 1;
+}
+/* Delete in red, outlined, filled on hover; the Add window's Add buttons turn green on hover. */
+button.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.add-row button:not(:disabled):hover {
+  background: var(--add);
+  border-color: var(--add);
+  color: var(--panel);
+}
+button.btn-danger:not(:disabled):hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--panel);
+}
+/* Low specificity on purpose: coloured buttons (primary, Add, Delete, pressed, markers) keep theirs. */
+button:where(:not(:disabled)):hover {
+  background: var(--hover);
 }
 button:focus-visible,
 a:focus-visible {
@@ -77,6 +158,11 @@ a {
 button.link {
   border: none;
   padding: 0;
+  min-height: 0;
+  box-shadow: none;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   background: none;
   color: var(--accent);
 }
@@ -89,11 +175,16 @@ button.link {
 .canvas {
   min-height: 0;
 }
+/* Side panel hidden from the toolbar: the canvas takes the whole width. */
+.main.no-side {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
 .side {
   position: relative;
   min-height: 0;
   font-size: 16px;
-  border-left: 1px solid var(--line);
+  border-left: 2px solid var(--control-line);
   background: var(--panel);
 }
 .side-scroll {
@@ -103,7 +194,10 @@ button.link {
 }
 .side h2 {
   font-size: 1.1em;
-  margin: 12px 0 8px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
 }
 /* Generate and the design options stay in view while the rest of the panel scrolls. */
 .side .generate {
@@ -125,8 +219,64 @@ button.link {
 .side .chip,
 .side .findings,
 .side .detail,
-.side .versions {
+.side .versions,
+.tool-window .versions,
+.tool-window .models {
   font-size: 14px;
+}
+/* Tool windows: float over the canvas's left edge, stacked, clear of the zoom controls. */
+.tool-toggles {
+  margin-left: 8px;
+}
+.tool-windows {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  bottom: 132px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+  pointer-events: none;
+}
+.tool-window {
+  pointer-events: auto;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+.tool-window > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ctr);
+  border-radius: 8px 8px 0 0;
+}
+.tool-window > header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tool-window-close {
+  min-height: 28px;
+  padding: 0 9px;
+  box-shadow: none;
+  line-height: 1;
+}
+.tool-window-body {
+  overflow: auto;
+  min-height: 0;
+  padding: 8px 12px 12px;
 }
 .side .small {
   font-size: 13px;
@@ -149,19 +299,6 @@ button.link {
 .resize-handle:focus-visible {
   outline: 2px solid var(--accent);
   opacity: 1;
-}
-.collapsible {
-  margin: 12px 0;
-}
-.collapsible > summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 1.1em;
-  padding: 4px 0;
-}
-.collapsible > summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 .muted {
   color: var(--muted);
@@ -212,15 +349,71 @@ button.link {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.detail .settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 45%);
+  gap: 6px 10px;
+  align-items: center;
+}
+/* Each row's name and control sit in the two grid columns. */
+.detail .settings .setting {
+  display: contents;
+}
+.detail .setting-name {
+  overflow-wrap: anywhere;
+}
+.detail .setting-name a {
+  text-decoration: none;
+  font-size: 12px;
+}
+.detail .settings .input {
+  width: 100%;
+  min-width: 0;
+}
 .detail .setting {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
   margin-bottom: 6px;
 }
-.detail .setting .input {
-  flex: 1 1 140px;
+/* An on/off setting: a switch drawn on a checkbox (role="switch") at the start of its column. */
+.switch {
+  appearance: none;
+  justify-self: start;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--control-line);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s;
+}
+.switch:checked {
+  background: var(--accent);
+}
+.switch:checked::after {
+  transform: translateX(14px);
+}
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .svc {
   display: flex;
@@ -356,6 +549,13 @@ button.link {
   /* Stacked under the canvas the panel is full width: no handle, stored width ignored. */
   .resize-handle {
     display: none;
+  }
+  .tool-windows {
+    right: 12px;
+    width: auto;
+  }
+  .bar {
+    flex-wrap: wrap;
   }
 }
 
@@ -555,6 +755,9 @@ table.models caption {
   margin: 6px 0;
 }
 .chip {
+  min-height: 0;
+  box-shadow: none;
+  font-weight: 400;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 13px;
@@ -565,6 +768,53 @@ table.models caption {
   background: var(--ctr);
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+.bar .seg > button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  box-shadow: none;
+}
+/* Finding markers on the canvas: a small badge on a component's top-right corner. */
+.mark {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--panel);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+button.mark-error,
+button.mark-error:hover {
+  background: var(--error);
+}
+button.mark-warning,
+button.mark-warning:hover {
+  background: #d97706;
+}
+button.mark-info,
+button.mark-info:hover {
+  background: var(--info);
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+button.mark:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+.findings li.is-focus {
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--ctr);
+  outline: 1px solid var(--accent);
 }
 .check {
   display: flex;
@@ -732,12 +982,19 @@ dialog.confirm::backdrop {
 }
 .menu summary {
   list-style: none;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  padding: 5px 12px;
+  border: 1px solid var(--control-line);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+}
+.menu summary:hover {
+  background: var(--hover);
 }
 .menu summary::-webkit-details-marker {
   display: none;
@@ -845,6 +1102,8 @@ dialog.confirm::backdrop {
   white-space: nowrap;
 }
 .add-row button {
-  padding: 2px 8px;
+  min-height: 24px;
+  padding: 1px 10px;
   font-size: 12px;
+  line-height: 20px;
 }

@@ -660,7 +660,31 @@ const RULES: Rule[] = [
       return [...unprotected, ...unencrypted];
     },
   },
+  {
+    // Editor-only for now: not sent to the AI repair turn (see EDITOR_ONLY_RULES).
+    id: 'VR-026',
+    severity: 'warning',
+    check: (ctx) => {
+      if (ctx.project.nodes.length < 2) return [];
+      const linked = new Set(ctx.project.edges.flatMap((e) => [e.source, e.target]));
+      return ctx.project.nodes
+        .filter((n) => !linked.has(n.id) && !BASELINE.includes(svc(n) ?? ''))
+        .map((n) => ({
+          ruleId: 'VR-026',
+          severity: 'warning' as const,
+          nodeIds: [n.id],
+          explanation: `${n.label} is not connected to anything.`,
+          remediation: 'Connect it to the components it works with, or delete it.',
+        }));
+    },
+  },
 ];
+
+/**
+ * Rules the editor shows but the AI repair turn does not get: sending them would change
+ * generation, which is measured per model. Enable one only after an eval run.
+ */
+export const EDITOR_ONLY_RULES: readonly string[] = ['VR-026'];
 
 /** Structural and catalog checks (TECHNICAL_ARCHITECTURE §10 layers 1–2). */
 function structural(ctx: Ctx): Draft[] {
