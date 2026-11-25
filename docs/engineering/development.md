@@ -13,15 +13,18 @@ Containers, built from source: `docker compose -f compose.yaml -f compose.build.
 
 ## Commands
 
-| Command            | What it does                                                                                 |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| `pnpm run ci`      | Lint, format check, typecheck, tests, build — same as CI                                     |
-| `pnpm test`        | Unit tests in all packages (Vitest)                                                          |
-| `pnpm eval`        | Score `eval/candidates` against `eval/scenarios`                                             |
-| `pnpm format`      | Prettier write                                                                               |
-| `pnpm screenshots` | Rebuild the web app and regenerate `docs/images` (needs Google Chrome; API calls are mocked) |
+| Command                                    | What it does                                                                                                                                             |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run ci`                              | Lint, format check, typecheck, tests, build — same as CI                                                                                                 |
+| `pnpm test`                                | Unit tests in all packages (Vitest)                                                                                                                      |
+| `pnpm eval`                                | Score `eval/candidates` against `eval/scenarios`                                                                                                         |
+| `pnpm format`                              | Prettier write                                                                                                                                           |
+| `pnpm screenshots`                         | Rebuild the web app and regenerate `docs/images/social-preview.png`; `--gif` records the README's `demo.gif` (needs Google Chrome; API calls are mocked) |
+| `pnpm --filter @cloudarchitect/e2e manual` | Regenerate the user manual's screenshots in `docs/manual/images` (Docker stack with the fake AI, like the browser test)                                  |
 
 Regenerate the screenshots whenever a change alters what they show, and commit the images with that change.
+
+**User manual.** When a change adds or changes something a user sees or does, update the matching page in [docs/manual](../manual/README.md) in the same pull request, and add a shot to `e2e/tests/manual.spec.ts` if a new screen needs a picture. Skip it when nothing a user would notice changed (refactors, dependency updates, internal tooling). The pull request template asks about it.
 
 ## TypeScript versions
 
