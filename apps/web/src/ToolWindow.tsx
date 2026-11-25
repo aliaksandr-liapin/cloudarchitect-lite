@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { REPO_URL } from './demo';
 import { TOOL_WINDOWS, type ToolWindowId } from './toolWindows';
 
 export const WINDOW_TITLES: Record<ToolWindowId, string> = {
@@ -98,5 +99,23 @@ export function PanelToggle({ open, onToggle }: { open: boolean; onToggle(): voi
         )}
       </svg>
     </button>
+  );
+}
+
+export const MANUAL_URL = `${REPO_URL}/blob/main/docs/manual/README.md`;
+
+/** Toolbar link to the illustrated user manual on GitHub. */
+export function HelpLink() {
+  return (
+    <a
+      className="button icon-btn"
+      href={MANUAL_URL}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="User manual"
+      title="User manual"
+    >
+      ?
+    </a>
   );
 }

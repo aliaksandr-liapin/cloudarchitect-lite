@@ -1,7 +1,7 @@
 import { renderToStaticMarkup as render } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AddPanel } from './AddPanel';
-import { PanelToggle, ToolToggles, ToolWindow } from './ToolWindow';
+import { HelpLink, PanelToggle, ToolToggles, ToolWindow } from './ToolWindow';
 import { VersionsPanel } from './VersionsPanel';
 
 describe('tool windows UI', () => {
@@ -26,6 +26,14 @@ describe('tool windows UI', () => {
     expect(render(<PanelToggle open={false} onToggle={() => {}} />)).toContain(
       'title="Show side panel"',
     );
+  });
+  it('HelpLink opens the user manual in a new tab', () => {
+    const html = render(<HelpLink />);
+    expect(html).toContain(
+      'href="https://github.com/aliaksandr-liapin/cloudarchitect-lite/blob/main/docs/manual/README.md"',
+    );
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('aria-label="User manual"');
   });
   it('ToolWindow is a named region with a title and a close button', () => {
     const html = render(
