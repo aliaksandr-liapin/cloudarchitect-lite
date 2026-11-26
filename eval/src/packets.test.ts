@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Scenario } from './harness.js';
 import {
   acceptSaved,
+  parseReviewers,
   aggregate,
   missingCalls,
   normalizeReviewOutput,
@@ -557,5 +558,25 @@ describe('buildPackets with arm pairs', () => {
     }
     expect(packets.length).toBeGreaterThan(0);
     for (const p of packets) expect(p.markdown).not.toMatch(/~[WI]/);
+  });
+});
+
+describe('parseReviewers', () => {
+  const known = ['anthropic', 'openai', 'google'];
+
+  it('uses every reviewer when none are named', () => {
+    expect(parseReviewers(undefined, known)).toEqual(known);
+  });
+
+  it('calls each named reviewer once, in the order first named', () => {
+    // Issue #33: a duplicate paid twice and counted twice in the median.
+    expect(parseReviewers('anthropic,anthropic', known)).toEqual(['anthropic']);
+    expect(parseReviewers('google,anthropic,google', known)).toEqual(['google', 'anthropic']);
+  });
+
+  it('rejects an unknown reviewer', () => {
+    expect(() => parseReviewers('anthropic,mistral', known)).toThrow(
+      'Unknown reviewer mistral (anthropic, openai, google)',
+    );
   });
 });
