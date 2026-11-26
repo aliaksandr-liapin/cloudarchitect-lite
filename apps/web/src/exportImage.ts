@@ -61,13 +61,22 @@ export async function exportImage(
     filter: keep,
     style: { width: `${width}px`, height: `${height}px`, transform },
   };
+  // The image is drawn at 100% zoom, so finding markers get their normal size, not the enlargement
+  // MarkScale applies on a zoomed-out screen (html-to-image copies computed styles from the page).
+  const markScale = viewport.style.getPropertyValue('--mark-scale');
+  viewport.style.setProperty('--mark-scale', '1');
   let blob: Blob;
-  if (format === 'png') {
-    const png = await toBlob(viewport, options);
-    if (!png) throw new Error('the browser could not encode the PNG');
-    blob = png;
-  } else {
-    blob = svgBlob(await toSvg(viewport, options));
+  try {
+    if (format === 'png') {
+      const png = await toBlob(viewport, options);
+      if (!png) throw new Error('the browser could not encode the PNG');
+      blob = png;
+    } else {
+      blob = svgBlob(await toSvg(viewport, options));
+    }
+  } finally {
+    if (markScale) viewport.style.setProperty('--mark-scale', markScale);
+    else viewport.style.removeProperty('--mark-scale');
   }
   downloadBlob(blob, `${fileBaseName(opts.fileName)}.${format}`);
 }
