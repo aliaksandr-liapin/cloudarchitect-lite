@@ -35,6 +35,9 @@ export function ModelComparison({
   disabledLabel?: string;
 }) {
   const b = (o: ModelOption) => o.benchmark;
+  const reviewed = options.flatMap((o) =>
+    o.benchmark?.designsReviewed ? [`${o.label}: ${o.benchmark.designsReviewed}`] : [],
+  );
   const rows: [string, (o: ModelOption) => string][] = [
     ['Blind review score (0–3)', (o) => orNot(b(o)?.blindMedianScore, (x) => x.toFixed(2))],
     ['Automated checks passed', (o) => orNot(b(o)?.passRate, pct)],
@@ -91,10 +94,10 @@ export function ModelComparison({
       </tbody>
       <caption className="muted small">
         Measured {options[0]?.benchmark?.measuredAt} in live eval runs (
-        {options.map((o) => `${o.label}: ${o.benchmark?.runs ?? 0}`).join(', ')}); blind rubric
-        review (PRD §14) of 12 designs per economical model and 9 per best-quality model by three AI
-        reviewers, one from each provider.{' '}
-        {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
+        {options.map((o) => `${o.label}: ${o.benchmark?.runs ?? 0}`).join(', ')})
+        {reviewed.length > 0 &&
+          `; blind rubric review (PRD §14) by three AI reviewers, one from each provider (designs reviewed: ${reviewed.join(', ')})`}
+        . {options.map((o) => `${o.label}: ${o.summary}`).join(' ')}
       </caption>
     </table>
   );

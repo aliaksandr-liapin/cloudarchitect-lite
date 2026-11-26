@@ -102,3 +102,26 @@ describe('usd', () => {
     expect(usd(0.0071)).toBe('$0.0071');
   });
 });
+
+describe('ModelComparison caption', () => {
+  const caption = (options: Parameters<typeof ModelComparison>[0]['options']) =>
+    renderToStaticMarkup(
+      <ModelComparison options={options} enabled={['haiku', 'sonnet']} onSelect={vi.fn()} />,
+    ).match(/<caption[^>]*>(.*?)<\/caption>/s)![1]!;
+
+  it('names how many designs each model had reviewed, from the benchmark data', () => {
+    const text = caption([withBenchmark('haiku'), withBenchmark('sonnet')]);
+    expect(text).toContain('designs reviewed: Claude Haiku 5.5: 12, Claude Sonnet 5.5: 9');
+    expect(text).not.toContain('per economical model');
+  });
+
+  it('follows the data when a benchmark reviews a different number', () => {
+    const haiku = withBenchmark('haiku');
+    const text = caption([{ ...haiku, benchmark: { ...haiku.benchmark!, designsReviewed: 15 } }]);
+    expect(text).toContain('designs reviewed: Claude Haiku 5.5: 15');
+  });
+
+  it('leaves the review out when no listed model has reviewed designs', () => {
+    expect(caption([lunaMeasured])).not.toContain('designs reviewed');
+  });
+});
