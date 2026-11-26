@@ -218,7 +218,9 @@ export class SetupService {
 
     const keys: Settings = Object.fromEntries(newKeys.map(([p, key]) => [KEY_SETTING[p], key]));
     const kept: Settings = { ...this.settings };
-    for (const p of input.removeKeys ?? []) delete kept[KEY_SETTING[p]];
+    // Removing a key the environment sets is ignored; its saved copy stays for when the env var goes.
+    for (const p of input.removeKeys ?? [])
+      if (before[p] !== 'environment') delete kept[KEY_SETTING[p]];
     const after = this.keySources({ ...kept, ...keys });
     if (PROVIDERS.every((p) => after[p] === 'none')) throw new SetupError('invalid_api_key', 400);
     if (input.models.some((m) => after[modelOption(m).provider] === 'none'))
