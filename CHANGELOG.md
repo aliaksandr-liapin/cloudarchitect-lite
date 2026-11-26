@@ -17,6 +17,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Changed
 
+- Model comparison: the caption names how many designs the blind review covered for each model, from the benchmark data (`designsReviewed`) instead of fixed text, so it stays right after the next benchmark ([#32](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/32)).
 - Editor: upgraded the diagram library to React Flow (@xyflow/react) 13. Nothing should look or behave differently: the fit-to-view margin is kept (5%), the canvas still follows the app's own light/dark switch rather than the system setting, and the zoom controls keep their look.
 - Editor: Add, Findings, Versions and AI model are now windows over the canvas, opened from the toolbar and closed by default, so the canvas can show the diagram alone. The side column defaults to the toolbar's width and its headings and buttons are easier to see.
 - Editor: a cleaner toolbar and buttons. The window toggles form one group, Undo and Redo are icon buttons, all buttons share one height and outline, and Delete is red.
