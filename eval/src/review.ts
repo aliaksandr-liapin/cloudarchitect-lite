@@ -54,6 +54,7 @@ import {
   ReviewOutput,
   acceptSaved,
   missingCalls,
+  parseReviewers,
   normalizeReviewOutput,
   packetMismatches,
   type DesignRun,
@@ -234,13 +235,10 @@ for (const r of REVIEWERS)
     panel.push({ reviewer: r.provider, packetId: p.id, output });
     have.add(`${r.provider}/${p.id}`);
   }
-const selected = args.reviewers
-  ? args.reviewers.split(',').map((name) => {
-      const r = REVIEWERS.find((x) => x.provider === name);
-      if (!r) throw new Error(`Unknown reviewer ${name} (anthropic, openai, google)`);
-      return r;
-    })
-  : REVIEWERS;
+const selected = parseReviewers(
+  args.reviewers,
+  REVIEWERS.map((r) => r.provider),
+).map((name) => REVIEWERS.find((r) => r.provider === name)!);
 const todo = missingCalls(
   selected.map((r) => r.provider),
   packets.map((p) => p.id),
