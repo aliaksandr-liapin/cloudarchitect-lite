@@ -11,7 +11,7 @@
 
 _Replay of a real recorded generation with Claude Haiku, shortened: a real generation takes about 50 seconds._
 
-**[Try the demo](https://aliaksandr-liapin.github.io/cloudarchitect-lite/)** (a clickable editor in your browser, no install) · **[Install](#install)** (one command, needs Docker) · **[User manual](docs/manual/README.md)** (illustrated, every feature)
+**[Try the demo](https://aliaksandr-liapin.github.io/cloudarchitect-lite/)** (a clickable editor in your browser, no install) · **[Install](#install)** (one command, needs Docker) · **[User manual](docs/manual/README.md)** (illustrated, every feature) · **[Examples](docs/examples/README.md)** (four generated designs, with their findings)
 
 ## Install
 
@@ -73,6 +73,7 @@ Small samples (9 to 12 reviewed designs per model), AI reviewers, prices checked
 ## Documentation
 
 - **[User manual](docs/manual/README.md)**: everything the app can do, step by step, with screenshots
+- **[Example designs](docs/examples/README.md)**: four designs generated from plain-English descriptions, with the questions asked, the requirements and the findings
 - Product: [overview](docs/product/README.md) · [PRD](docs/product/prd.md) · [technical architecture](docs/product/technical-architecture.md) · [catalog](docs/product/cloud-provider-catalog.md) · [roadmap](docs/product/roadmap.md)
 - Decisions: [docs/adr](docs/adr/)
 - Security: [SECURITY.md](SECURITY.md) · [threat model](docs/security/threat-model.md)

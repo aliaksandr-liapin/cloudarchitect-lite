@@ -1,0 +1,726 @@
+{
+  "schemaVersion": "1.4.0",
+  "projectId": "generated",
+  "name": "Serverless Global Blog",
+  "revision": 0,
+  "providerContext": ["aws"],
+  "catalogSnapshot": {
+    "aws": "aws-catalog-2026.10.0"
+  },
+  "iconPackSnapshot": {},
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Serverless global blog",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R2",
+      "text": "Traffic is read-heavy with infrequent writes",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R3",
+      "text": "Serve a static site plus a REST API",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R4",
+      "text": "Use caching to reduce read latency and load",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R5",
+      "text": "Send a welcome email to new subscribers",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R6",
+      "text": "Authors can upload photos",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R7",
+      "text": "Generate thumbnails for uploaded photos",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R8",
+      "text": "Serve content globally with low latency",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R9",
+      "text": "Keep cost low",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R10",
+      "text": "Scale automatically with traffic without managing servers",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R11",
+      "text": "Serve cached reads to global readers with minimal origin load",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R12",
+      "text": "Process photo uploads asynchronously so authors are not blocked on thumbnail generation",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R13",
+      "text": "Protect write endpoints and author uploads from unauthenticated access",
+      "type": "constraint",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "C-auth-methods",
+      "text": "How should authors sign in to write posts and upload photos? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-user-scale",
+      "text": "What read traffic and author count should the design handle at peak? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-notifications",
+      "text": "What should the welcome email include and how should subscribers be confirmed? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "I1",
+      "text": "Store blog posts and subscriber records in a serverless database",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I2",
+      "text": "Failed asynchronous processing (thumbnails, emails) must be retained and alarmed on",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I3",
+      "text": "Monitor the system with logs, metrics and alarms",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I4",
+      "text": "Data stores are encrypted at rest and DynamoDB has point-in-time recovery",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    }
+  ],
+  "containers": [
+    {
+      "id": "cloud",
+      "kind": "aws-cloud",
+      "label": "AWS Cloud"
+    },
+    {
+      "id": "region",
+      "kind": "region",
+      "parentId": "cloud",
+      "label": "Primary Region"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "readers",
+      "provider": "aws",
+      "label": "Readers",
+      "purpose": "Browse the blog and subscribe",
+      "rationale": "Anonymous global audience",
+      "requirementIds": ["R1", "R8"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "user",
+        "name": "Readers and subscribers (browser)"
+      }
+    },
+    {
+      "id": "authors",
+      "provider": "aws",
+      "label": "Authors",
+      "purpose": "Sign in, write posts and upload photos",
+      "rationale": "Limited set of authenticated writers",
+      "requirementIds": ["R6", "R13"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "user",
+        "name": "Authors (browser)"
+      }
+    },
+    {
+      "id": "cf",
+      "provider": "aws",
+      "label": "CloudFront distribution",
+      "purpose": "Serve static site, photos and cached API reads globally",
+      "rationale": "Edge caching gives low latency and minimal origin load at low cost",
+      "requirementIds": ["R3", "R4", "R8", "R9", "R11"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudfront"
+    },
+    {
+      "id": "site",
+      "provider": "aws",
+      "label": "Static site and media bucket",
+      "purpose": "Host site assets, original photos and thumbnails as private objects",
+      "rationale": "Cheap durable storage served via CloudFront OAC",
+      "requirementIds": ["R3", "R6", "R10", "I4"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "versioning"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.s3"
+    },
+    {
+      "id": "thumbs",
+      "provider": "aws",
+      "label": "Thumbnails bucket",
+      "purpose": "Store generated thumbnails",
+      "rationale": "Separate bucket prevents recursive triggers",
+      "requirementIds": ["R7", "I4"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "versioning"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.s3"
+    },
+    {
+      "id": "uploads",
+      "provider": "aws",
+      "label": "Photo uploads bucket",
+      "purpose": "Receive original photos from authors",
+      "rationale": "Direct presigned uploads keep the API out of the data path",
+      "requirementIds": ["R6", "R12", "I4"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "versioning"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.s3"
+    },
+    {
+      "id": "api",
+      "provider": "aws",
+      "label": "Blog REST API",
+      "purpose": "Read posts, create posts, subscribe, request upload URLs",
+      "rationale": "REST API supports caching and Cognito authorizer",
+      "requirementIds": ["R3", "R4", "R10", "R13"],
+      "configuration": {
+        "apiType": "REST",
+        "authorizer": "Cognito user pool on write and upload routes"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.apigateway"
+    },
+    {
+      "id": "cognito",
+      "provider": "aws",
+      "label": "Author user pool",
+      "purpose": "Authenticate authors",
+      "rationale": "Managed sign-in with no servers",
+      "requirementIds": ["R13", "C-auth-methods"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cognito"
+    },
+    {
+      "id": "apifn",
+      "provider": "aws",
+      "label": "API handler",
+      "purpose": "Handle posts, subscriptions and presigned URL generation",
+      "rationale": "Pay-per-use compute",
+      "requirementIds": ["R3", "R5", "R6", "R10", "I1"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "ddb",
+      "provider": "aws",
+      "label": "Blog table",
+      "purpose": "Store posts",
+      "rationale": "Serverless, low-latency reads",
+      "requirementIds": ["R2", "R10", "I1", "I4"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "PITR"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.dynamodb"
+    },
+    {
+      "id": "subs",
+      "provider": "aws",
+      "label": "Subscribers table",
+      "purpose": "Store subscribers with streams enabled",
+      "rationale": "Stream triggers welcome email from committed writes",
+      "requirementIds": ["R5", "I1", "I4"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "PITR"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.dynamodb"
+    },
+    {
+      "id": "emailfn",
+      "provider": "aws",
+      "label": "Welcome email function",
+      "purpose": "Send welcome email for new subscribers",
+      "rationale": "Event-driven and idempotent",
+      "requirementIds": ["R5", "C-notifications"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "ses",
+      "provider": "aws",
+      "label": "SES",
+      "purpose": "Send welcome emails",
+      "rationale": "Low-cost managed email",
+      "requirementIds": ["R5", "C-notifications"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.ses"
+    },
+    {
+      "id": "q",
+      "provider": "aws",
+      "label": "Thumbnail queue",
+      "purpose": "Buffer upload events",
+      "rationale": "Asynchronous processing with retries",
+      "requirementIds": ["R12", "I2"],
+      "configuration": {
+        "encryption": "KMS"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "dlq",
+      "provider": "aws",
+      "label": "Thumbnail DLQ",
+      "purpose": "Hold failed upload messages",
+      "rationale": "Retain failures for inspection",
+      "requirementIds": ["I2"],
+      "configuration": {
+        "encryption": "KMS"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "thumbfn",
+      "provider": "aws",
+      "label": "Thumbnail function",
+      "purpose": "Create thumbnails",
+      "rationale": "Serverless image processing, partial batch responses",
+      "requirementIds": ["R7", "R12"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "edlq",
+      "provider": "aws",
+      "label": "Email failure queue",
+      "purpose": "Hold failed stream records",
+      "rationale": "Retain failures from stream processing",
+      "requirementIds": ["I2"],
+      "configuration": {
+        "encryption": "KMS"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "kms",
+      "provider": "aws",
+      "label": "Customer managed key",
+      "purpose": "Encrypt data at rest",
+      "rationale": "Key control",
+      "requirementIds": ["I4"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.kms"
+    },
+    {
+      "id": "cw",
+      "provider": "aws",
+      "label": "CloudWatch",
+      "purpose": "Logs, metrics and DLQ depth alarms",
+      "rationale": "Observability",
+      "requirementIds": ["I3", "I2"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudwatch"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "readers",
+      "target": "cf",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Browse site and API",
+      "requirementIds": ["R8", "R11"]
+    },
+    {
+      "id": "e2",
+      "source": "cf",
+      "target": "site",
+      "kind": "origin",
+      "protocol": "HTTPS",
+      "label": "Static site and photos",
+      "configuration": {
+        "originAccess": "OAC"
+      },
+      "requirementIds": ["R3", "R4"]
+    },
+    {
+      "id": "e3",
+      "source": "cf",
+      "target": "api",
+      "kind": "origin",
+      "protocol": "HTTPS",
+      "label": "Cached API reads",
+      "requirementIds": ["R3", "R4", "R11"]
+    },
+    {
+      "id": "e4",
+      "source": "authors",
+      "target": "cognito",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Sign in",
+      "requirementIds": ["R13", "C-auth-methods"]
+    },
+    {
+      "id": "e5",
+      "source": "authors",
+      "target": "api",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Write posts, request upload URL",
+      "requirementIds": ["R13", "R6"]
+    },
+    {
+      "id": "e6",
+      "source": "api",
+      "target": "cognito",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Validate tokens",
+      "requirementIds": ["R13"]
+    },
+    {
+      "id": "e7",
+      "source": "api",
+      "target": "apifn",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Proxy integration",
+      "requirementIds": ["R3"]
+    },
+    {
+      "id": "e8",
+      "source": "apifn",
+      "target": "ddb",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Read and write posts",
+      "requirementIds": ["R2", "I1"]
+    },
+    {
+      "id": "e9",
+      "source": "apifn",
+      "target": "subs",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Add subscriber",
+      "requirementIds": ["R5"]
+    },
+    {
+      "id": "e10",
+      "source": "authors",
+      "target": "uploads",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Upload photo via presigned URL",
+      "configuration": {
+        "presignedUrl": "Short-lived URL issued to authenticated authors"
+      },
+      "requirementIds": ["R6", "R13"]
+    },
+    {
+      "id": "e11",
+      "source": "apifn",
+      "target": "uploads",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Sign upload URL",
+      "requirementIds": ["R6"]
+    },
+    {
+      "id": "e12",
+      "source": "uploads",
+      "target": "q",
+      "kind": "event",
+      "protocol": "S3 event",
+      "label": "ObjectCreated",
+      "configuration": {
+        "eventNotification": "ObjectCreated"
+      },
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e13",
+      "source": "q",
+      "target": "thumbfn",
+      "kind": "event",
+      "protocol": "SQS",
+      "label": "Poll with partial batch responses",
+      "configuration": {
+        "deadLetterQueue": "dlq with redrive after max receives"
+      },
+      "requirementIds": ["R7", "R12", "I2"]
+    },
+    {
+      "id": "e14",
+      "source": "thumbfn",
+      "target": "thumbs",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Write thumbnails",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e15",
+      "source": "thumbfn",
+      "target": "uploads",
+      "kind": "read",
+      "protocol": "HTTPS",
+      "label": "Read original",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e16",
+      "source": "q",
+      "target": "dlq",
+      "kind": "other",
+      "protocol": "SQS",
+      "label": "Redrive failed messages",
+      "requirementIds": ["I2"]
+    },
+    {
+      "id": "e17",
+      "source": "subs",
+      "target": "emailfn",
+      "kind": "event",
+      "protocol": "DynamoDB Streams",
+      "label": "New subscriber record",
+      "requirementIds": ["R5"]
+    },
+    {
+      "id": "e18",
+      "source": "emailfn",
+      "target": "ses",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Send welcome email",
+      "requirementIds": ["R5", "C-notifications"]
+    },
+    {
+      "id": "e19",
+      "source": "emailfn",
+      "target": "edlq",
+      "kind": "other",
+      "protocol": "SQS",
+      "label": "On-failure destination for stream records",
+      "requirementIds": ["I2"]
+    },
+    {
+      "id": "e20",
+      "source": "dlq",
+      "target": "cw",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Queue depth alarm",
+      "requirementIds": ["I2", "I3"]
+    },
+    {
+      "id": "e21",
+      "source": "apifn",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Logs and metrics",
+      "requirementIds": ["I3"]
+    },
+    {
+      "id": "e22",
+      "source": "thumbfn",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Logs and metrics",
+      "requirementIds": ["I3"]
+    },
+    {
+      "id": "e23",
+      "source": "edlq",
+      "target": "cw",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Failure queue alarm",
+      "requirementIds": ["I2", "I3"]
+    },
+    {
+      "id": "e24",
+      "source": "kms",
+      "target": "ddb",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Encryption key",
+      "requirementIds": ["I4"]
+    },
+    {
+      "id": "e25",
+      "source": "thumbs",
+      "target": "cf",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Thumbnails served via distribution",
+      "requirementIds": ["R7", "R8"]
+    },
+    {
+      "id": "e26",
+      "source": "emailfn",
+      "target": "subs",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Mark welcome sent",
+      "requirementIds": ["R5"]
+    }
+  ],
+  "findings": [],
+  "generation": {
+    "toggles": {},
+    "model": "sonnet",
+    "generatedAt": "2026-11-26T20:57:11.878Z",
+    "contentHash": "9f4cc51c"
+  }
+}

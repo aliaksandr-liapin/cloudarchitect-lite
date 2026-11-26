@@ -6,6 +6,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
+- Docs: a gallery of example designs ([docs/examples/](docs/examples/README.md)): four designs generated with Claude Sonnet 5.5 from test-scenario descriptions, each with the questions asked, the requirements, the diagram, the findings and the project JSON to import ([#34](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/34)).
 - [User manual](docs/manual/README.md): an illustrated guide to everything the app does, from install to export, with every rule explained. Its screenshots are generated from the running app (`pnpm --filter @cloudarchitect/e2e manual`), and a **?** button in the toolbar opens it.
 - Validation rule VR-026 (warning): a component that is not connected to anything. Baseline services such as CloudWatch are exempt, and a design with one component is not flagged. It is shown in the editor only and not sent to the AI repair turn, so generation is unchanged.
 - Editor: a component with findings shows a marker on its corner (red for an error, amber for a warning, blue for info) that stays readable when the canvas is zoomed out. Hovering lists the findings; clicking opens the Findings window with them highlighted.
