@@ -31,6 +31,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Editor: a component added with an Add button goes in the nearest free spot instead of on top of another component, and is stored in the container it appears in. When the selected container is full, it grows to make room (one undo takes both back).
 - Editor: undo and redo put connectors back exactly as they were, without re-running the layout.
 - Setup API: asking to remove a key that an environment variable also sets is ignored, as documented, and no longer deletes the saved copy behind it ([#31](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/31)). The setup wizard never sent this request.
+- Eval: `review --reviewers` calls each named reviewer once, so a repeated name no longer pays twice and counts twice in the median ([#33](https://github.com/aliaksandr-liapin/cloudarchitect-lite/issues/33)).
 - Editor: dragging several components at once moves each into the container it is dropped in (before, only a single component could change containers).
 - Editor: if the layout engine fails to load (for example on a flaky connection), a message says so instead of an empty canvas or an Auto layout button that does nothing; trying again loads it afresh.
 - Editor: on Windows and Linux, Delete and Backspace stopped deleting after Ctrl+Z until the page was reloaded.

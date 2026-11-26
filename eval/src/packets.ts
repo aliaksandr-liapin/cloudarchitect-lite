@@ -603,3 +603,16 @@ export function packetMismatches(saved: Record<string, string>, built: Packet[])
   const byId = new Map(built.map((p) => [p.id, p.markdown]));
   return [...ids].filter((id) => saved[id] !== byId.get(id)).sort();
 }
+
+/**
+ * The reviewers named in `--reviewers` (comma-separated), each once in the order first named; all
+ * `known` reviewers when none are named. A repeated name would pay for the same review twice and
+ * count it twice in the median.
+ */
+export function parseReviewers(arg: string | undefined, known: readonly string[]): string[] {
+  if (!arg) return [...known];
+  const names = [...new Set(arg.split(','))];
+  for (const name of names)
+    if (!known.includes(name)) throw new Error(`Unknown reviewer ${name} (${known.join(', ')})`);
+  return names;
+}
