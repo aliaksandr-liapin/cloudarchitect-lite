@@ -1,0 +1,903 @@
+{
+  "schemaVersion": "1.4.0",
+  "projectId": "generated",
+  "name": "Regional Bank Customer Self-Service Portal",
+  "revision": 0,
+  "providerContext": ["aws"],
+  "catalogSnapshot": {
+    "aws": "aws-catalog-2026.10.0"
+  },
+  "iconPackSnapshot": {},
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Protection against common web exploits and DDoS",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R2",
+      "text": "TLS everywhere",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R3",
+      "text": "All data encrypted at rest with keys the customer controls",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R4",
+      "text": "Full audit trail of administrative API activity in the AWS account",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R5",
+      "text": "Customer sign-in with MFA",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R6",
+      "text": "Customer self-service web application plus API",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R7",
+      "text": "Application tier runs in containers in private subnets",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R8",
+      "text": "Regional bank scope: workloads and data remain within the bank's operating region",
+      "type": "constraint",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R9",
+      "text": "Audit logs are retained and protected from tampering",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R10",
+      "text": "Encryption keys are customer-managed with rotation and access logging",
+      "type": "constraint",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R11",
+      "text": "Network ingress limited to HTTPS through managed edge and load balancing; no direct public access to private containers",
+      "type": "constraint",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R12",
+      "text": "Secure customer identity with MFA enforced for all customer sign-ins",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "C-compliance",
+      "text": "Which regulatory frameworks must the portal satisfy, since this changes logging, retention, and encryption controls? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-auth-methods",
+      "text": "Which MFA methods should customers use to sign in? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-availability-target",
+      "text": "What availability target should the portal meet? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "I1",
+      "text": "Highly available application tier and database across two Availability Zones",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I2",
+      "text": "Persistent store for customer portal data, encrypted with customer managed keys and backed up",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I3",
+      "text": "Application secrets and configuration held in a managed secrets store, not in container images",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I4",
+      "text": "Monitoring and alarms on application, WAF and audit-log health",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I5",
+      "text": "Private containers need outbound access to AWS APIs and image pulls without public exposure",
+      "type": "constraint",
+      "status": "inferred",
+      "provenance": "ai"
+    }
+  ],
+  "containers": [
+    {
+      "id": "cloud",
+      "kind": "aws-cloud",
+      "label": "AWS Cloud"
+    },
+    {
+      "id": "region",
+      "kind": "region",
+      "parentId": "cloud",
+      "label": "Operating Region"
+    },
+    {
+      "id": "vpc",
+      "kind": "vpc",
+      "parentId": "region",
+      "label": "Portal VPC"
+    },
+    {
+      "id": "az1",
+      "kind": "availability-zone",
+      "parentId": "vpc",
+      "label": "AZ 1"
+    },
+    {
+      "id": "az2",
+      "kind": "availability-zone",
+      "parentId": "vpc",
+      "label": "AZ 2"
+    },
+    {
+      "id": "pub1",
+      "kind": "subnet",
+      "parentId": "az1",
+      "label": "Public subnet AZ1",
+      "properties": {
+        "subnetType": "public"
+      }
+    },
+    {
+      "id": "pub2",
+      "kind": "subnet",
+      "parentId": "az2",
+      "label": "Public subnet AZ2",
+      "properties": {
+        "subnetType": "public"
+      }
+    },
+    {
+      "id": "app1",
+      "kind": "subnet",
+      "parentId": "az1",
+      "label": "App private subnet AZ1",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "app2",
+      "kind": "subnet",
+      "parentId": "az2",
+      "label": "App private subnet AZ2",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "db1",
+      "kind": "subnet",
+      "parentId": "az1",
+      "label": "Data private subnet AZ1",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "db2",
+      "kind": "subnet",
+      "parentId": "az2",
+      "label": "Data private subnet AZ2",
+      "properties": {
+        "subnetType": "private"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "customer",
+      "provider": "aws",
+      "label": "Bank customer",
+      "purpose": "Uses the portal through a browser or API client",
+      "rationale": "Source of all traffic",
+      "requirementIds": ["R6"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "user",
+        "name": "Bank customer (browser / API client)"
+      }
+    },
+    {
+      "id": "r53",
+      "provider": "aws",
+      "label": "Route 53",
+      "purpose": "DNS for the portal domain",
+      "rationale": "Routes customers to CloudFront",
+      "requirementIds": ["R6", "R2"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.route53"
+    },
+    {
+      "id": "cf",
+      "provider": "aws",
+      "label": "CloudFront",
+      "purpose": "HTTPS edge entry for web assets and API",
+      "rationale": "Managed edge with TLS termination and DDoS absorption; the only ingress path",
+      "requirementIds": ["R1", "R2", "R6", "R11"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudfront"
+    },
+    {
+      "id": "shield",
+      "provider": "aws",
+      "label": "Shield",
+      "purpose": "DDoS protection for the edge",
+      "rationale": "Shield Standard protects CloudFront automatically against network and transport layer attacks",
+      "requirementIds": ["R1"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.shield"
+    },
+    {
+      "id": "waf",
+      "provider": "aws",
+      "label": "WAF",
+      "purpose": "Blocks common web exploits",
+      "rationale": "Managed rule sets and rate limiting on CloudFront traffic",
+      "requirementIds": ["R1", "R11"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.waf"
+    },
+    {
+      "id": "acm",
+      "provider": "aws",
+      "label": "ACM certificates",
+      "purpose": "TLS certificates for CloudFront and ALB",
+      "rationale": "Managed, auto-renewing certificates",
+      "requirementIds": ["R2"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.acm"
+    },
+    {
+      "id": "web",
+      "provider": "aws",
+      "label": "Web assets bucket",
+      "purpose": "Hosts the single-page app static files",
+      "rationale": "Private bucket read only through CloudFront OAC; encrypted with a customer managed key",
+      "requirementIds": ["R6", "R3", "R10", "R11"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "versioning"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.s3"
+    },
+    {
+      "id": "cognito",
+      "provider": "aws",
+      "label": "Cognito user pool",
+      "purpose": "Customer sign-in with required MFA",
+      "rationale": "User pool with MFA set to required using TOTP, so all customers use MFA",
+      "requirementIds": ["R5", "R12"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cognito"
+    },
+    {
+      "id": "alb",
+      "provider": "aws",
+      "label": "Application Load Balancer",
+      "purpose": "HTTPS load balancing to containers",
+      "rationale": "Spans two AZs; accepts only HTTPS from CloudFront; keeps containers private",
+      "requirementIds": ["R2", "R11", "R7", "I1"],
+      "containerId": "pub1",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.alb"
+    },
+    {
+      "id": "alb2",
+      "provider": "aws",
+      "label": "ALB (AZ2 subnet)",
+      "purpose": "Second-AZ presence of the load balancer",
+      "rationale": "Represents the same ALB's node in the second AZ subnet, required for two-AZ ALB",
+      "requirementIds": ["R11", "I1"],
+      "containerId": "pub2",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.alb"
+    },
+    {
+      "id": "nat",
+      "provider": "aws",
+      "label": "NAT Gateway",
+      "purpose": "Outbound access for containers to AWS endpoints",
+      "rationale": "Lets private tasks reach AWS APIs and pull images without inbound exposure",
+      "requirementIds": ["I5", "R7"],
+      "containerId": "pub1",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.nat-gateway"
+    },
+    {
+      "id": "ecs",
+      "provider": "aws",
+      "label": "ECS cluster",
+      "purpose": "Orchestrates the app containers",
+      "rationale": "Simpler than Kubernetes for a containerised web app and API",
+      "requirementIds": ["R7", "R6"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.ecs"
+    },
+    {
+      "id": "fg1",
+      "provider": "aws",
+      "label": "Fargate tasks AZ1",
+      "purpose": "Run the portal API containers",
+      "rationale": "Serverless containers in a private subnet",
+      "requirementIds": ["R7", "R6", "I1"],
+      "containerId": "app1",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.fargate"
+    },
+    {
+      "id": "fg2",
+      "provider": "aws",
+      "label": "Fargate tasks AZ2",
+      "purpose": "Run the portal API containers",
+      "rationale": "Second AZ for availability",
+      "requirementIds": ["R7", "R6", "I1"],
+      "containerId": "app2",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.fargate"
+    },
+    {
+      "id": "ecr",
+      "provider": "aws",
+      "label": "Amazon ECR",
+      "purpose": "Stores container images",
+      "rationale": "Images stay within the bank's AWS environment",
+      "requirementIds": ["R7"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "unresolved": {
+        "name": "Amazon ECR",
+        "rationale": "Container image registry is needed for the Fargate tasks but is not in the catalog"
+      }
+    },
+    {
+      "id": "aurora",
+      "provider": "aws",
+      "label": "Aurora PostgreSQL",
+      "purpose": "Stores portal application data",
+      "rationale": "Relational store in private subnets, Multi-AZ, encrypted with customer managed key, with backups",
+      "requirementIds": ["I2", "R3", "R10", "I1", "R8"],
+      "configuration": {
+        "encryption": "KMS",
+        "multiAz": "Aurora replica in second AZ",
+        "backup": "automated backups"
+      },
+      "containerId": "db1",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.aurora"
+    },
+    {
+      "id": "auroraRep",
+      "provider": "aws",
+      "label": "Aurora replica AZ2",
+      "purpose": "Failover replica in the second AZ",
+      "rationale": "Provides automatic failover",
+      "requirementIds": ["I2", "I1", "R3"],
+      "configuration": {
+        "encryption": "KMS",
+        "multiAz": "replica",
+        "backup": "automated backups"
+      },
+      "containerId": "db2",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.aurora"
+    },
+    {
+      "id": "kms",
+      "provider": "aws",
+      "label": "KMS customer managed keys",
+      "purpose": "Keys for S3, Aurora, logs and secrets",
+      "rationale": "Customer managed keys with automatic rotation; usage is logged by CloudTrail",
+      "requirementIds": ["R3", "R10"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.kms"
+    },
+    {
+      "id": "secrets",
+      "provider": "aws",
+      "label": "Secrets Manager",
+      "purpose": "Database credentials and app secrets",
+      "rationale": "Keeps secrets out of images; encrypted with the KMS key",
+      "requirementIds": ["I3", "R3"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.secretsmanager"
+    },
+    {
+      "id": "trail",
+      "provider": "aws",
+      "label": "CloudTrail",
+      "purpose": "Audit trail of administrative API activity",
+      "rationale": "Multi-Region trail with log file validation covering all in-scope accounts",
+      "requirementIds": ["R4", "R9", "R10"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudtrail"
+    },
+    {
+      "id": "auditS3",
+      "provider": "aws",
+      "label": "Audit log bucket",
+      "purpose": "Retained, tamper-protected audit logs",
+      "rationale": "Versioned, KMS encrypted, private bucket with restricted write policy and log validation",
+      "requirementIds": ["R4", "R9", "R3", "R10"],
+      "configuration": {
+        "encryption": "KMS",
+        "backup": "versioning"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.s3"
+    },
+    {
+      "id": "iam",
+      "provider": "aws",
+      "label": "IAM",
+      "purpose": "Least-privilege roles and bucket and key policies",
+      "rationale": "Task roles and deny-delete protections for audit data",
+      "requirementIds": ["R9", "R7"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.iam"
+    },
+    {
+      "id": "cw",
+      "provider": "aws",
+      "label": "CloudWatch",
+      "purpose": "Logs, metrics and alarms",
+      "rationale": "Observability for containers, WAF, ALB, Aurora and CloudTrail",
+      "requirementIds": ["I4", "R4"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudwatch"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "customer",
+      "target": "r53",
+      "kind": "invoke",
+      "protocol": "DNS",
+      "label": "Resolve portal domain",
+      "requirementIds": ["R6"]
+    },
+    {
+      "id": "e2",
+      "source": "customer",
+      "target": "cf",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "HTTPS requests",
+      "requirementIds": ["R2", "R6", "R11"]
+    },
+    {
+      "id": "e3",
+      "source": "waf",
+      "target": "cf",
+      "kind": "other",
+      "protocol": "",
+      "label": "Protects distribution",
+      "requirementIds": ["R1"]
+    },
+    {
+      "id": "e4",
+      "source": "shield",
+      "target": "cf",
+      "kind": "other",
+      "protocol": "",
+      "label": "DDoS protection",
+      "requirementIds": ["R1"]
+    },
+    {
+      "id": "e5",
+      "source": "cf",
+      "target": "web",
+      "kind": "origin",
+      "protocol": "HTTPS",
+      "label": "Static assets via OAC",
+      "configuration": {
+        "originAccess": "OAC"
+      },
+      "requirementIds": ["R6", "R11"]
+    },
+    {
+      "id": "e6",
+      "source": "cf",
+      "target": "alb",
+      "kind": "origin",
+      "protocol": "HTTPS",
+      "label": "API origin",
+      "requirementIds": ["R2", "R11", "R6"]
+    },
+    {
+      "id": "e7",
+      "source": "alb",
+      "target": "fg1",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Forward to tasks",
+      "requirementIds": ["R2", "R7", "R11"]
+    },
+    {
+      "id": "e8",
+      "source": "alb2",
+      "target": "fg2",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Forward to tasks",
+      "requirementIds": ["R2", "R7", "R11"]
+    },
+    {
+      "id": "e9",
+      "source": "ecs",
+      "target": "fg1",
+      "kind": "other",
+      "protocol": "",
+      "label": "Schedules tasks",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e10",
+      "source": "ecs",
+      "target": "fg2",
+      "kind": "other",
+      "protocol": "",
+      "label": "Schedules tasks",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e11",
+      "source": "fg1",
+      "target": "cognito",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Validate JWT / user pool",
+      "requirementIds": ["R5", "R12"]
+    },
+    {
+      "id": "e12",
+      "source": "customer",
+      "target": "cognito",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Sign in with MFA",
+      "requirementIds": ["R5", "R12"]
+    },
+    {
+      "id": "e13",
+      "source": "fg1",
+      "target": "aurora",
+      "kind": "write",
+      "protocol": "TLS",
+      "label": "SQL over TLS",
+      "requirementIds": ["I2", "R2"]
+    },
+    {
+      "id": "e14",
+      "source": "fg2",
+      "target": "aurora",
+      "kind": "write",
+      "protocol": "TLS",
+      "label": "SQL over TLS",
+      "requirementIds": ["I2", "R2"]
+    },
+    {
+      "id": "e15",
+      "source": "aurora",
+      "target": "auroraRep",
+      "kind": "other",
+      "protocol": "",
+      "label": "Replication",
+      "requirementIds": ["I1"]
+    },
+    {
+      "id": "e16",
+      "source": "fg1",
+      "target": "secrets",
+      "kind": "read",
+      "protocol": "HTTPS",
+      "label": "Read secrets",
+      "requirementIds": ["I3"]
+    },
+    {
+      "id": "e17",
+      "source": "fg2",
+      "target": "secrets",
+      "kind": "read",
+      "protocol": "HTTPS",
+      "label": "Read secrets",
+      "requirementIds": ["I3"]
+    },
+    {
+      "id": "e18",
+      "source": "fg1",
+      "target": "nat",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Outbound to AWS APIs",
+      "requirementIds": ["I5"]
+    },
+    {
+      "id": "e19",
+      "source": "fg1",
+      "target": "ecr",
+      "kind": "read",
+      "protocol": "HTTPS",
+      "label": "Pull images",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e20",
+      "source": "fg2",
+      "target": "ecr",
+      "kind": "read",
+      "protocol": "HTTPS",
+      "label": "Pull images",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e21",
+      "source": "acm",
+      "target": "cf",
+      "kind": "other",
+      "protocol": "",
+      "label": "Certificate",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e22",
+      "source": "acm",
+      "target": "alb",
+      "kind": "other",
+      "protocol": "",
+      "label": "Certificate",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e23",
+      "source": "kms",
+      "target": "aurora",
+      "kind": "other",
+      "protocol": "",
+      "label": "Encrypts data",
+      "requirementIds": ["R3", "R10"]
+    },
+    {
+      "id": "e24",
+      "source": "kms",
+      "target": "web",
+      "kind": "other",
+      "protocol": "",
+      "label": "Encrypts objects",
+      "requirementIds": ["R3", "R10"]
+    },
+    {
+      "id": "e25",
+      "source": "kms",
+      "target": "auditS3",
+      "kind": "other",
+      "protocol": "",
+      "label": "Encrypts logs",
+      "requirementIds": ["R3", "R10", "R9"]
+    },
+    {
+      "id": "e26",
+      "source": "kms",
+      "target": "secrets",
+      "kind": "other",
+      "protocol": "",
+      "label": "Encrypts secrets",
+      "requirementIds": ["R3", "R10"]
+    },
+    {
+      "id": "e27",
+      "source": "trail",
+      "target": "auditS3",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Deliver audit logs",
+      "requirementIds": ["R4", "R9"]
+    },
+    {
+      "id": "e28",
+      "source": "iam",
+      "target": "auditS3",
+      "kind": "other",
+      "protocol": "",
+      "label": "Restrictive policies",
+      "requirementIds": ["R9"]
+    },
+    {
+      "id": "e29",
+      "source": "trail",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Trail events to logs",
+      "requirementIds": ["R4", "I4"]
+    },
+    {
+      "id": "e30",
+      "source": "fg1",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "Container logs",
+      "requirementIds": ["I4"]
+    },
+    {
+      "id": "e31",
+      "source": "waf",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "WAF metrics",
+      "requirementIds": ["I4", "R1"]
+    },
+    {
+      "id": "e32",
+      "source": "alb",
+      "target": "alb2",
+      "kind": "other",
+      "protocol": "",
+      "label": "Same load balancer, second AZ",
+      "requirementIds": ["I1"]
+    },
+    {
+      "id": "e33",
+      "source": "nat",
+      "target": "cw",
+      "kind": "write",
+      "protocol": "HTTPS",
+      "label": "NAT metrics",
+      "requirementIds": ["I4"]
+    },
+    {
+      "id": "e34",
+      "source": "r53",
+      "target": "cf",
+      "kind": "other",
+      "protocol": "DNS",
+      "label": "Alias to distribution",
+      "requirementIds": ["R6"]
+    }
+  ],
+  "findings": [],
+  "generation": {
+    "toggles": {},
+    "model": "sonnet",
+    "generatedAt": "2026-11-26T20:57:19.833Z",
+    "contentHash": "89425555"
+  }
+}

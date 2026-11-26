@@ -1,0 +1,592 @@
+{
+  "schemaVersion": "1.4.0",
+  "projectId": "generated",
+  "name": "Online Shop Order Processing",
+  "revision": 0,
+  "providerContext": ["aws"],
+  "catalogSnapshot": {
+    "aws": "aws-catalog-2026.10.0"
+  },
+  "iconPackSnapshot": {},
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Accept orders through an API",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R2",
+      "text": "After an order is placed, payment capture, inventory reservation and confirmation email must happen independently",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R3",
+      "text": "A failure in one step (payment capture, inventory reservation, confirmation email) must not block the others",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R4",
+      "text": "Failed steps must be retried",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R5",
+      "text": "Failed steps must never be silently lost",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R6",
+      "text": "Orders can be looked up by order ID",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R7",
+      "text": "Order processing steps are decoupled so each can fail and recover independently",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R8",
+      "text": "Retries that exhaust attempts must be captured for inspection and reprocessing (dead-letter handling)",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R9",
+      "text": "Order placement should return an acknowledgement without waiting for all downstream steps to complete",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I1",
+      "text": "Order creation must be authenticated/authorized and the order write plus event publish must not lose events",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I2",
+      "text": "Alarm on dead-letter queue depth and monitor processing",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I3",
+      "text": "Consumers must be idempotent since queues deliver at least once",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I4",
+      "text": "Order data encrypted at rest and backed up",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    }
+  ],
+  "containers": [
+    {
+      "id": "cloud",
+      "kind": "aws-cloud",
+      "label": "AWS Cloud"
+    },
+    {
+      "id": "region",
+      "kind": "region",
+      "parentId": "cloud",
+      "label": "Region"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "client",
+      "provider": "aws",
+      "label": "Shop client",
+      "purpose": "Places and looks up orders",
+      "rationale": "Caller of the order API",
+      "requirementIds": ["R1", "R6"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "client-app",
+        "name": "Shop client"
+      }
+    },
+    {
+      "id": "cognito",
+      "provider": "aws",
+      "label": "User pool",
+      "purpose": "Authenticates customers",
+      "rationale": "Protects the public API",
+      "requirementIds": ["I1"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cognito"
+    },
+    {
+      "id": "api",
+      "provider": "aws",
+      "label": "Orders API",
+      "purpose": "Accepts orders and lookups",
+      "rationale": "Managed API returning quick acknowledgement",
+      "requirementIds": ["R1", "R6", "R9", "I1"],
+      "configuration": {
+        "apiType": "REST",
+        "authorizer": "Cognito user pool"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.apigateway"
+    },
+    {
+      "id": "orderFn",
+      "provider": "aws",
+      "label": "Order handler",
+      "purpose": "Validates and stores order, reads order by ID",
+      "rationale": "Writes order and returns acknowledgement immediately",
+      "requirementIds": ["R1", "R6", "R9"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "orders",
+      "provider": "aws",
+      "label": "Orders table",
+      "purpose": "Stores orders keyed by orderId",
+      "rationale": "Key-value lookup by order ID; Streams provide the outbox",
+      "requirementIds": ["R6", "I1", "I4"],
+      "configuration": {
+        "encryption": "AWS-managed",
+        "backup": "PITR"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.dynamodb"
+    },
+    {
+      "id": "publisher",
+      "provider": "aws",
+      "label": "Order event publisher",
+      "purpose": "Publishes order-placed events from the stream",
+      "rationale": "Ensures committed orders are always published",
+      "requirementIds": ["R2", "R5", "I1"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "topic",
+      "provider": "aws",
+      "label": "Order-placed topic",
+      "purpose": "Fans out order events",
+      "rationale": "Decouples the three steps",
+      "requirementIds": ["R2", "R3", "R7"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sns"
+    },
+    {
+      "id": "qPay",
+      "provider": "aws",
+      "label": "Payment queue",
+      "purpose": "Buffers payment tasks",
+      "rationale": "Independent retry per step",
+      "requirementIds": ["R3", "R4", "R7"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "qInv",
+      "provider": "aws",
+      "label": "Inventory queue",
+      "purpose": "Buffers inventory tasks",
+      "rationale": "Independent retry per step",
+      "requirementIds": ["R3", "R4", "R7"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "qMail",
+      "provider": "aws",
+      "label": "Email queue",
+      "purpose": "Buffers email tasks",
+      "rationale": "Independent retry per step",
+      "requirementIds": ["R3", "R4", "R7"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "dlqPay",
+      "provider": "aws",
+      "label": "Payment DLQ",
+      "purpose": "Holds exhausted payment messages",
+      "rationale": "Inspection and reprocessing",
+      "requirementIds": ["R5", "R8"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "dlqInv",
+      "provider": "aws",
+      "label": "Inventory DLQ",
+      "purpose": "Holds exhausted inventory messages",
+      "rationale": "Inspection and reprocessing",
+      "requirementIds": ["R5", "R8"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "dlqMail",
+      "provider": "aws",
+      "label": "Email DLQ",
+      "purpose": "Holds exhausted email messages",
+      "rationale": "Inspection and reprocessing",
+      "requirementIds": ["R5", "R8"],
+      "configuration": {
+        "encryption": "AWS-managed"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.sqs"
+    },
+    {
+      "id": "payFn",
+      "provider": "aws",
+      "label": "Payment capture",
+      "purpose": "Captures payment idempotently",
+      "rationale": "Independent consumer",
+      "requirementIds": ["R2", "R3", "R4", "I3"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "invFn",
+      "provider": "aws",
+      "label": "Inventory reservation",
+      "purpose": "Reserves stock idempotently",
+      "rationale": "Independent consumer",
+      "requirementIds": ["R2", "R3", "R4", "I3"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "mailFn",
+      "provider": "aws",
+      "label": "Confirmation email",
+      "purpose": "Sends confirmation idempotently",
+      "rationale": "Independent consumer",
+      "requirementIds": ["R2", "R3", "R4", "I3"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.lambda"
+    },
+    {
+      "id": "ses",
+      "provider": "aws",
+      "label": "SES",
+      "purpose": "Sends confirmation emails",
+      "rationale": "Managed email sending",
+      "requirementIds": ["R2"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.ses"
+    },
+    {
+      "id": "cw",
+      "provider": "aws",
+      "label": "CloudWatch",
+      "purpose": "Logs, metrics and DLQ-depth alarms",
+      "rationale": "Observability and alerting on failed steps",
+      "requirementIds": ["I2", "R5", "R8"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudwatch"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "client",
+      "target": "api",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "POST/GET orders",
+      "requirementIds": ["R1", "R6"]
+    },
+    {
+      "id": "e2",
+      "source": "cognito",
+      "target": "api",
+      "kind": "other",
+      "label": "Authorize requests",
+      "requirementIds": ["I1"]
+    },
+    {
+      "id": "e3",
+      "source": "api",
+      "target": "orderFn",
+      "kind": "invoke",
+      "label": "Proxy integration",
+      "requirementIds": ["R1", "R6", "R9"]
+    },
+    {
+      "id": "e4",
+      "source": "orderFn",
+      "target": "orders",
+      "kind": "write",
+      "label": "Put/Get order",
+      "requirementIds": ["R6", "R9"]
+    },
+    {
+      "id": "e5",
+      "source": "orders",
+      "target": "publisher",
+      "kind": "event",
+      "label": "DynamoDB Stream",
+      "configuration": {
+        "failureDestination": "SQS on-failure queue"
+      },
+      "requirementIds": ["R2", "I1"]
+    },
+    {
+      "id": "e6",
+      "source": "publisher",
+      "target": "topic",
+      "kind": "write",
+      "label": "Publish order-placed",
+      "requirementIds": ["R2", "R7"]
+    },
+    {
+      "id": "e7",
+      "source": "topic",
+      "target": "qPay",
+      "kind": "event",
+      "label": "Subscribe",
+      "requirementIds": ["R2", "R3", "R7"]
+    },
+    {
+      "id": "e8",
+      "source": "topic",
+      "target": "qInv",
+      "kind": "event",
+      "label": "Subscribe",
+      "requirementIds": ["R2", "R3", "R7"]
+    },
+    {
+      "id": "e9",
+      "source": "topic",
+      "target": "qMail",
+      "kind": "event",
+      "label": "Subscribe",
+      "requirementIds": ["R2", "R3", "R7"]
+    },
+    {
+      "id": "e10",
+      "source": "qPay",
+      "target": "payFn",
+      "kind": "event",
+      "label": "SQS trigger, partial batch",
+      "configuration": {
+        "deadLetterQueue": "Payment DLQ, maxReceiveCount 3"
+      },
+      "requirementIds": ["R4", "R8"]
+    },
+    {
+      "id": "e11",
+      "source": "qInv",
+      "target": "invFn",
+      "kind": "event",
+      "label": "SQS trigger, partial batch",
+      "configuration": {
+        "deadLetterQueue": "Inventory DLQ, maxReceiveCount 3"
+      },
+      "requirementIds": ["R4", "R8"]
+    },
+    {
+      "id": "e12",
+      "source": "qMail",
+      "target": "mailFn",
+      "kind": "event",
+      "label": "SQS trigger, partial batch",
+      "configuration": {
+        "deadLetterQueue": "Email DLQ, maxReceiveCount 3"
+      },
+      "requirementIds": ["R4", "R8"]
+    },
+    {
+      "id": "e13",
+      "source": "qPay",
+      "target": "dlqPay",
+      "kind": "other",
+      "label": "Redrive after max receives",
+      "requirementIds": ["R5", "R8"]
+    },
+    {
+      "id": "e14",
+      "source": "qInv",
+      "target": "dlqInv",
+      "kind": "other",
+      "label": "Redrive after max receives",
+      "requirementIds": ["R5", "R8"]
+    },
+    {
+      "id": "e15",
+      "source": "qMail",
+      "target": "dlqMail",
+      "kind": "other",
+      "label": "Redrive after max receives",
+      "requirementIds": ["R5", "R8"]
+    },
+    {
+      "id": "e16",
+      "source": "mailFn",
+      "target": "ses",
+      "kind": "invoke",
+      "label": "Send email",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e17",
+      "source": "dlqPay",
+      "target": "cw",
+      "kind": "other",
+      "label": "Depth alarm",
+      "requirementIds": ["I2", "R8"]
+    },
+    {
+      "id": "e18",
+      "source": "dlqInv",
+      "target": "cw",
+      "kind": "other",
+      "label": "Depth alarm",
+      "requirementIds": ["I2", "R8"]
+    },
+    {
+      "id": "e19",
+      "source": "dlqMail",
+      "target": "cw",
+      "kind": "other",
+      "label": "Depth alarm",
+      "requirementIds": ["I2", "R8"]
+    },
+    {
+      "id": "e20",
+      "source": "payFn",
+      "target": "orders",
+      "kind": "write",
+      "label": "Record payment status (conditional write)",
+      "requirementIds": ["R2", "I3"]
+    },
+    {
+      "id": "e21",
+      "source": "invFn",
+      "target": "orders",
+      "kind": "write",
+      "label": "Record reservation status (conditional write)",
+      "requirementIds": ["R2", "I3"]
+    }
+  ],
+  "findings": [],
+  "generation": {
+    "toggles": {},
+    "model": "sonnet",
+    "generatedAt": "2026-11-26T20:57:06.720Z",
+    "contentHash": "a28e8d25"
+  }
+}

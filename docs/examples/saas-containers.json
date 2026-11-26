@@ -1,0 +1,879 @@
+{
+  "schemaVersion": "1.4.0",
+  "projectId": "generated",
+  "name": "B2B SaaS REST API on AWS",
+  "revision": 0,
+  "providerContext": ["aws"],
+  "catalogSnapshot": {
+    "aws": "aws-catalog-2026.10.0"
+  },
+  "iconPackSnapshot": {},
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Run a B2B SaaS REST API packaged as Docker containers",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R2",
+      "text": "Provide a PostgreSQL database for the API",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R3",
+      "text": "Provide a shared session cache",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R4",
+      "text": "Containers call a third-party payments API over outbound connectivity",
+      "type": "functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R5",
+      "text": "Survive the loss of one availability zone (multi-AZ resilience)",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R6",
+      "text": "Containers must not be directly reachable from the internet",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R7",
+      "text": "Database credentials must be rotated automatically",
+      "type": "non-functional",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R8",
+      "text": "No Kubernetes and no server management; use serverless or managed container hosting",
+      "type": "constraint",
+      "status": "confirmed",
+      "provenance": "ai"
+    },
+    {
+      "id": "R9",
+      "text": "Public entry point for API clients must route to private containers through a controlled ingress layer",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R10",
+      "text": "Store and manage the payments API credentials securely",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R11",
+      "text": "Container images stored in a private registry with scanning and access control",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R12",
+      "text": "Centralized logging, metrics, and tracing for the API and data tier",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "R13",
+      "text": "Tenant isolation appropriate for a B2B SaaS platform",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "C-auth-methods",
+      "text": "How do API clients and your users authenticate to the REST API? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-user-scale",
+      "text": "What is the expected scale in tenants, users, and requests per second at launch and in 12 months? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "C-availability-target",
+      "text": "What availability target and recovery objectives (RTO/RPO) apply beyond surviving one AZ loss? (decided by the architect)",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "clarification"
+    },
+    {
+      "id": "I1",
+      "text": "Encrypt data at rest with customer managed keys and TLS in transit for public traffic",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I2",
+      "text": "Authenticate API clients and users with OAuth2 bearer tokens carrying a tenant claim, validated before requests reach the containers",
+      "type": "functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I3",
+      "text": "Protect the public entry point against common web exploits and DDoS",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    },
+    {
+      "id": "I4",
+      "text": "Backups of the database with point-in-time restore",
+      "type": "non-functional",
+      "status": "inferred",
+      "provenance": "ai"
+    }
+  ],
+  "containers": [
+    {
+      "id": "cloud",
+      "kind": "aws-cloud",
+      "label": "AWS Cloud"
+    },
+    {
+      "id": "region",
+      "kind": "region",
+      "parentId": "cloud",
+      "label": "Region"
+    },
+    {
+      "id": "vpc",
+      "kind": "vpc",
+      "parentId": "region",
+      "label": "Application VPC"
+    },
+    {
+      "id": "azA",
+      "kind": "availability-zone",
+      "parentId": "vpc",
+      "label": "Availability Zone A"
+    },
+    {
+      "id": "azB",
+      "kind": "availability-zone",
+      "parentId": "vpc",
+      "label": "Availability Zone B"
+    },
+    {
+      "id": "pubA",
+      "kind": "subnet",
+      "parentId": "azA",
+      "label": "Public subnet A",
+      "properties": {
+        "subnetType": "public"
+      }
+    },
+    {
+      "id": "pubB",
+      "kind": "subnet",
+      "parentId": "azB",
+      "label": "Public subnet B",
+      "properties": {
+        "subnetType": "public"
+      }
+    },
+    {
+      "id": "appA",
+      "kind": "subnet",
+      "parentId": "azA",
+      "label": "Private app subnet A",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "appB",
+      "kind": "subnet",
+      "parentId": "azB",
+      "label": "Private app subnet B",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "dataA",
+      "kind": "subnet",
+      "parentId": "azA",
+      "label": "Private data subnet A",
+      "properties": {
+        "subnetType": "private"
+      }
+    },
+    {
+      "id": "dataB",
+      "kind": "subnet",
+      "parentId": "azB",
+      "label": "Private data subnet B",
+      "properties": {
+        "subnetType": "private"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "clients",
+      "provider": "aws",
+      "label": "API clients",
+      "purpose": "Tenant systems and users calling the REST API",
+      "rationale": "Consumers of the public API",
+      "requirementIds": ["R1", "R9"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "client-app",
+        "name": "B2B API clients"
+      }
+    },
+    {
+      "id": "payments",
+      "provider": "aws",
+      "label": "Payments API",
+      "purpose": "External payment provider",
+      "rationale": "Called outbound by the containers",
+      "requirementIds": ["R4"],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "external": {
+        "kind": "third-party",
+        "name": "Third-party payments API"
+      }
+    },
+    {
+      "id": "waf",
+      "provider": "aws",
+      "label": "WAF",
+      "purpose": "Filters malicious requests at the API",
+      "rationale": "WAF attaches to REST API stages, so a REST API is used",
+      "requirementIds": ["I3", "R9"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.waf"
+    },
+    {
+      "id": "apigw",
+      "provider": "aws",
+      "label": "API Gateway (REST)",
+      "purpose": "Public entry point with token authorization and throttling",
+      "rationale": "Controlled ingress layer in front of private containers; REST type supports WAF, usage plans and throttling",
+      "requirementIds": ["R9", "R6", "I2", "I3", "R13"],
+      "configuration": {
+        "apiType": "REST",
+        "authorizer": "Cognito user pool"
+      },
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.apigateway"
+    },
+    {
+      "id": "cognito",
+      "provider": "aws",
+      "label": "Cognito user pool",
+      "purpose": "Issues OAuth2 tokens with tenant claims",
+      "rationale": "Managed identity provider for users and API clients",
+      "requirementIds": ["I2", "R13"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cognito"
+    },
+    {
+      "id": "alb",
+      "provider": "aws",
+      "label": "Internal ALB",
+      "purpose": "Load balances requests across Fargate tasks in both AZs",
+      "rationale": "Requires subnets in two AZs; internal so containers are not internet reachable",
+      "requirementIds": ["R1", "R5", "R6", "R9"],
+      "containerId": "appA",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.alb"
+    },
+    {
+      "id": "ecs",
+      "provider": "aws",
+      "label": "ECS cluster and service",
+      "purpose": "Orchestrates the API containers",
+      "rationale": "Managed container orchestration without Kubernetes",
+      "requirementIds": ["R1", "R8"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.ecs"
+    },
+    {
+      "id": "taskA",
+      "provider": "aws",
+      "label": "Fargate tasks (AZ A)",
+      "purpose": "Run the API containers",
+      "rationale": "Serverless containers, no servers to manage",
+      "requirementIds": ["R1", "R5", "R6", "R8"],
+      "containerId": "appA",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.fargate"
+    },
+    {
+      "id": "taskB",
+      "provider": "aws",
+      "label": "Fargate tasks (AZ B)",
+      "purpose": "Run the API containers in the second AZ",
+      "rationale": "Tasks spread across two AZs survive loss of one",
+      "requirementIds": ["R1", "R5", "R6", "R8"],
+      "containerId": "appB",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.fargate"
+    },
+    {
+      "id": "natA",
+      "provider": "aws",
+      "label": "NAT Gateway A",
+      "purpose": "Outbound path to payments API and image pulls",
+      "rationale": "Fixed egress without inbound exposure",
+      "requirementIds": ["R4", "R5", "R6"],
+      "containerId": "pubA",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.nat-gateway"
+    },
+    {
+      "id": "natB",
+      "provider": "aws",
+      "label": "NAT Gateway B",
+      "purpose": "Outbound path from AZ B",
+      "rationale": "Per-AZ NAT keeps egress working if one AZ is lost",
+      "requirementIds": ["R4", "R5"],
+      "containerId": "pubB",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.nat-gateway"
+    },
+    {
+      "id": "aurora",
+      "provider": "aws",
+      "label": "Aurora PostgreSQL",
+      "purpose": "Relational database with writer and reader in separate AZs",
+      "rationale": "Managed PostgreSQL with automatic failover across AZs",
+      "requirementIds": ["R2", "R5", "R13", "I1", "I4"],
+      "configuration": {
+        "multiAz": "Writer and replica in two AZs",
+        "backup": "Automated continuous backups with point-in-time restore",
+        "encryption": "KMS"
+      },
+      "containerId": "dataA",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.aurora"
+    },
+    {
+      "id": "auroraB",
+      "provider": "aws",
+      "label": "Aurora replica (AZ B)",
+      "purpose": "Reader/failover instance in the second AZ",
+      "rationale": "Provides failover target when AZ A is lost",
+      "requirementIds": ["R2", "R5", "I1", "I4"],
+      "configuration": {
+        "multiAz": "Replica in second AZ",
+        "backup": "Shared cluster automated backups",
+        "encryption": "KMS"
+      },
+      "containerId": "dataB",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.aurora"
+    },
+    {
+      "id": "cache",
+      "provider": "aws",
+      "label": "ElastiCache session cache",
+      "purpose": "Shared session store for all tasks",
+      "rationale": "In-memory cache with replica in second AZ and automatic failover",
+      "requirementIds": ["R3", "R5", "I1"],
+      "configuration": {
+        "multiAz": "Replica in second AZ",
+        "encryption": "KMS",
+        "backup": "Snapshots"
+      },
+      "containerId": "dataA",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.elasticache"
+    },
+    {
+      "id": "cacheB",
+      "provider": "aws",
+      "label": "Session cache replica (AZ B)",
+      "purpose": "Replica node of the session cache",
+      "rationale": "Failover target in second AZ",
+      "requirementIds": ["R3", "R5", "I1"],
+      "configuration": {
+        "multiAz": "Replica with automatic failover",
+        "encryption": "KMS"
+      },
+      "containerId": "dataB",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.elasticache"
+    },
+    {
+      "id": "dbsecret",
+      "provider": "aws",
+      "label": "DB credentials secret",
+      "purpose": "Stores and automatically rotates Aurora credentials",
+      "rationale": "Native managed rotation for Aurora PostgreSQL",
+      "requirementIds": ["R7", "R2"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.secretsmanager"
+    },
+    {
+      "id": "paysecret",
+      "provider": "aws",
+      "label": "Payments API secret",
+      "purpose": "Stores payments API credentials",
+      "rationale": "Secure storage injected into tasks at runtime",
+      "requirementIds": ["R10"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.secretsmanager"
+    },
+    {
+      "id": "kms",
+      "provider": "aws",
+      "label": "KMS customer managed key",
+      "purpose": "Encrypts database, cache, secrets and logs",
+      "rationale": "Customer managed key control over encryption at rest",
+      "requirementIds": ["I1", "R10"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.kms"
+    },
+    {
+      "id": "ecr",
+      "provider": "aws",
+      "label": "ECR private registry",
+      "purpose": "Stores container images with vulnerability scanning",
+      "rationale": "Private registry with scan on push and IAM-based access",
+      "requirementIds": ["R11", "R8"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "unresolved": {
+        "name": "Amazon Elastic Container Registry (ECR)",
+        "rationale": "Private image registry with scanning and IAM access control is needed but not in the catalog"
+      }
+    },
+    {
+      "id": "cw",
+      "provider": "aws",
+      "label": "CloudWatch",
+      "purpose": "Logs, metrics, dashboards and alarms for API, tasks, database and cache",
+      "rationale": "Central observability",
+      "requirementIds": ["R12", "R5"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.cloudwatch"
+    },
+    {
+      "id": "xray",
+      "provider": "aws",
+      "label": "X-Ray",
+      "purpose": "Distributed tracing of API requests",
+      "rationale": "Tracing across API Gateway and the containers",
+      "requirementIds": ["R12"],
+      "containerId": "region",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.xray"
+    },
+    {
+      "id": "iam",
+      "provider": "aws",
+      "label": "IAM task roles",
+      "purpose": "Least-privilege roles for tasks and execution",
+      "rationale": "Access control to ECR, secrets and logs",
+      "requirementIds": ["R11", "R10", "R13"],
+      "containerId": "cloud",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "serviceId": "aws.iam"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "clients",
+      "target": "apigw",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "API requests with bearer token",
+      "requirementIds": ["R1", "R9"]
+    },
+    {
+      "id": "e2",
+      "source": "waf",
+      "target": "apigw",
+      "kind": "other",
+      "label": "Protects API stage",
+      "requirementIds": ["I3"]
+    },
+    {
+      "id": "e3",
+      "source": "apigw",
+      "target": "cognito",
+      "kind": "other",
+      "label": "Validate token",
+      "requirementIds": ["I2", "R13"]
+    },
+    {
+      "id": "e4",
+      "source": "apigw",
+      "target": "alb",
+      "kind": "invoke",
+      "protocol": "HTTPS via VPC link",
+      "label": "Forward to private ingress",
+      "requirementIds": ["R9", "R6"]
+    },
+    {
+      "id": "e5",
+      "source": "alb",
+      "target": "taskA",
+      "kind": "invoke",
+      "protocol": "HTTP",
+      "label": "Route to tasks",
+      "requirementIds": ["R1", "R5"]
+    },
+    {
+      "id": "e6",
+      "source": "alb",
+      "target": "taskB",
+      "kind": "invoke",
+      "protocol": "HTTP",
+      "label": "Route to tasks",
+      "requirementIds": ["R1", "R5"]
+    },
+    {
+      "id": "e7",
+      "source": "ecs",
+      "target": "taskA",
+      "kind": "other",
+      "label": "Schedules tasks",
+      "requirementIds": ["R8", "R1"]
+    },
+    {
+      "id": "e8",
+      "source": "ecs",
+      "target": "taskB",
+      "kind": "other",
+      "label": "Schedules tasks",
+      "requirementIds": ["R8", "R1"]
+    },
+    {
+      "id": "e9",
+      "source": "taskA",
+      "target": "aurora",
+      "kind": "write",
+      "protocol": "PostgreSQL TLS",
+      "label": "SQL queries",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e10",
+      "source": "taskB",
+      "target": "aurora",
+      "kind": "write",
+      "protocol": "PostgreSQL TLS",
+      "label": "SQL queries",
+      "requirementIds": ["R2"]
+    },
+    {
+      "id": "e11",
+      "source": "aurora",
+      "target": "auroraB",
+      "kind": "other",
+      "label": "Cluster replication",
+      "requirementIds": ["R5", "R2"]
+    },
+    {
+      "id": "e12",
+      "source": "taskA",
+      "target": "cache",
+      "kind": "write",
+      "protocol": "TLS",
+      "label": "Session read/write",
+      "requirementIds": ["R3"]
+    },
+    {
+      "id": "e13",
+      "source": "taskB",
+      "target": "cache",
+      "kind": "write",
+      "protocol": "TLS",
+      "label": "Session read/write",
+      "requirementIds": ["R3"]
+    },
+    {
+      "id": "e14",
+      "source": "cache",
+      "target": "cacheB",
+      "kind": "other",
+      "label": "Replication",
+      "requirementIds": ["R3", "R5"]
+    },
+    {
+      "id": "e15",
+      "source": "taskA",
+      "target": "natA",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Outbound egress",
+      "requirementIds": ["R4", "R6"]
+    },
+    {
+      "id": "e16",
+      "source": "taskB",
+      "target": "natB",
+      "kind": "other",
+      "protocol": "HTTPS",
+      "label": "Outbound egress",
+      "requirementIds": ["R4", "R5"]
+    },
+    {
+      "id": "e17",
+      "source": "natA",
+      "target": "payments",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Payments calls",
+      "requirementIds": ["R4"]
+    },
+    {
+      "id": "e18",
+      "source": "natB",
+      "target": "payments",
+      "kind": "invoke",
+      "protocol": "HTTPS",
+      "label": "Payments calls",
+      "requirementIds": ["R4"]
+    },
+    {
+      "id": "e19",
+      "source": "dbsecret",
+      "target": "aurora",
+      "kind": "other",
+      "label": "Automatic credential rotation",
+      "requirementIds": ["R7"]
+    },
+    {
+      "id": "e20",
+      "source": "taskA",
+      "target": "dbsecret",
+      "kind": "read",
+      "label": "Fetch DB credentials",
+      "requirementIds": ["R7", "R2"]
+    },
+    {
+      "id": "e21",
+      "source": "taskB",
+      "target": "dbsecret",
+      "kind": "read",
+      "label": "Fetch DB credentials",
+      "requirementIds": ["R7", "R2"]
+    },
+    {
+      "id": "e22",
+      "source": "taskA",
+      "target": "paysecret",
+      "kind": "read",
+      "label": "Fetch payments credentials",
+      "requirementIds": ["R10"]
+    },
+    {
+      "id": "e23",
+      "source": "taskB",
+      "target": "paysecret",
+      "kind": "read",
+      "label": "Fetch payments credentials",
+      "requirementIds": ["R10"]
+    },
+    {
+      "id": "e24",
+      "source": "ecr",
+      "target": "ecs",
+      "kind": "read",
+      "label": "Image pull",
+      "requirementIds": ["R11", "R1"]
+    },
+    {
+      "id": "e25",
+      "source": "kms",
+      "target": "aurora",
+      "kind": "other",
+      "label": "Encryption key",
+      "requirementIds": ["I1"]
+    },
+    {
+      "id": "e26",
+      "source": "kms",
+      "target": "cache",
+      "kind": "other",
+      "label": "Encryption key",
+      "requirementIds": ["I1"]
+    },
+    {
+      "id": "e27",
+      "source": "kms",
+      "target": "dbsecret",
+      "kind": "other",
+      "label": "Encryption key",
+      "requirementIds": ["I1", "R10"]
+    },
+    {
+      "id": "e28",
+      "source": "kms",
+      "target": "paysecret",
+      "kind": "other",
+      "label": "Encryption key",
+      "requirementIds": ["R10", "I1"]
+    },
+    {
+      "id": "e29",
+      "source": "taskA",
+      "target": "cw",
+      "kind": "write",
+      "label": "Logs and metrics",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e30",
+      "source": "taskB",
+      "target": "cw",
+      "kind": "write",
+      "label": "Logs and metrics",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e31",
+      "source": "taskA",
+      "target": "xray",
+      "kind": "write",
+      "label": "Trace segments",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e32",
+      "source": "taskB",
+      "target": "xray",
+      "kind": "write",
+      "label": "Trace segments",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e33",
+      "source": "aurora",
+      "target": "cw",
+      "kind": "write",
+      "label": "Database metrics and logs",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e34",
+      "source": "cache",
+      "target": "cw",
+      "kind": "write",
+      "label": "Cache metrics",
+      "requirementIds": ["R12"]
+    },
+    {
+      "id": "e35",
+      "source": "iam",
+      "target": "ecs",
+      "kind": "other",
+      "label": "Task and execution roles",
+      "requirementIds": ["R11", "R10", "R13"]
+    }
+  ],
+  "findings": [],
+  "generation": {
+    "toggles": {},
+    "model": "sonnet",
+    "generatedAt": "2026-11-26T20:57:19.113Z",
+    "contentHash": "1590a5ec"
+  }
+}
