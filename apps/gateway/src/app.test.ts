@@ -471,6 +471,23 @@ describe('setup wizard', () => {
     expect(both.saved().OPENAI_API_KEY).toBe(NEW);
   });
 
+  it('keeps the saved copy of a key that the environment also sets when asked to remove it', async () => {
+    // Issue #31: the removal is ignored, so the saved copy must survive for when the env var goes.
+    const { apiKey: _omit, ...noKey } = input;
+    void _omit;
+    const SAVED = 'sk-openai-saved-0123456789abcdef';
+    const { app, saved, service } = wizard({ OPENAI_API_KEY: OAI }, 'valid', {
+      OPENAI_API_KEY: SAVED,
+    });
+    const res = await app.request(
+      '/api/setup/complete',
+      post('', { ...noKey, removeKeys: ['openai'], models: ['gpt-sol'], defaultModel: 'gpt-sol' }),
+    );
+    expect(res.status).toBe(200);
+    expect(service.status().providers.openai).toBe('environment');
+    expect(saved().OPENAI_API_KEY).toBe(SAVED);
+  });
+
   it('rejects an unknown provider in removeKeys', async () => {
     const res = await wizard().app.request(
       '/api/setup/complete',
