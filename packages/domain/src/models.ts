@@ -42,6 +42,8 @@ export interface ModelBenchmark {
   noCriticalDefectRate?: number;
   /** Major defects summed over the blind-reviewed designs (median over reviewers per design). */
   majorDefects?: number;
+  /** Designs the blind review covered (one per scenario); absent until a blind review has run. */
+  designsReviewed?: number;
   /** Mean cost of one generation in USD, at the provider price list in force on the release date (Argon: December price). */
   costPerOperationUsd: number;
   medianLatencySeconds: number;
@@ -91,6 +93,7 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
       blindMedianScore: 2.52,
       noCriticalDefectRate: 1,
       majorDefects: 8,
+      designsReviewed: 12,
       costPerOperationUsd: 0.0071,
       medianLatencySeconds: 53,
     },
@@ -112,6 +115,7 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
       blindMedianScore: 2.55,
       noCriticalDefectRate: 1,
       majorDefects: 9,
+      designsReviewed: 9,
       costPerOperationUsd: 0.049,
       medianLatencySeconds: 30,
     },
@@ -144,6 +148,7 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
       blindMedianScore: 2.86,
       noCriticalDefectRate: 1,
       majorDefects: 1,
+      designsReviewed: 9,
       costPerOperationUsd: 0.044,
       medianLatencySeconds: 65,
     },
@@ -173,6 +178,7 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
       blindMedianScore: 2.43,
       noCriticalDefectRate: 0.889,
       majorDefects: 11,
+      designsReviewed: 9,
       costPerOperationUsd: 0.1197,
       medianLatencySeconds: 50,
     },
